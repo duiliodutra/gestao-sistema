@@ -493,16 +493,16 @@
         <div class="card-title" style="margin-bottom:12px;">Previsão de Caixa</div>
         <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;margin-bottom:12px;">
           <div>
-            <div class="form-label">💰 Em Conta</div>
+            <div class="form-label">💰 Dinheiro em Conta</div>
             <input type="number" class="form-control cashflow-input" id="cf-em-conta" placeholder="R$ 0,00" oninput="updateCashflow()">
-          </div>
-          <div>
-            <div class="form-label">✅ Já Recebido</div>
-            <input type="number" class="form-control cashflow-input" id="cf-recebido" placeholder="R$ 0,00" oninput="updateCashflow()">
           </div>
           <div>
             <div class="form-label">📈 Previsão de Recebimento</div>
             <input type="number" class="form-control cashflow-input" id="cf-previsao" placeholder="R$ 0,00" oninput="updateCashflow()">
+          </div>
+          <div>
+            <div class="form-label">✅ Já Recebido</div>
+            <input type="number" class="form-control cashflow-input" id="cf-recebido" placeholder="R$ 0,00" oninput="updateCashflow()">
           </div>
         </div>
         <div id="cashflow-result"></div>
@@ -1106,6 +1106,7 @@ function renderDashboard() {
     const pd = (appData.employeePayments||{})[emp.id]||{};
     const salario = calcLiquido(pd);
     funcTotal += salario;
+    if(pd.folhaPaga) paid+=salario; else pending+=salario;
   });
 
   set('dash-empresa-total', fmtBRL(eTotal));
@@ -1207,7 +1208,7 @@ function updateCashflow() {
   let folha = 0;
   (appData.employees.list||[]).forEach(emp => {
     const pd = (appData.employeePayments||{})[emp.id]||{};
-    folha += calcLiquido(pd);
+    if (!pd.folhaPaga) folha += calcLiquido(pd);
   });
 
   const totalContas = despesasEmpresa + despesasPessoal + folha;
@@ -1215,12 +1216,10 @@ function updateCashflow() {
   // Lógica:
   // Falta = Total contas - Em conta  (quanto falta para cobrir tudo)
   // Previsão de fechamento = Previsão de recebimento - Falta
-  // Falta = quanto ainda falta pagar depois do que já está em conta
-  const falta = Math.max(0, totalContas - emConta);
-  // Sobra em conta depois de pagar tudo
-  const sobraEmConta = Math.max(0, emConta - totalContas);
-  // Prev fechamento = o que sobra em conta + previsão de recebimento - o que ainda falta
-  const prevFechamento = sobraEmConta + previsao - falta;
+  // Prev fechamento = Dinheiro em conta + Previsão total do mês - Contas em aberto
+  const prevFechamento = emConta + previsao - totalContas;
+  // "Já recebido" é só indicador de progresso da previsão
+  const percentRecebido = previsao > 0 ? Math.min(100, Math.round((recebido/previsao)*100)) : 0;
 
   const el = document.getElementById('cashflow-result');
   el.className = '';
@@ -1241,26 +1240,28 @@ function updateCashflow() {
             const v=(b.items||[]).filter(i=>!i.paid).reduce((s,i)=>s+(parseFloat(i.value)||0),0);
             return v>0?`<tr style="background:#16a34a;color:white;"><td style="padding:7px 14px;">${escHtml(b.name)}</td><td style="padding:7px 14px;text-align:right;font-weight:600;">${fmtBRL(v)}</td></tr>`:'';
           }).join('')}
-          ${folha>0?`<tr style="background:#16a34a;color:white;"><td style="padding:7px 14px;">Funcionários</td><td style="padding:7px 14px;text-align:right;font-weight:600;">${fmtBRL(folha)}</td></tr>`:''}
+          ${(appData.employees.list||[]).map(emp=>{
+            const pd=(appData.employeePayments||{})[emp.id]||{};
+            if(pd.folhaPaga) return '';
+            const liq=calcLiquido(pd);
+            return liq>0?`<tr style="background:#16a34a;color:white;"><td style="padding:7px 14px;">👤 ${escHtml(emp.name)}</td><td style="padding:7px 14px;text-align:right;font-weight:600;">${fmtBRL(liq)}</td></tr>`:'';
+          }).join('')}
           <tr style="background:#dc2626;color:white;font-weight:700;">
             <td style="padding:9px 14px;">Total</td>
             <td style="padding:9px 14px;text-align:right;">${fmtBRL(totalContas)}</td>
           </tr>
+
           <tr style="background:var(--gray-50);">
-            <td style="padding:8px 14px;color:var(--gray-700);">Em conta</td>
+            <td style="padding:8px 14px;color:var(--gray-700);">Dinheiro em conta</td>
             <td style="padding:8px 14px;text-align:right;font-weight:600;">${fmtBRL(emConta)}</td>
           </tr>
-          <tr style="background:${falta>0?'#dc2626':'#16a34a'};color:white;font-weight:700;">
-            <td style="padding:9px 14px;">${falta>0?'Falta':'Sobra em conta'}</td>
-            <td style="padding:9px 14px;text-align:right;">${fmtBRL(falta>0?falta:sobraEmConta)}</td>
-          </tr>
           <tr style="background:var(--gray-50);">
-            <td style="padding:8px 14px;color:var(--gray-700);">Prev. de recebimento</td>
+            <td style="padding:8px 14px;color:var(--gray-700);">Previsão de recebimento</td>
             <td style="padding:8px 14px;text-align:right;font-weight:600;">${fmtBRL(previsao)}</td>
           </tr>
-          <tr style="background:var(--gray-50);">
-            <td style="padding:8px 14px;color:var(--gray-700);">Recebido</td>
-            <td style="padding:8px 14px;text-align:right;font-weight:600;">${fmtBRL(recebido)}</td>
+          <tr style="background:var(--gray-100);border-left:3px solid var(--primary);">
+            <td style="padding:8px 14px;color:var(--gray-500);font-size:12px;">↳ Já recebido <span style="background:var(--primary-light);color:var(--primary);padding:1px 7px;border-radius:10px;margin-left:6px;">${percentRecebido}%</span></td>
+            <td style="padding:8px 14px;text-align:right;color:var(--gray-500);font-size:12px;">${fmtBRL(recebido)}</td>
           </tr>
           <tr style="background:${prevFechamento>=0?'#16a34a':'#dc2626'};color:white;font-weight:700;font-size:15px;">
             <td style="padding:10px 14px;">Prev. de fechamento</td>
@@ -1407,9 +1408,18 @@ function buildEmployeeCard(emp, pd) {
           </div>
         </div>
       </div>
-      <div style="background:var(--primary-light);border-radius:var(--radius);padding:12px 16px;margin-top:12px;display:flex;justify-content:space-between;align-items:center;">
-        <span style="font-weight:600;color:var(--primary);font-size:15px;">💵 Líquido a Pagar</span>
-        <span class="emp-liquido" style="font-weight:700;color:var(--primary);font-size:20px;">${fmtBRL(liquido)}</span>
+      <div style="background:var(--primary-light);border-radius:var(--radius);padding:12px 16px;margin-top:12px;display:flex;justify-content:space-between;align-items:center;gap:12px;">
+        <div>
+          <div style="font-size:12px;color:var(--primary);margin-bottom:2px;">💵 Líquido a Pagar</div>
+          <div class="emp-liquido" style="font-weight:700;color:var(--primary);font-size:20px;">${fmtBRL(liquido)}</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;">
+          ${pd.folhaPaga
+            ? `<span style="background:var(--success-light);color:var(--success);padding:5px 12px;border-radius:20px;font-size:12px;font-weight:600;">✅ Folha Paga</span>
+               <button class="btn btn-sm btn-ghost" onclick="toggleFolhaPaga('${emp.id}')">Reabrir</button>`
+            : `<button class="btn btn-success" onclick="toggleFolhaPaga('${emp.id}')">✓ Marcar Folha como Paga</button>`
+          }
+        </div>
       </div>
       <div style="margin-top:16px;">
         <div class="card-title" style="margin-bottom:10px;">🎄 13º Salário</div>
@@ -1452,6 +1462,13 @@ function calcLiquido(pd) {
   const r = (pd.receitas||[]).reduce((s,x)=>s+(parseFloat(x.valor)||0),0);
   const d = (pd.descontos_list||[]).reduce((s,x)=>s+(parseFloat(x.valor)||0),0);
   return r - d;
+}
+
+function toggleFolhaPaga(eid) {
+  if (!appData.employeePayments) appData.employeePayments = {};
+  if (!appData.employeePayments[eid]) appData.employeePayments[eid] = {};
+  appData.employeePayments[eid].folhaPaga = !appData.employeePayments[eid].folhaPaga;
+  saveEmployeePayments().then(()=>{ renderEmployees(); renderDashboard(); updateCashflow(); });
 }
 
 function addEmpLine(eid, tipo) {
