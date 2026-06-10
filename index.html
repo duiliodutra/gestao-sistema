@@ -1213,13 +1213,21 @@ function updateCashflow() {
   });
 
   const totalDespesas = despesasEmpresa + despesasPessoal + folha;
-  const total = (emConta + recebido + previsao) - totalDespesas;
+  // Saldo = Dinheiro em conta + Previsão total de recebimento - Despesas
+  // "Já recebido" mostra andamento mas não soma duas vezes
+  const total = (emConta + previsao) - totalDespesas;
+  const percentRecebido = previsao > 0 ? Math.min(100, Math.round((recebido/previsao)*100)) : 0;
 
   const el = document.getElementById('cashflow-result');
   el.innerHTML = `
-    <div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:8px;font-size:13px;opacity:0.85;">
-      <span>➕ Entradas: ${fmtBRL(emConta+recebido+previsao)}</span>
-      <span>➖ Empresa: ${fmtBRL(despesasEmpresa)} &nbsp;|&nbsp; Pessoal: ${fmtBRL(despesasPessoal)} &nbsp;|&nbsp; Folha: ${fmtBRL(folha)}</span>
+    <div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:10px;font-size:13px;">
+      <span>💰 Em conta: <b>${fmtBRL(emConta)}</b></span>
+      <span>📈 Previsão recebimento: <b>${fmtBRL(previsao)}</b>
+        <span style="margin-left:6px;background:rgba(0,0,0,0.08);padding:2px 7px;border-radius:10px;font-size:11px;">${percentRecebido}% já recebido</span>
+      </span>
+      <span>➖ Despesas: <b>${fmtBRL(totalDespesas)}</b>
+        <span style="font-size:11px;opacity:0.7;margin-left:4px;">(Empresa ${fmtBRL(despesasEmpresa)} + Pessoal ${fmtBRL(despesasPessoal)} + Folha ${fmtBRL(folha)})</span>
+      </span>
     </div>
     <div style="font-size:20px;font-weight:700;">Saldo Final Estimado: ${fmtBRL(total)}</div>`;
   el.className = 'cashflow-total ' + (total >= 0 ? 'positive' : 'negative');
