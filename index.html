@@ -1847,13 +1847,30 @@ function set(id, val) {
   if (el) el.textContent = val;
 }
 
-// Google Sign In
+// Google Sign In — popup no desktop, redirect no mobile
+const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+
+// Handle redirect result on page load
+auth.getRedirectResult().then(result => {
+  if (result && result.user) {
+    // Already handled by onAuthStateChanged
+  }
+}).catch(e => {
+  const el = document.getElementById('auth-error');
+  if (el) el.textContent = 'Erro ao entrar: ' + e.message;
+});
+
 document.getElementById('google-signin-btn').addEventListener('click', async () => {
   const provider = new firebase.auth.GoogleAuthProvider();
   try {
-    await auth.signInWithPopup(provider);
+    if (isMobile) {
+      await auth.signInWithRedirect(provider);
+    } else {
+      await auth.signInWithPopup(provider);
+    }
   } catch(e) {
-    document.getElementById('auth-error').textContent = 'Erro ao entrar: ' + e.message;
+    const el = document.getElementById('auth-error');
+    if (el) el.textContent = 'Erro ao entrar: ' + e.message;
   }
 });
 
