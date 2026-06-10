@@ -1215,8 +1215,12 @@ function updateCashflow() {
   // Lógica:
   // Falta = Total contas - Em conta  (quanto falta para cobrir tudo)
   // Previsão de fechamento = Previsão de recebimento - Falta
-  const falta = totalContas - emConta;
-  const prevFechamento = previsao - falta;
+  // Falta = quanto ainda falta pagar depois do que já está em conta
+  const falta = Math.max(0, totalContas - emConta);
+  // Sobra em conta depois de pagar tudo
+  const sobraEmConta = Math.max(0, emConta - totalContas);
+  // Prev fechamento = o que sobra em conta + previsão de recebimento - o que ainda falta
+  const prevFechamento = sobraEmConta + previsao - falta;
 
   const el = document.getElementById('cashflow-result');
   el.className = '';
@@ -1247,8 +1251,8 @@ function updateCashflow() {
             <td style="padding:8px 14px;text-align:right;font-weight:600;">${fmtBRL(emConta)}</td>
           </tr>
           <tr style="background:${falta>0?'#dc2626':'#16a34a'};color:white;font-weight:700;">
-            <td style="padding:9px 14px;">${falta>0?'Falta':'Sobra'}</td>
-            <td style="padding:9px 14px;text-align:right;">${fmtBRL(Math.abs(falta))}</td>
+            <td style="padding:9px 14px;">${falta>0?'Falta':'Sobra em conta'}</td>
+            <td style="padding:9px 14px;text-align:right;">${fmtBRL(falta>0?falta:sobraEmConta)}</td>
           </tr>
           <tr style="background:var(--gray-50);">
             <td style="padding:8px 14px;color:var(--gray-700);">Prev. de recebimento</td>
