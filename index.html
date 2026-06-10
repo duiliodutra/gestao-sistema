@@ -412,7 +412,7 @@
 </div>
 
 <!-- MAIN APP -->
-<div id="app">
+<div id="app" style="display:none;">
   <div class="topbar">
     <div class="topbar-brand">📊 <span>Gestão</span></div>
     <div class="topbar-right">
@@ -539,7 +539,7 @@
 
     <!-- ===== EMPRESA ===== -->
     <div class="tab-pane" id="tab-empresa">
-      <div class="flex" style="justify-content:space-between;align-items:flex-start;margin-bottom:20px;">
+      <div class="flex" style="justify-content:space-between;align-items:flex-start;margin-bottom:16px;">
         <div>
           <div class="section-title">🏢 Contas da Empresa</div>
           <div class="section-desc">Gerencie blocos de contas por categoria</div>
@@ -548,12 +548,13 @@
           <button class="btn btn-primary" onclick="addBlock('empresa')">+ Novo Bloco</button>
         </div>
       </div>
+      <div id="empresa-subtabs" style="display:flex;flex-wrap:wrap;gap:4px;border-bottom:2px solid var(--gray-200);margin-bottom:20px;padding-bottom:0;"></div>
       <div id="empresa-blocks"></div>
     </div>
 
     <!-- ===== PESSOAL ===== -->
     <div class="tab-pane" id="tab-pessoal">
-      <div class="flex" style="justify-content:space-between;align-items:flex-start;margin-bottom:20px;">
+      <div class="flex" style="justify-content:space-between;align-items:flex-start;margin-bottom:16px;">
         <div>
           <div class="section-title">👤 Contas Pessoais</div>
           <div class="section-desc">Seus gastos e compromissos pessoais</div>
@@ -562,12 +563,13 @@
           <button class="btn btn-primary" onclick="addBlock('pessoal')">+ Novo Bloco</button>
         </div>
       </div>
+      <div id="pessoal-subtabs" style="display:flex;flex-wrap:wrap;gap:4px;border-bottom:2px solid var(--gray-200);margin-bottom:20px;padding-bottom:0;"></div>
       <div id="pessoal-blocks"></div>
     </div>
 
     <!-- ===== FUNCIONÁRIOS ===== -->
     <div class="tab-pane" id="tab-funcionarios">
-      <div class="flex" style="justify-content:space-between;align-items:flex-start;margin-bottom:20px;">
+      <div class="flex" style="justify-content:space-between;align-items:flex-start;margin-bottom:16px;">
         <div>
           <div class="section-title">👥 Funcionários</div>
           <div class="section-desc">Controle de pagamentos, férias e 13º</div>
@@ -576,6 +578,7 @@
           <button class="btn btn-primary" onclick="addEmployee()">+ Novo Funcionário</button>
         </div>
       </div>
+      <div id="emp-subtabs" style="display:flex;flex-wrap:wrap;gap:4px;border-bottom:2px solid var(--gray-200);margin-bottom:20px;padding-bottom:0;"></div>
       <div id="employees-container"></div>
     </div>
 
@@ -625,6 +628,7 @@
   <div class="modal" id="modal-box"></div>
 </div>
 
+
 <!-- Firebase SDKs -->
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
@@ -632,7 +636,7 @@
 
 <script>
 // =============================================
-// FIREBASE CONFIG — SUBSTITUA COM OS SEUS DADOS
+// FIREBASE CONFIG
 // =============================================
 const firebaseConfig = {
   apiKey: "AIzaSyBoHHtjo2xIukzls8COqQVO6cpjIQuM-Wg",
@@ -652,10 +656,10 @@ const db = firebase.firestore();
 // =============================================
 const ADMIN_EMAIL = "duiliodudu@gmail.com";
 let currentUser = null;
-let isAdmin = false;
+let isAdmin = true;
 let isEmployee = false;
-let employeeOwnId = null; // if user is an employee, their ID
-let currentMonth = new Date().getMonth(); // 0-indexed
+let employeeOwnId = null;
+let currentMonth = new Date().getMonth();
 let currentYear = new Date().getFullYear();
 let calEscalaMonth = currentMonth;
 let calEscalaYear = currentYear;
@@ -689,22 +693,18 @@ function init() {
 async function checkUserRole() {
   isAdmin = currentUser.email === ADMIN_EMAIL;
   if (!isAdmin) {
-    // Check if this user is a registered employee
     const snap = await db.collection('global').doc('employees').get();
     if (snap.exists) {
       const emps = snap.data().list || [];
       const found = emps.find(e => e.email && e.email.toLowerCase() === currentUser.email.toLowerCase());
-      if (found) {
-        isEmployee = true;
-        employeeOwnId = found.id;
-      }
+      if (found) { isEmployee = true; employeeOwnId = found.id; }
     }
   }
 }
 
 function showAuthScreen() {
   document.getElementById('loading').style.display = 'none';
-  document.getElementById('auth-screen').classList.remove('hidden');
+  document.getElementById('auth-screen').style.display = 'flex';
   document.getElementById('app').style.display = 'none';
 }
 
@@ -726,37 +726,16 @@ function updateUserUI() {
 
 function applyRoleVisibility() {
   if (!isAdmin) {
-    // Hide admin controls
     ['empresa-admin-controls','pessoal-admin-controls','func-admin-controls'].forEach(id => {
-      const el = document.getElementById(id);
-      if (el) el.style.display = 'none';
+      const el = document.getElementById(id); if (el) el.style.display = 'none';
     });
-    // Hide personal and empresa tabs for non-admin non-employee
-    if (!isAdmin) {
-      const tabs = ['tab-empresa-btn','tab-pessoal-btn','tab-funcionarios-btn'];
-      tabs.forEach(id => {
-        const el = document.getElementById(id);
-        if (el && !isAdmin) el.style.display = 'none';
-      });
-    }
+    ['tab-empresa-btn','tab-pessoal-btn','tab-funcionarios-btn'].forEach(id => {
+      const el = document.getElementById(id); if (el) el.style.display = 'none';
+    });
   }
 }
 
-// =============================================
-// SIGN IN / OUT
-// =============================================
-document.getElementById('google-signin-btn').addEventListener('click', async () => {
-  const provider = new firebase.auth.GoogleAuthProvider();
-  try {
-    await auth.signInWithPopup(provider);
-  } catch (e) {
-    document.getElementById('auth-error').textContent = 'Erro ao entrar: ' + e.message;
-  }
-});
-
-function signOut() {
-  auth.signOut();
-}
+function signOut() { auth.signOut(); }
 
 // =============================================
 // MONTH/YEAR SELECTORS
@@ -787,38 +766,31 @@ async function loadMonthData() {
   const key = getMonthKey();
   document.getElementById('dashboard-period-label').textContent = `${MONTHS[currentMonth]} ${currentYear}`;
 
-  // Load empresa blocks
   const eDoc = await db.collection('months').doc(key).collection('empresa').doc('data').get();
   appData.empresa = eDoc.exists ? eDoc.data() : { blocks: {} };
   if (!appData.empresa.blocks) appData.empresa.blocks = {};
 
-  // Load pessoal blocks
   const pDoc = await db.collection('months').doc(key).collection('pessoal').doc('data').get();
   appData.pessoal = pDoc.exists ? pDoc.data() : { blocks: {} };
   if (!appData.pessoal.blocks) appData.pessoal.blocks = {};
 
-  // Load cashflow
   const cfDoc = await db.collection('months').doc(key).collection('cashflow').doc('data').get();
   appData.cashflow = cfDoc.exists ? cfDoc.data() : {};
   if (appData.cashflow.emConta) document.getElementById('cf-em-conta').value = appData.cashflow.emConta;
   if (appData.cashflow.recebido) document.getElementById('cf-recebido').value = appData.cashflow.recebido;
   if (appData.cashflow.previsao) document.getElementById('cf-previsao').value = appData.cashflow.previsao;
 
-  // Load employees (global)
   const empDoc = await db.collection('global').doc('employees').get();
   appData.employees = empDoc.exists ? empDoc.data() : { list: [] };
   if (!appData.employees.list) appData.employees.list = [];
 
-  // Load employee payment data for month
   const epDoc = await db.collection('months').doc(key).collection('employees').doc('payments').get();
   appData.employeePayments = epDoc.exists ? epDoc.data() : {};
 
-  // Load escala
   const esDoc = await db.collection('months').doc(key).collection('escala').doc('data').get();
   appData.escala = esDoc.exists ? esDoc.data() : { events: {} };
   if (!appData.escala.events) appData.escala.events = {};
 
-  // Check if month is empty → show copy banner
   const isEmpty = Object.keys(appData.empresa.blocks).length === 0 &&
                   Object.keys(appData.pessoal.blocks).length === 0;
   document.getElementById('copy-banner').style.display = (isEmpty && isAdmin) ? 'flex' : 'none';
@@ -901,49 +873,78 @@ function renderAll() {
 }
 
 // =============================================
-// BLOCKS (empresa / pessoal)
+// BLOCKS
 // =============================================
+const activeBlockTab = { empresa: null, pessoal: null };
+
 function renderBlocks(group) {
+  const subtabs = document.getElementById(`${group}-subtabs`);
   const container = document.getElementById(`${group}-blocks`);
   const data = appData[group].blocks;
-  container.innerHTML = '';
+  const entries = Object.entries(data);
 
-  if (Object.keys(data).length === 0) {
-    container.innerHTML = `<div class="text-gray text-sm" style="padding:20px;text-align:center;">Nenhum bloco cadastrado. ${isAdmin ? 'Clique em "+ Novo Bloco" para adicionar.' : ''}</div>`;
+  if (entries.length === 0) {
+    if (subtabs) subtabs.innerHTML = '';
+    container.innerHTML = `<div class="text-gray text-sm" style="padding:20px;text-align:center;">Nenhum bloco cadastrado. Clique em "+ Novo Bloco" para adicionar.</div>`;
     return;
   }
 
-  Object.entries(data).forEach(([bid, block]) => {
-    const total = (block.items || []).reduce((s,i) => s + (parseFloat(i.value)||0), 0);
-    const paidTotal = (block.items || []).filter(i=>i.paid).reduce((s,i) => s + (parseFloat(i.value)||0), 0);
-    const pendingTotal = total - paidTotal;
+  // Keep active tab valid
+  if (!activeBlockTab[group] || !data[activeBlockTab[group]]) {
+    activeBlockTab[group] = entries[0][0];
+  }
 
-    const div = document.createElement('div');
-    div.className = 'account-block';
-    div.innerHTML = `
-      <div class="account-block-header">
-        <div>
-          <div class="block-name">${escHtml(block.name)}</div>
-          <div style="font-size:11px;color:var(--gray-400);">Pago: ${fmtBRL(paidTotal)} / Aberto: ${fmtBRL(pendingTotal)}</div>
-        </div>
-        <div class="block-actions">
-          <div class="block-total">${fmtBRL(total)}</div>
-          ${isAdmin ? `<button class="btn btn-sm btn-ghost" onclick="addItemToBlock('${group}','${bid}')">+ Item</button>
-          <button class="btn btn-sm btn-ghost" onclick="editBlockName('${group}','${bid}')">✏️</button>
-          <button class="btn btn-sm btn-danger" onclick="deleteBlock('${group}','${bid}')">🗑️</button>` : ''}
-        </div>
+  // Render sub-tab buttons
+  if (subtabs) {
+    subtabs.innerHTML = entries.map(([bid, block]) => {
+      const isActive = bid === activeBlockTab[group];
+      const total = (block.items||[]).reduce((s,i)=>s+(parseFloat(i.value)||0),0);
+      const pending = (block.items||[]).filter(i=>!i.paid).reduce((s,i)=>s+(parseFloat(i.value)||0),0);
+      return `<button onclick="switchBlockTab('${group}','${bid}')" style="
+        padding:9px 16px;border:none;background:none;cursor:pointer;font-size:13px;font-weight:500;
+        color:${isActive ? 'var(--primary)' : 'var(--gray-500)'};
+        border-bottom:${isActive ? '2px solid var(--primary)' : '2px solid transparent'};
+        margin-bottom:-2px;transition:all 0.15s;white-space:nowrap;display:flex;flex-direction:column;align-items:flex-start;gap:2px;
+      "><span>${escHtml(block.name)}</span><span style="font-size:10px;font-weight:400;color:${pending>0?'var(--warning)':'var(--success)'};">${fmtBRL(total)}</span></button>`;
+    }).join('');
+  }
+
+  // Render active block only
+  const [bid, block] = entries.find(([b]) => b === activeBlockTab[group]);
+  const total = (block.items || []).reduce((s,i) => s + (parseFloat(i.value)||0), 0);
+  const paidTotal = (block.items || []).filter(i=>i.paid).reduce((s,i) => s + (parseFloat(i.value)||0), 0);
+  const pendingTotal = total - paidTotal;
+
+  container.innerHTML = '';
+  const div = document.createElement('div');
+  div.className = 'account-block';
+  div.innerHTML = `
+    <div class="account-block-header">
+      <div>
+        <div class="block-name">${escHtml(block.name)}</div>
+        <div style="font-size:11px;color:var(--gray-400);">Pago: ${fmtBRL(paidTotal)} / Aberto: ${fmtBRL(pendingTotal)}</div>
       </div>
-      <div class="account-block-body">
-        ${renderBlockItems(group, bid, block.items || [])}
-      </div>`;
-    container.appendChild(div);
-  });
+      <div class="block-actions">
+        <div class="block-total">${fmtBRL(total)}</div>
+        <button class="btn btn-sm btn-ghost" onclick="addItemToBlock('${group}','${bid}')">+ Item</button>
+        <button class="btn btn-sm btn-ghost" onclick="editBlockName('${group}','${bid}')">✏️</button>
+        <button class="btn btn-sm btn-danger" onclick="deleteBlock('${group}','${bid}')">🗑️</button>
+      </div>
+    </div>
+    <div class="account-block-body">
+      ${renderBlockItems(group, bid, block.items || [])}
+    </div>`;
+  container.appendChild(div);
+}
+
+function switchBlockTab(group, bid) {
+  activeBlockTab[group] = bid;
+  renderBlocks(group);
 }
 
 function renderBlockItems(group, bid, items) {
   if (items.length === 0) return '<div class="text-gray text-sm">Nenhum item neste bloco.</div>';
-
-  return `<table class="data-table"><thead><tr><th>Descrição</th><th>Vencimento</th><th>Valor</th><th>Status</th>${isAdmin?'<th>Ações</th>':''}</tr></thead><tbody>
+  return `<table class="data-table"><thead><tr><th>Descrição</th><th>Vencimento</th><th>Valor</th><th>Status</th><th>Ações</th></tr></thead><tbody>
     ${items.map((item, idx) => {
       const statusClass = item.paid ? 'badge-paid' : (isOverdue(item.dueDate) ? 'badge-overdue' : 'badge-pending');
       const statusText = item.paid ? 'Pago' : (isOverdue(item.dueDate) ? 'Vencido' : 'Em aberto');
@@ -952,11 +953,11 @@ function renderBlockItems(group, bid, items) {
         <td>${fmtDate(item.dueDate)}</td>
         <td class="font-bold">${fmtBRL(item.value)}</td>
         <td><span class="badge ${statusClass}">${statusText}</span></td>
-        ${isAdmin ? `<td style="display:flex;gap:4px;">
+        <td style="display:flex;gap:4px;">
           <button class="btn btn-sm ${item.paid?'btn-ghost':'btn-success'}" onclick="togglePaid('${group}','${bid}',${idx})">${item.paid?'Reabrir':'✓ Pago'}</button>
           <button class="btn btn-sm btn-ghost" onclick="editItem('${group}','${bid}',${idx})">✏️</button>
           <button class="btn btn-sm btn-danger" onclick="deleteItem('${group}','${bid}',${idx})">🗑️</button>
-        </td>` : ''}
+        </td>
       </tr>`;
     }).join('')}
   </tbody></table>`;
@@ -979,11 +980,8 @@ function confirmAddBlock(group) {
   if (!name) return alert('Digite um nome para o bloco.');
   const bid = 'b' + Date.now();
   appData[group].blocks[bid] = { name, items: [] };
-  (group === 'empresa' ? saveEmpresa() : savePessoal()).then(() => {
-    renderBlocks(group);
-    renderDashboard();
-    closeModal();
-  });
+  activeBlockTab[group] = bid;
+  (group === 'empresa' ? saveEmpresa() : savePessoal()).then(() => { renderBlocks(group); renderDashboard(); closeModal(); });
 }
 
 function editBlockName(group, bid) {
@@ -1088,7 +1086,6 @@ function togglePaid(group, bid, idx) {
 function renderDashboard() {
   let eTotal=0, pTotal=0, funcTotal=0, paid=0, pending=0;
 
-  // Empresa
   Object.values(appData.empresa.blocks||{}).forEach(b=>{
     (b.items||[]).forEach(i=>{
       const v = parseFloat(i.value)||0;
@@ -1097,7 +1094,6 @@ function renderDashboard() {
     });
   });
 
-  // Pessoal
   Object.values(appData.pessoal.blocks||{}).forEach(b=>{
     (b.items||[]).forEach(i=>{
       const v = parseFloat(i.value)||0;
@@ -1106,10 +1102,9 @@ function renderDashboard() {
     });
   });
 
-  // Funcionários (folha)
   (appData.employees.list||[]).forEach(emp=>{
     const pd = (appData.employeePayments||{})[emp.id]||{};
-    const salario = parseFloat(pd.salario||pd.salarioBruto||emp.salarioBase||0)||0;
+    const salario = calcLiquido(pd);
     funcTotal += salario;
   });
 
@@ -1127,7 +1122,6 @@ function renderDashboard() {
 function renderAlerts() {
   const container = document.getElementById('alerts-container');
   const today = new Date(); today.setHours(0,0,0,0);
-  const in7 = new Date(today); in7.setDate(in7.getDate()+7);
   const alerts = [];
 
   function collectItems(group, label) {
@@ -1143,7 +1137,6 @@ function renderAlerts() {
   }
   collectItems('empresa','Empresa');
   collectItems('pessoal','Pessoal');
-
   alerts.sort((a,b)=>a.diff-b.diff);
 
   if (alerts.length === 0) {
@@ -1161,7 +1154,7 @@ function renderAlerts() {
       </div>
       <div style="display:flex;align-items:center;gap:8px;">
         <div class="alert-value">${fmtBRL(a.value)}</div>
-        ${isAdmin ? `<button class="btn btn-sm btn-success" onclick="togglePaid('${a.group}','${a.bid}',${a.idx})">✓ Pago</button>` : ''}
+        <button class="btn btn-sm btn-success" onclick="togglePaid('${a.group}','${a.bid}',${a.idx})">✓ Pago</button>
       </div>
     </div>`;
   }).join('');
@@ -1173,9 +1166,7 @@ function renderReport() {
 
   function collect(group, label, badgeCls) {
     Object.values(appData[group].blocks||{}).forEach(block=>{
-      (block.items||[]).forEach(item=>{
-        rows.push({...item, label, badgeCls, blockName: block.name});
-      });
+      (block.items||[]).forEach(item=>{ rows.push({...item, label, badgeCls, blockName: block.name}); });
     });
   }
   collect('empresa','Empresa','badge-empresa');
@@ -1187,7 +1178,6 @@ function renderReport() {
   }
 
   rows.sort((a,b)=>(a.dueDate||'').localeCompare(b.dueDate||''));
-
   tbody.innerHTML = rows.map(r=>{
     const sc = r.paid ? 'badge-paid' : (isOverdue(r.dueDate)?'badge-overdue':'badge-pending');
     const st = r.paid ? 'Pago' : (isOverdue(r.dueDate)?'Vencido':'Em aberto');
@@ -1216,7 +1206,6 @@ function updateCashflow() {
   el.textContent = `Saldo Final Estimado: ${fmtBRL(total)}`;
   el.className = 'cashflow-total ' + (total >= 0 ? 'positive' : 'negative');
 
-  // Save debounced
   appData.cashflow = { emConta, recebido, previsao };
   clearTimeout(window._cfTimer);
   window._cfTimer = setTimeout(saveCashflow, 1500);
@@ -1225,40 +1214,82 @@ function updateCashflow() {
 // =============================================
 // EMPLOYEES
 // =============================================
+let activeEmpTab = null;
+
 function renderEmployees() {
+  const subtabs = document.getElementById('emp-subtabs');
   const container = document.getElementById('employees-container');
   const list = appData.employees.list || [];
 
   if (list.length === 0) {
-    container.innerHTML = `<div class="text-gray text-sm" style="padding:20px;text-align:center;">${isAdmin?'Nenhum funcionário. Clique em "+ Novo Funcionário".':'Nenhum funcionário cadastrado.'}</div>`;
+    subtabs.innerHTML = '';
+    container.innerHTML = '<div class="text-gray text-sm" style="padding:20px;text-align:center;">Nenhum funcionário. Clique em "+ Novo Funcionário".</div>';
     return;
   }
 
-  // Filter if employee role
-  const filtered = (isEmployee && !isAdmin) ? list.filter(e=>e.id===employeeOwnId) : list;
+  // Keep active tab valid
+  if (!activeEmpTab || !list.find(e=>e.id===activeEmpTab)) {
+    activeEmpTab = list[0].id;
+  }
 
+  // Render sub-tab buttons
+  subtabs.innerHTML = list.map(emp => {
+    const isActive = emp.id === activeEmpTab;
+    return `<button onclick="switchEmpTab('${emp.id}')" style="
+      padding:9px 18px;border:none;background:none;cursor:pointer;font-size:13px;font-weight:500;
+      color:${isActive ? 'var(--primary)' : 'var(--gray-500)'};
+      border-bottom:${isActive ? '2px solid var(--primary)' : '2px solid transparent'};
+      margin-bottom:-2px;transition:all 0.15s;white-space:nowrap;
+    ">${escHtml(emp.name.split(' ')[0])}</button>`;
+  }).join('');
+
+  // Render active employee
+  const emp = list.find(e=>e.id===activeEmpTab);
+  if (!emp) return;
+  const pd = (appData.employeePayments||{})[emp.id] || {};
   container.innerHTML = '';
-  filtered.forEach(emp => {
-    const pd = (appData.employeePayments||{})[emp.id] || {};
-    const div = document.createElement('div');
-    div.className = 'employee-card';
-    div.innerHTML = buildEmployeeCard(emp, pd);
-    container.appendChild(div);
-  });
+  const div = document.createElement('div');
+  div.className = 'employee-card';
+  div.innerHTML = buildEmployeeCard(emp, pd);
+  container.appendChild(div);
+}
+
+function switchEmpTab(eid) {
+  activeEmpTab = eid;
+  renderEmployees();
 }
 
 function buildEmployeeCard(emp, pd) {
   const vac = emp.ferias || { periods: [] };
   const thirteenth = pd.decimoTerceiro || {};
-  const canEdit = isAdmin;
+  const receitas = pd.receitas || [];
+  const descontos_list = pd.descontos_list || [];
+
+  const totalReceitas = receitas.reduce((s,r)=>s+(parseFloat(r.valor)||0),0);
+  const totalDescontos = descontos_list.reduce((s,d)=>s+(parseFloat(d.valor)||0),0);
+  const liquido = totalReceitas - totalDescontos;
+
+  const receitasHTML = receitas.map((r,i)=>`
+    <div style="display:flex;gap:6px;align-items:center;margin-bottom:6px;">
+      <input type="text" class="form-control" style="flex:2;" value="${escHtml(r.nome)}" placeholder="Ex: Salário, Hora Extra..." onchange="updateEmpLine('${emp.id}','receitas',${i},'nome',this.value)">
+      <input type="number" class="form-control" style="flex:1;min-width:90px;" value="${r.valor||''}" placeholder="0,00" onchange="updateEmpLine('${emp.id}','receitas',${i},'valor',this.value)">
+      <button class="btn btn-sm btn-danger btn-icon" onclick="removeEmpLine('${emp.id}','receitas',${i})">✕</button>
+    </div>`).join('');
+
+  const descontosHTML = descontos_list.map((d,i)=>`
+    <div style="display:flex;gap:6px;align-items:center;margin-bottom:6px;">
+      <input type="text" class="form-control" style="flex:2;" value="${escHtml(d.nome)}" placeholder="Ex: INSS, Adiantamento..." onchange="updateEmpLine('${emp.id}','descontos_list',${i},'nome',this.value)">
+      <input type="number" class="form-control" style="flex:1;min-width:90px;" value="${d.valor||''}" placeholder="0,00" onchange="updateEmpLine('${emp.id}','descontos_list',${i},'valor',this.value)">
+      <button class="btn btn-sm btn-danger btn-icon" onclick="removeEmpLine('${emp.id}','descontos_list',${i})">✕</button>
+    </div>`).join('');
 
   const periodsHTML = (vac.periods || []).map((p,i)=>`
     <div class="period-row">
-      <input type="date" value="${p.start||''}" ${canEdit?`onchange="updateVacPeriod('${emp.id}',${i},'start',this.value)"`:'readonly'} placeholder="Início">
+      <input type="date" value="${p.start||''}" onchange="updateVacPeriod('${emp.id}',${i},'start',this.value)" placeholder="Início">
       <span>→</span>
-      <input type="date" value="${p.end||''}" ${canEdit?`onchange="updateVacPeriod('${emp.id}',${i},'end',this.value)"`:'readonly'} placeholder="Fim">
+      <input type="date" value="${p.end||''}" onchange="updateVacPeriod('${emp.id}',${i},'end',this.value)" placeholder="Fim">
       <span class="text-xs text-gray">${calcPeriodDays(p.start,p.end)} dias</span>
-      ${canEdit?`<button class="btn btn-sm btn-danger btn-icon" onclick="removeVacPeriod('${emp.id}',${i})">✕</button>`:''}
+      <button class="btn btn-sm btn-danger btn-icon" onclick="removeVacPeriod('${emp.id}',${i})">✕</button>
     </div>`).join('');
 
   const totalVacDays = (vac.periods||[]).reduce((s,p)=>s+calcPeriodDays(p.start,p.end),0);
@@ -1271,59 +1302,79 @@ function buildEmployeeCard(emp, pd) {
         <div class="employee-name">${escHtml(emp.name)}</div>
         <div class="text-xs text-gray">${escHtml(emp.cargo||'')} ${emp.email?'· '+emp.email:''}</div>
       </div>
-      ${canEdit?`<div style="display:flex;gap:6px;">
+      <div style="display:flex;gap:6px;">
         <button class="btn btn-sm btn-ghost" onclick="editEmployee('${emp.id}')">✏️ Editar</button>
         <button class="btn btn-sm btn-danger" onclick="deleteEmployee('${emp.id}')">🗑️</button>
-      </div>`:''}
+      </div>
     </div>
     <div class="employee-body">
       <div class="emp-grid">
-        <!-- PAGAMENTO -->
         <div>
-          <div class="card-title" style="margin-bottom:10px;">💰 Pagamento — ${MONTHS[currentMonth]}</div>
-          <div class="form-group mb-1"><div class="form-label">Salário Base</div>
-            <input type="number" class="form-control" value="${pd.salarioBruto||emp.salarioBase||''}" ${canEdit?`onchange="updateEmpPayment('${emp.id}','salarioBruto',this.value)"`:' readonly'} placeholder="0,00">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+            <div class="card-title">💰 Receitas — ${MONTHS[currentMonth]}</div>
+            <button class="btn btn-sm btn-success" onclick="addEmpLine('${emp.id}','receitas')">+ Receita</button>
           </div>
-          <div class="form-group mb-1"><div class="form-label">Horas Extras (R$)</div>
-            <input type="number" class="form-control" value="${pd.horasExtras||''}" ${canEdit?`onchange="updateEmpPayment('${emp.id}','horasExtras',this.value)"`:' readonly'} placeholder="0,00">
+          <div style="display:flex;gap:6px;margin-bottom:4px;">
+            <span class="text-xs text-gray" style="flex:2;">Descrição</span>
+            <span class="text-xs text-gray" style="flex:1;">Valor</span>
+            <span style="width:32px;"></span>
           </div>
-          <div class="form-group mb-1"><div class="form-label">Adiantamento</div>
-            <input type="number" class="form-control" value="${pd.adiantamento||''}" ${canEdit?`onchange="updateEmpPayment('${emp.id}','adiantamento',this.value)"`:' readonly'} placeholder="0,00">
-          </div>
-          <div class="form-group mb-1"><div class="form-label">INSS/Outros Descontos</div>
-            <input type="number" class="form-control" value="${pd.descontos||''}" ${canEdit?`onchange="updateEmpPayment('${emp.id}','descontos',this.value)"`:' readonly'} placeholder="0,00">
-          </div>
-          <div style="background:var(--primary-light);border-radius:var(--radius);padding:10px 12px;margin-top:8px;font-weight:700;color:var(--primary);">
-            Líquido: ${fmtBRL(calcLiquido(pd, emp))}
+          ${receitasHTML || '<div class="text-gray text-sm" style="margin-bottom:8px;">Nenhuma receita. Clique em + Receita.</div>'}
+          <div style="background:var(--success-light);border-radius:var(--radius);padding:8px 12px;margin-top:4px;display:flex;justify-content:space-between;">
+            <span style="font-size:12px;color:var(--success);">Total Receitas</span>
+            <span style="font-weight:700;color:var(--success);">${fmtBRL(totalReceitas)}</span>
           </div>
         </div>
-
-        <!-- DÉCIMO TERCEIRO -->
         <div>
-          <div class="card-title" style="margin-bottom:10px;">🎄 13º Salário</div>
-          <div class="form-group mb-1"><div class="form-label">Valor Total do 13º</div>
-            <input type="number" class="form-control" value="${thirteenth.valorTotal||''}" ${canEdit?`onchange="updateDecimo('${emp.id}','valorTotal',this.value)"`:' readonly'} placeholder="0,00">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+            <div class="card-title">➖ Descontos — ${MONTHS[currentMonth]}</div>
+            <button class="btn btn-sm btn-danger" onclick="addEmpLine('${emp.id}','descontos_list')">+ Desconto</button>
           </div>
-          <div class="form-group mb-1"><div class="form-label">Valor Pago até Agora</div>
-            <input type="number" class="form-control" value="${thirteenth.valorPago||''}" ${canEdit?`onchange="updateDecimo('${emp.id}','valorPago',this.value)"`:' readonly'} placeholder="0,00">
+          <div style="display:flex;gap:6px;margin-bottom:4px;">
+            <span class="text-xs text-gray" style="flex:2;">Descrição</span>
+            <span class="text-xs text-gray" style="flex:1;">Valor</span>
+            <span style="width:32px;"></span>
           </div>
-          <div class="form-group mb-1"><div class="form-label">Data do Último Pagamento</div>
-            <input type="date" class="form-control" value="${thirteenth.dataUltimoPgto||''}" ${canEdit?`onchange="updateDecimo('${emp.id}','dataUltimoPgto',this.value)"`:' readonly'}>
-          </div>
-          <div class="form-group mb-1"><div class="form-label">Forma de Pagamento</div>
-            <input type="text" class="form-control" value="${thirteenth.forma||''}" ${canEdit?`onchange="updateDecimo('${emp.id}','forma',this.value)"`:' readonly'} placeholder="Ex: PIX, Depósito...">
-          </div>
-          <div style="background:var(--warning-light);border-radius:var(--radius);padding:10px 12px;margin-top:8px;font-size:13px;color:var(--warning);">
-            Restante: ${fmtBRL((parseFloat(thirteenth.valorTotal)||0)-(parseFloat(thirteenth.valorPago)||0))}
+          ${descontosHTML || '<div class="text-gray text-sm" style="margin-bottom:8px;">Nenhum desconto. Clique em + Desconto.</div>'}
+          <div style="background:var(--danger-light);border-radius:var(--radius);padding:8px 12px;margin-top:4px;display:flex;justify-content:space-between;">
+            <span style="font-size:12px;color:var(--danger);">Total Descontos</span>
+            <span style="font-weight:700;color:var(--danger);">${fmtBRL(totalDescontos)}</span>
           </div>
         </div>
       </div>
-
-      <!-- FÉRIAS -->
+      <div style="background:var(--primary-light);border-radius:var(--radius);padding:12px 16px;margin-top:12px;display:flex;justify-content:space-between;align-items:center;">
+        <span style="font-weight:600;color:var(--primary);font-size:15px;">💵 Líquido a Pagar</span>
+        <span style="font-weight:700;color:var(--primary);font-size:20px;">${fmtBRL(liquido)}</span>
+      </div>
+      <div style="margin-top:16px;">
+        <div class="card-title" style="margin-bottom:10px;">🎄 13º Salário</div>
+        <div class="emp-grid">
+          <div>
+            <div class="form-group mb-1"><div class="form-label">Valor Total do 13º</div>
+              <input type="number" class="form-control" value="${thirteenth.valorTotal||''}" onchange="updateDecimo('${emp.id}','valorTotal',this.value)" placeholder="0,00">
+            </div>
+            <div class="form-group mb-1"><div class="form-label">Valor Pago até Agora</div>
+              <input type="number" class="form-control" value="${thirteenth.valorPago||''}" onchange="updateDecimo('${emp.id}','valorPago',this.value)" placeholder="0,00">
+            </div>
+          </div>
+          <div>
+            <div class="form-group mb-1"><div class="form-label">Data do Último Pagamento</div>
+              <input type="date" class="form-control" value="${thirteenth.dataUltimoPgto||''}" onchange="updateDecimo('${emp.id}','dataUltimoPgto',this.value)">
+            </div>
+            <div class="form-group mb-1"><div class="form-label">Forma de Pagamento</div>
+              <input type="text" class="form-control" value="${thirteenth.forma||''}" onchange="updateDecimo('${emp.id}','forma',this.value)" placeholder="Ex: PIX, Depósito...">
+            </div>
+          </div>
+        </div>
+        <div style="background:var(--warning-light);border-radius:var(--radius);padding:10px 12px;margin-top:8px;display:flex;justify-content:space-between;">
+          <span style="font-size:13px;color:var(--warning);">Restante do 13º</span>
+          <span style="font-weight:700;color:var(--warning);">${fmtBRL((parseFloat(thirteenth.valorTotal)||0)-(parseFloat(thirteenth.valorPago)||0))}</span>
+        </div>
+      </div>
       <div style="margin-top:16px;">
         <div class="card-title" style="margin-bottom:10px;">🌴 Férias (Direito: ${vacEntitlement} dias)</div>
         ${periodsHTML || '<div class="text-gray text-sm">Nenhum período registrado.</div>'}
-        ${canEdit?`<button class="btn btn-ghost btn-sm mt-1" onclick="addVacPeriod('${emp.id}')">+ Período</button>`:''}
+        <button class="btn btn-ghost btn-sm mt-1" onclick="addVacPeriod('${emp.id}')">+ Período</button>
         <div style="margin-top:8px;display:flex;gap:16px;">
           <div class="stat-box" style="flex:1;"><div class="stat-label">Dias Usados</div><div class="stat-value blue">${totalVacDays}</div></div>
           <div class="stat-box" style="flex:1;"><div class="stat-label">Dias Restantes</div><div class="stat-value ${remainingDays<0?'red':'green'}">${remainingDays}</div></div>
@@ -1332,13 +1383,34 @@ function buildEmployeeCard(emp, pd) {
     </div>`;
 }
 
-function calcLiquido(pd, emp) {
-  const bruto = parseFloat(pd.salarioBruto||emp.salarioBase||0);
-  const extras = parseFloat(pd.horasExtras||0);
-  const adian = parseFloat(pd.adiantamento||0);
-  const desc = parseFloat(pd.descontos||0);
-  return bruto + extras - adian - desc;
+function calcLiquido(pd) {
+  const r = (pd.receitas||[]).reduce((s,x)=>s+(parseFloat(x.valor)||0),0);
+  const d = (pd.descontos_list||[]).reduce((s,x)=>s+(parseFloat(x.valor)||0),0);
+  return r - d;
 }
+
+function addEmpLine(eid, tipo) {
+  if (!appData.employeePayments) appData.employeePayments = {};
+  if (!appData.employeePayments[eid]) appData.employeePayments[eid] = {};
+  if (!appData.employeePayments[eid][tipo]) appData.employeePayments[eid][tipo] = [];
+  appData.employeePayments[eid][tipo].push({ nome: '', valor: '' });
+  saveEmployeePayments().then(()=>renderEmployees());
+}
+
+function removeEmpLine(eid, tipo, idx) {
+  appData.employeePayments[eid][tipo].splice(idx, 1);
+  saveEmployeePayments().then(()=>{ renderEmployees(); renderDashboard(); });
+}
+
+function updateEmpLine(eid, tipo, idx, field, val) {
+  if (!appData.employeePayments) appData.employeePayments = {};
+  if (!appData.employeePayments[eid]) appData.employeePayments[eid] = {};
+  if (!appData.employeePayments[eid][tipo]) appData.employeePayments[eid][tipo] = [];
+  appData.employeePayments[eid][tipo][idx][field] = field === 'valor' ? (parseFloat(val)||0) : val;
+  clearTimeout(window._epTimer);
+  window._epTimer = setTimeout(()=>{ saveEmployeePayments(); renderEmployees(); renderDashboard(); }, 800);
+}
+
 
 function addEmployee() {
   openModal(`
@@ -1349,7 +1421,7 @@ function addEmployee() {
     </div>
     <div class="form-row">
       <div class="form-group"><div class="form-label">Salário Base (R$)</div><input type="number" class="form-control" id="m-emp-salario"></div>
-      <div class="form-group"><div class="form-label">E-mail Google (acesso)</div><input type="email" class="form-control" id="m-emp-email" placeholder="funcionario@gmail.com"></div>
+      <div class="form-group"><div class="form-label">E-mail Google</div><input type="email" class="form-control" id="m-emp-email" placeholder="funcionario@gmail.com"></div>
     </div>
     <div class="form-row">
       <div class="form-group"><div class="form-label">Dias de Férias/ano</div><input type="number" class="form-control" id="m-emp-ferias" value="30"></div>
@@ -1461,8 +1533,7 @@ function calcPeriodDays(start, end) {
   if (!start || !end) return 0;
   const s = new Date(start+'T00:00:00');
   const e = new Date(end+'T00:00:00');
-  const diff = Math.ceil((e-s)/(1000*60*60*24)) + 1;
-  return Math.max(0, diff);
+  return Math.max(0, Math.ceil((e-s)/(1000*60*60*24)) + 1);
 }
 
 // =============================================
@@ -1480,25 +1551,20 @@ const EMP_COLORS = ['#1e40af','#065f46','#92400e','#5b21b6','#9f1239','#0c4a6e']
 function renderCalendar(type) {
   const month = type === 'escala' ? calEscalaMonth : calFeriasMonth;
   const year  = type === 'escala' ? calEscalaYear  : calFeriasYear;
-
   const gridId = `cal-${type}-grid`;
   const titleId = `cal-${type}-title`;
 
   document.getElementById(titleId).textContent = `${MONTHS[month]} ${year}`;
 
-  const firstDay = new Date(year, month, 1).getDay(); // 0=Sun
+  const firstDay = new Date(year, month, 1).getDay();
   const daysInMonth = new Date(year, month+1, 0).getDate();
   const prevDays = new Date(year, month, 0).getDate();
 
   let html = '<div class="cal-grid">';
-  ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'].forEach(d=>{
-    html += `<div class="cal-header-day">${d}</div>`;
-  });
+  ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'].forEach(d=>{ html += `<div class="cal-header-day">${d}</div>`; });
 
-  // Fill leading empty days
   for (let i = 0; i < firstDay; i++) {
-    const d = prevDays - firstDay + i + 1;
-    html += `<div class="cal-day other-month"><div class="cal-day-num">${d}</div></div>`;
+    html += `<div class="cal-day other-month"><div class="cal-day-num">${prevDays - firstDay + i + 1}</div></div>`;
   }
 
   const today = new Date(); today.setHours(0,0,0,0);
@@ -1513,33 +1579,30 @@ function renderCalendar(type) {
       dayEvents.forEach(ev=>{
         const t = SHIFT_TYPES.find(s=>s.value===ev.type)||{cls:'',label:ev.type};
         const emp = (appData.employees.list||[]).find(e=>e.id===ev.empId);
-        eventsHTML += `<div class="cal-event ${t.cls}" title="${escHtml(emp?emp.name:'?')} — ${t.label}">${escHtml(emp?emp.name.split(' ')[0]:'?')}</div>`;
+        eventsHTML += `<div class="cal-event ${t.cls}">${escHtml(emp?emp.name.split(' ')[0]:'?')}</div>`;
       });
     } else {
       (appData.employees.list||[]).forEach((emp,idx)=>{
         (emp.ferias?.periods||[]).forEach(p=>{
           if (!p.start||!p.end) return;
           if (dateStr >= p.start && dateStr <= p.end) {
-            eventsHTML += `<div class="cal-event ferias" style="background:${EMP_COLORS[idx%EMP_COLORS.length]}22;color:${EMP_COLORS[idx%EMP_COLORS.length]};" title="${escHtml(emp.name)}">${escHtml(emp.name.split(' ')[0])}</div>`;
+            eventsHTML += `<div class="cal-event ferias" style="background:${EMP_COLORS[idx%EMP_COLORS.length]}22;color:${EMP_COLORS[idx%EMP_COLORS.length]};">${escHtml(emp.name.split(' ')[0])}</div>`;
           }
         });
       });
     }
 
-    const clickAttr = (type === 'escala' && isAdmin) ? `onclick="openShiftModal('${dateStr}')"` : '';
+    const clickAttr = type === 'escala' ? `onclick="openShiftModal('${dateStr}')"` : '';
     html += `<div class="cal-day ${isToday?'today':''}" ${clickAttr}>
-      <div class="cal-day-num">${d}</div>
-      ${eventsHTML}
+      <div class="cal-day-num">${d}</div>${eventsHTML}
     </div>`;
   }
 
-  // trailing
   const total = firstDay + daysInMonth;
   const trailing = total % 7 === 0 ? 0 : 7 - (total % 7);
   for (let d = 1; d <= trailing; d++) {
     html += `<div class="cal-day other-month"><div class="cal-day-num">${d}</div></div>`;
   }
-
   html += '</div>';
   document.getElementById(gridId).innerHTML = html;
 
@@ -1551,11 +1614,7 @@ function renderShiftSummary() {
   const container = document.getElementById('shift-summary');
   const counts = {};
   Object.values(appData.escala.events||{}).forEach(dayEvs=>{
-    dayEvs.forEach(ev=>{
-      if (ev.type === 'remunerado') {
-        counts[ev.empId] = (counts[ev.empId]||0) + 1;
-      }
-    });
+    dayEvs.forEach(ev=>{ if (ev.type === 'remunerado') counts[ev.empId] = (counts[ev.empId]||0) + 1; });
   });
   const emps = appData.employees.list||[];
   if (emps.length === 0) { container.innerHTML = '<div class="text-gray text-sm">Nenhum funcionário.</div>'; return; }
@@ -1688,9 +1747,17 @@ function set(id, val) {
   if (el) el.textContent = val;
 }
 
-// =============================================
+// Google Sign In
+document.getElementById('google-signin-btn').addEventListener('click', async () => {
+  const provider = new firebase.auth.GoogleAuthProvider();
+  try {
+    await auth.signInWithPopup(provider);
+  } catch(e) {
+    document.getElementById('auth-error').textContent = 'Erro ao entrar: ' + e.message;
+  }
+});
+
 // START
-// =============================================
 init();
 </script>
 </body>
