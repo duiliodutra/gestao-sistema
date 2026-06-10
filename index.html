@@ -1216,9 +1216,8 @@ function updateCashflow() {
   // Lógica:
   // Falta = Total contas - Em conta  (quanto falta para cobrir tudo)
   // Previsão de fechamento = Previsão de recebimento - Falta
-  // Prev fechamento = Dinheiro em conta + Previsão total do mês - Contas em aberto
-  const prevFechamento = emConta + previsao - totalContas;
-  // "Já recebido" é só indicador de progresso da previsão
+  // Prev fechamento = Previsão − Já recebido − Em aberto + Em conta
+  const prevFechamento = previsao - recebido - totalContas + emConta;
   const percentRecebido = previsao > 0 ? Math.min(100, Math.round((recebido/previsao)*100)) : 0;
 
   const el = document.getElementById('cashflow-result');
