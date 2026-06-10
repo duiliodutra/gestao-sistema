@@ -438,21 +438,56 @@ window.addEventListener('unhandledrejection', function(e) {
         <div class="user-avatar" id="user-initial">?</div>
         <span id="user-name-label" class="hidden" style="font-size:12px;"></span>
         <span id="admin-badge-el" class="admin-badge hidden">Admin</span>
+        <span id="employee-badge-el" class="admin-badge hidden" style="background:var(--success-light);color:var(--success);">Funcionário</span>
       </div>
       <button class="btn-logout" onclick="signOut()">Sair</button>
     </div>
   </div>
 
   <div class="navtabs" id="navtabs-container">
-    <button class="navtab active" onclick="showTab('dashboard', this)">🏠 Painel</button>
+    <button class="navtab active" id="tab-dashboard-btn" onclick="showTab('dashboard', this)">🏠 Painel</button>
+    <button class="navtab" id="tab-minha-area-btn" style="display:none;" onclick="showTab('minha-area', this)">👤 Minha Área</button>
     <button class="navtab" id="tab-empresa-btn" onclick="showTab('empresa', this)">🏢 Empresa</button>
     <button class="navtab" id="tab-pessoal-btn" onclick="showTab('pessoal', this)">👤 Pessoal</button>
     <button class="navtab" id="tab-funcionarios-btn" onclick="showTab('funcionarios', this)">👥 Funcionários</button>
-    <button class="navtab" onclick="showTab('escala', this)">📅 Escala</button>
-    <button class="navtab" onclick="showTab('ferias', this)">🌴 Férias</button>
+    <button class="navtab" id="tab-escala-btn" onclick="showTab('escala', this)">📅 Escala</button>
+    <button class="navtab" id="tab-ferias-btn" onclick="showTab('ferias', this)">🌴 Férias</button>
   </div>
 
   <div class="content">
+    <!-- ===== MINHA ÁREA (FUNCIONÁRIO) ===== -->
+    <div class="tab-pane" id="tab-minha-area">
+      <div class="viewer-notice">ℹ️ Modo somente leitura — você está visualizando apenas os seus próprios dados.</div>
+      <div class="section-title" id="employee-portal-title">Minha Área</div>
+      <div class="section-desc" id="employee-portal-period">Carregando...</div>
+      <div id="employee-portal-salary"></div>
+      <div class="card" style="margin-top:16px;">
+        <div class="card-title" style="margin-bottom:12px;">📅 Meus Plantões</div>
+        <div class="legend">
+          <div class="legend-item"><div class="legend-dot" style="background:#dc2626;"></div>Plantão Remunerado</div>
+          <div class="legend-item"><div class="legend-dot" style="background:#6b7280;"></div>Não Remunerado</div>
+          <div class="legend-item"><div class="legend-dot" style="background:#2563eb;"></div>Hora Extra</div>
+          <div class="legend-item"><div class="legend-dot" style="background:#ea580c;"></div>Meio Plantão</div>
+        </div>
+        <div class="calendar-header">
+          <button class="btn btn-ghost btn-sm" onclick="prevCalMonth('escala')">← Anterior</button>
+          <span id="cal-emp-escala-title" style="font-weight:600;"></span>
+          <button class="btn btn-ghost btn-sm" onclick="nextCalMonth('escala')">Próximo →</button>
+        </div>
+        <div id="cal-emp-escala-grid"></div>
+        <div class="shift-summary" id="shift-summary-emp" style="margin-top:16px;"></div>
+      </div>
+      <div class="card">
+        <div class="card-title" style="margin-bottom:12px;">🌴 Minhas Férias</div>
+        <div class="calendar-header">
+          <button class="btn btn-ghost btn-sm" onclick="prevCalMonth('ferias')">← Anterior</button>
+          <span id="cal-emp-ferias-title" style="font-weight:600;"></span>
+          <button class="btn btn-ghost btn-sm" onclick="nextCalMonth('ferias')">Próximo →</button>
+        </div>
+        <div id="cal-emp-ferias-grid"></div>
+      </div>
+    </div>
+
     <!-- ===== DASHBOARD ===== -->
     <div class="tab-pane active" id="tab-dashboard">
       <div class="section-title">Painel Principal</div>
@@ -680,7 +715,7 @@ const db = firebase.firestore();
 // =============================================
 const ADMIN_EMAIL = "duiliodudu@gmail.com";
 let currentUser = null;
-let isAdmin = true;
+let isAdmin = false;
 let isEmployee = false;
 let employeeOwnId = null;
 let currentMonth = new Date().getMonth();
@@ -717,7 +752,9 @@ function init() {
 }
 
 async function checkUserRole() {
-  isAdmin = currentUser.email === ADMIN_EMAIL;
+  isAdmin = currentUser.email.toLowerCase() === ADMIN_EMAIL.toLowerCase();
+  isEmployee = false;
+  employeeOwnId = null;
   if (!isAdmin) {
     const snap = await db.collection('global').doc('employees').get();
     if (snap.exists) {
@@ -728,6 +765,10 @@ async function checkUserRole() {
   }
 }
 
+function canWrite() { return isAdmin; }
+
+function isEmployeeView() { return isEmployee && !isAdmin; }
+
 function showAuthScreen() {
   document.getElementById('loading').style.display = 'none';
   document.getElementById('auth-screen').style.display = 'flex';
@@ -735,6 +776,10 @@ function showAuthScreen() {
 }
 
 function loadApp() {
+  if (!isAdmin && !isEmployee) {
+    showAccessDenied();
+    return;
+  }
   document.getElementById('auth-screen').style.display = 'none';
   document.getElementById('app').style.display = 'flex';
   document.getElementById('loading').style.display = 'none';
@@ -743,14 +788,46 @@ function loadApp() {
   loadMonthData();
 }
 
+function showAccessDenied() {
+  document.getElementById('auth-screen').style.display = 'none';
+  document.getElementById('app').style.display = 'flex';
+  document.getElementById('loading').style.display = 'none';
+  document.getElementById('navtabs-container').style.display = 'none';
+  document.querySelector('.topbar .month-selector').style.display = 'none';
+  document.querySelector('.content').innerHTML = `
+    <div class="card" style="text-align:center;padding:48px 24px;max-width:480px;margin:40px auto;">
+      <div style="font-size:40px;margin-bottom:12px;">🔒</div>
+      <div class="section-title">Acesso não autorizado</div>
+      <p class="section-desc" style="margin-bottom:24px;">O e-mail <strong>${escHtml(currentUser.email)}</strong> não está cadastrado como administrador nem como funcionário.</p>
+      <button class="btn btn-primary" onclick="signOut()">Sair e tentar outra conta</button>
+    </div>`;
+}
+
 function updateUserUI() {
   const name = currentUser.displayName || currentUser.email;
   document.getElementById('user-initial').textContent = name.charAt(0).toUpperCase();
-  document.getElementById('user-name-label').textContent = name.split(' ')[0];
-  if (isAdmin) document.getElementById('admin-badge-el').classList.remove('hidden');
+  const nameLabel = document.getElementById('user-name-label');
+  nameLabel.textContent = name.split(' ')[0];
+  nameLabel.classList.remove('hidden');
+  document.getElementById('admin-badge-el').classList.toggle('hidden', !isAdmin);
+  document.getElementById('employee-badge-el').classList.toggle('hidden', !isEmployeeView());
 }
 
 function applyRoleVisibility() {
+  const adminTabs = ['tab-dashboard-btn','tab-empresa-btn','tab-pessoal-btn','tab-funcionarios-btn','tab-escala-btn','tab-ferias-btn'];
+  const minhaAreaBtn = document.getElementById('tab-minha-area-btn');
+
+  if (isEmployeeView()) {
+    adminTabs.forEach(id => { const el = document.getElementById(id); if (el) el.style.display = 'none'; });
+    if (minhaAreaBtn) minhaAreaBtn.style.display = '';
+    document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+    document.querySelectorAll('.navtab').forEach(b => b.classList.remove('active'));
+    document.getElementById('tab-minha-area').classList.add('active');
+    if (minhaAreaBtn) minhaAreaBtn.classList.add('active');
+    return;
+  }
+
+  if (minhaAreaBtn) minhaAreaBtn.style.display = 'none';
   if (!isAdmin) {
     ['empresa-admin-controls','pessoal-admin-controls','func-admin-controls'].forEach(id => {
       const el = document.getElementById(id); if (el) el.style.display = 'none';
@@ -825,21 +902,27 @@ async function loadMonthData() {
 }
 
 async function saveEmpresa() {
+  if (!canWrite()) return;
   await db.collection('months').doc(getMonthKey()).collection('empresa').doc('data').set(appData.empresa);
 }
 async function savePessoal() {
+  if (!canWrite()) return;
   await db.collection('months').doc(getMonthKey()).collection('pessoal').doc('data').set(appData.pessoal);
 }
 async function saveEmployees() {
+  if (!canWrite()) return;
   await db.collection('global').doc('employees').set(appData.employees);
 }
 async function saveEmployeePayments() {
+  if (!canWrite()) return;
   await db.collection('months').doc(getMonthKey()).collection('employees').doc('payments').set(appData.employeePayments);
 }
 async function saveEscala() {
+  if (!canWrite()) return;
   await db.collection('months').doc(getMonthKey()).collection('escala').doc('data').set(appData.escala);
 }
 async function saveCashflow() {
+  if (!canWrite()) return;
   await db.collection('months').doc(getMonthKey()).collection('cashflow').doc('data').set(appData.cashflow);
 }
 
@@ -847,6 +930,7 @@ async function saveCashflow() {
 // COPY FROM PREVIOUS MONTH
 // =============================================
 async function copyFromPreviousMonth() {
+  if (!canWrite()) return;
   let pm = currentMonth - 1, py = currentYear;
   if (pm < 0) { pm = 11; py--; }
   const prevKey = `${py}-${String(pm+1).padStart(2,'0')}`;
@@ -889,6 +973,10 @@ async function copyFromPreviousMonth() {
 // RENDER ALL
 // =============================================
 function renderAll() {
+  if (isEmployeeView()) {
+    renderEmployeePortal();
+    return;
+  }
   renderBlocks('empresa');
   renderBlocks('pessoal');
   renderEmployees();
@@ -896,6 +984,33 @@ function renderAll() {
   renderCalendar('escala');
   renderCalendar('ferias');
   updateCashflow();
+}
+
+function renderEmployeePortal() {
+  const emp = (appData.employees.list || []).find(e => e.id === employeeOwnId);
+  const periodEl = document.getElementById('employee-portal-period');
+  const titleEl = document.getElementById('employee-portal-title');
+  const salaryEl = document.getElementById('employee-portal-salary');
+
+  if (periodEl) periodEl.textContent = `${MONTHS[currentMonth]} ${currentYear}`;
+  if (!emp) {
+    if (titleEl) titleEl.textContent = 'Minha Área';
+    if (salaryEl) salaryEl.innerHTML = '<div class="card"><p class="text-gray text-sm">Cadastro não encontrado. Contate o administrador.</p></div>';
+    return;
+  }
+
+  if (titleEl) titleEl.textContent = `Minha Área — ${emp.name}`;
+  const pd = (appData.employeePayments || {})[emp.id] || {};
+  if (salaryEl) {
+    salaryEl.innerHTML = '';
+    const div = document.createElement('div');
+    div.className = 'employee-card';
+    div.innerHTML = buildEmployeeCard(emp, pd, true);
+    salaryEl.appendChild(div);
+  }
+
+  renderCalendar('escala', { portal: true, filterEmpId: employeeOwnId });
+  renderCalendar('ferias', { portal: true, filterEmpId: employeeOwnId });
 }
 
 // =============================================
@@ -1102,6 +1217,7 @@ function deleteItem(group, bid, idx) {
 }
 
 function togglePaid(group, bid, idx) {
+  if (!canWrite()) return;
   appData[group].blocks[bid].items[idx].paid = !appData[group].blocks[bid].items[idx].paid;
   (group === 'empresa' ? saveEmpresa() : savePessoal()).then(() => { renderBlocks(group); renderDashboard(); });
 }
@@ -1220,6 +1336,7 @@ function renderReport() {
 }
 
 function updateCashflow() {
+  if (isEmployeeView()) return;
   const emConta  = parseFloat(document.getElementById('cf-em-conta').value)||0;
   const recebido = parseFloat(document.getElementById('cf-recebido').value)||0;
   const previsao = parseFloat(document.getElementById('cf-previsao').value)||0;
@@ -1350,7 +1467,7 @@ function switchEmpTab(eid) {
   renderEmployees();
 }
 
-function buildEmployeeCard(emp, pd) {
+function buildEmployeeCard(emp, pd, readOnly = false) {
   const vac = emp.ferias || { periods: [] };
   const thirteenth = pd.decimoTerceiro || {};
   const receitas = pd.receitas || [];
@@ -1360,21 +1477,33 @@ function buildEmployeeCard(emp, pd) {
   const totalDescontos = descontos_list.reduce((s,d)=>s+(parseFloat(d.valor)||0),0);
   const liquido = totalReceitas - totalDescontos;
 
-  const receitasHTML = receitas.map((r,i)=>`
+  const receitasHTML = readOnly
+    ? (receitas.length
+      ? `<table class="data-table"><thead><tr><th>Descrição</th><th>Valor</th></tr></thead><tbody>${receitas.map(r=>`<tr><td>${escHtml(r.nome)}</td><td class="font-bold">${fmtBRL(r.valor)}</td></tr>`).join('')}</tbody></table>`
+      : '<div class="text-gray text-sm">Nenhuma receita neste mês.</div>')
+    : receitas.map((r,i)=>`
     <div style="display:flex;gap:6px;align-items:center;margin-bottom:6px;">
       <input type="text" class="form-control" style="flex:2;" value="${escHtml(r.nome)}" placeholder="Ex: Salário, Hora Extra..." onchange="updateEmpLine('${emp.id}','receitas',${i},'nome',this.value)">
       <input type="number" class="form-control" style="flex:1;min-width:90px;" value="${r.valor||''}" placeholder="0,00" onchange="updateEmpLine('${emp.id}','receitas',${i},'valor',this.value)">
       <button class="btn btn-sm btn-danger btn-icon" onclick="removeEmpLine('${emp.id}','receitas',${i})">✕</button>
     </div>`).join('');
 
-  const descontosHTML = descontos_list.map((d,i)=>`
+  const descontosHTML = readOnly
+    ? (descontos_list.length
+      ? `<table class="data-table"><thead><tr><th>Descrição</th><th>Valor</th></tr></thead><tbody>${descontos_list.map(d=>`<tr><td>${escHtml(d.nome)}</td><td class="font-bold">${fmtBRL(d.valor)}</td></tr>`).join('')}</tbody></table>`
+      : '<div class="text-gray text-sm">Nenhum desconto neste mês.</div>')
+    : descontos_list.map((d,i)=>`
     <div style="display:flex;gap:6px;align-items:center;margin-bottom:6px;">
       <input type="text" class="form-control" style="flex:2;" value="${escHtml(d.nome)}" placeholder="Ex: INSS, Adiantamento..." onchange="updateEmpLine('${emp.id}','descontos_list',${i},'nome',this.value)">
       <input type="number" class="form-control" style="flex:1;min-width:90px;" value="${d.valor||''}" placeholder="0,00" onchange="updateEmpLine('${emp.id}','descontos_list',${i},'valor',this.value)">
       <button class="btn btn-sm btn-danger btn-icon" onclick="removeEmpLine('${emp.id}','descontos_list',${i})">✕</button>
     </div>`).join('');
 
-  const periodsHTML = (vac.periods || []).map((p,i)=>`
+  const periodsHTML = readOnly
+    ? ((vac.periods || []).length
+      ? (vac.periods || []).map(p=>`<div class="period-row"><span class="text-sm">${fmtDate(p.start)} → ${fmtDate(p.end)}</span><span class="text-xs text-gray">${calcPeriodDays(p.start,p.end)} dias</span></div>`).join('')
+      : '<div class="text-gray text-sm">Nenhum período registrado.</div>')
+    : (vac.periods || []).map((p,i)=>`
     <div class="period-row">
       <input type="date" value="${p.start||''}" onchange="updateVacPeriod('${emp.id}',${i},'start',this.value)" placeholder="Início">
       <span>→</span>
@@ -1387,34 +1516,38 @@ function buildEmployeeCard(emp, pd) {
   const vacEntitlement = parseInt(emp.diasFerias||30);
   const remainingDays = vacEntitlement - totalVacDays;
 
+  const headerActions = readOnly
+    ? (pd.folhaPaga
+      ? `<span style="background:var(--success-light);color:var(--success);padding:5px 12px;border-radius:20px;font-size:12px;font-weight:600;">✅ Folha Paga</span>`
+      : `<span style="background:var(--warning-light);color:var(--warning);padding:5px 12px;border-radius:20px;font-size:12px;font-weight:600;">⏳ Folha em aberto</span>`)
+    : `${pd.folhaPaga
+          ? `<span style="background:var(--success-light);color:var(--success);padding:5px 12px;border-radius:20px;font-size:12px;font-weight:600;">✅ Folha Paga</span>
+             <button class="btn btn-sm btn-ghost" onclick="toggleFolhaPaga('${emp.id}')">Reabrir</button>`
+          : `<button class="btn btn-success" onclick="toggleFolhaPaga('${emp.id}')">✓ Marcar Folha Paga — ${fmtBRL(liquido)}</button>`
+        }
+        <button class="btn btn-sm btn-ghost" onclick="editEmployee('${emp.id}')">✏️ Editar</button>
+        <button class="btn btn-sm btn-danger" onclick="deleteEmployee('${emp.id}')">🗑️</button>`;
+
   return `
     <div class="employee-header">
       <div>
         <div class="employee-name">${escHtml(emp.name)}</div>
         <div class="text-xs text-gray">${escHtml(emp.cargo||'')} ${emp.email?'· '+emp.email:''}</div>
       </div>
-      <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
-        ${pd.folhaPaga
-          ? `<span style="background:var(--success-light);color:var(--success);padding:5px 12px;border-radius:20px;font-size:12px;font-weight:600;">✅ Folha Paga</span>
-             <button class="btn btn-sm btn-ghost" onclick="toggleFolhaPaga('${emp.id}')">Reabrir</button>`
-          : `<button class="btn btn-success" onclick="toggleFolhaPaga('${emp.id}')">✓ Marcar Folha Paga — ${fmtBRL(liquido)}</button>`
-        }
-        <button class="btn btn-sm btn-ghost" onclick="editEmployee('${emp.id}')">✏️ Editar</button>
-        <button class="btn btn-sm btn-danger" onclick="deleteEmployee('${emp.id}')">🗑️</button>
-      </div>
+      <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">${headerActions}</div>
     </div>
     <div class="employee-body">
       <div class="emp-grid">
         <div>
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
             <div class="card-title">💰 Receitas — ${MONTHS[currentMonth]}</div>
-            <button class="btn btn-sm btn-success" onclick="addEmpLine('${emp.id}','receitas')">+ Receita</button>
+            ${readOnly ? '' : `<button class="btn btn-sm btn-success" onclick="addEmpLine('${emp.id}','receitas')">+ Receita</button>`}
           </div>
-          <div style="display:flex;gap:6px;margin-bottom:4px;">
+          ${readOnly ? '' : `<div style="display:flex;gap:6px;margin-bottom:4px;">
             <span class="text-xs text-gray" style="flex:2;">Descrição</span>
             <span class="text-xs text-gray" style="flex:1;">Valor</span>
             <span style="width:32px;"></span>
-          </div>
+          </div>`}
           ${receitasHTML || '<div class="text-gray text-sm" style="margin-bottom:8px;">Nenhuma receita. Clique em + Receita.</div>'}
           <div style="background:var(--success-light);border-radius:var(--radius);padding:8px 12px;margin-top:4px;display:flex;justify-content:space-between;">
             <span style="font-size:12px;color:var(--success);">Total Receitas</span>
@@ -1424,13 +1557,13 @@ function buildEmployeeCard(emp, pd) {
         <div>
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
             <div class="card-title">➖ Descontos — ${MONTHS[currentMonth]}</div>
-            <button class="btn btn-sm btn-danger" onclick="addEmpLine('${emp.id}','descontos_list')">+ Desconto</button>
+            ${readOnly ? '' : `<button class="btn btn-sm btn-danger" onclick="addEmpLine('${emp.id}','descontos_list')">+ Desconto</button>`}
           </div>
-          <div style="display:flex;gap:6px;margin-bottom:4px;">
+          ${readOnly ? '' : `<div style="display:flex;gap:6px;margin-bottom:4px;">
             <span class="text-xs text-gray" style="flex:2;">Descrição</span>
             <span class="text-xs text-gray" style="flex:1;">Valor</span>
             <span style="width:32px;"></span>
-          </div>
+          </div>`}
           ${descontosHTML || '<div class="text-gray text-sm" style="margin-bottom:8px;">Nenhum desconto. Clique em + Desconto.</div>'}
           <div style="background:var(--danger-light);border-radius:var(--radius);padding:8px 12px;margin-top:4px;display:flex;justify-content:space-between;">
             <span style="font-size:12px;color:var(--danger);">Total Descontos</span>
@@ -1447,18 +1580,18 @@ function buildEmployeeCard(emp, pd) {
         <div class="emp-grid">
           <div>
             <div class="form-group mb-1"><div class="form-label">Valor Total do 13º</div>
-              <input type="number" class="form-control" value="${thirteenth.valorTotal||''}" onchange="updateDecimo('${emp.id}','valorTotal',this.value)" placeholder="0,00">
+              ${readOnly ? `<div class="form-control" style="background:var(--gray-50);">${fmtBRL(thirteenth.valorTotal||0)}</div>` : `<input type="number" class="form-control" value="${thirteenth.valorTotal||''}" onchange="updateDecimo('${emp.id}','valorTotal',this.value)" placeholder="0,00">`}
             </div>
             <div class="form-group mb-1"><div class="form-label">Valor Pago até Agora</div>
-              <input type="number" class="form-control" value="${thirteenth.valorPago||''}" onchange="updateDecimo('${emp.id}','valorPago',this.value)" placeholder="0,00">
+              ${readOnly ? `<div class="form-control" style="background:var(--gray-50);">${fmtBRL(thirteenth.valorPago||0)}</div>` : `<input type="number" class="form-control" value="${thirteenth.valorPago||''}" onchange="updateDecimo('${emp.id}','valorPago',this.value)" placeholder="0,00">`}
             </div>
           </div>
           <div>
             <div class="form-group mb-1"><div class="form-label">Data do Último Pagamento</div>
-              <input type="date" class="form-control" value="${thirteenth.dataUltimoPgto||''}" onchange="updateDecimo('${emp.id}','dataUltimoPgto',this.value)">
+              ${readOnly ? `<div class="form-control" style="background:var(--gray-50);">${fmtDate(thirteenth.dataUltimoPgto)}</div>` : `<input type="date" class="form-control" value="${thirteenth.dataUltimoPgto||''}" onchange="updateDecimo('${emp.id}','dataUltimoPgto',this.value)">`}
             </div>
             <div class="form-group mb-1"><div class="form-label">Forma de Pagamento</div>
-              <input type="text" class="form-control" value="${thirteenth.forma||''}" onchange="updateDecimo('${emp.id}','forma',this.value)" placeholder="Ex: PIX, Depósito...">
+              ${readOnly ? `<div class="form-control" style="background:var(--gray-50);">${escHtml(thirteenth.forma||'—')}</div>` : `<input type="text" class="form-control" value="${thirteenth.forma||''}" onchange="updateDecimo('${emp.id}','forma',this.value)" placeholder="Ex: PIX, Depósito...">`}
             </div>
           </div>
         </div>
@@ -1470,7 +1603,7 @@ function buildEmployeeCard(emp, pd) {
       <div style="margin-top:16px;">
         <div class="card-title" style="margin-bottom:10px;">🌴 Férias (Direito: ${vacEntitlement} dias)</div>
         ${periodsHTML || '<div class="text-gray text-sm">Nenhum período registrado.</div>'}
-        <button class="btn btn-ghost btn-sm mt-1" onclick="addVacPeriod('${emp.id}')">+ Período</button>
+        ${readOnly ? '' : `<button class="btn btn-ghost btn-sm mt-1" onclick="addVacPeriod('${emp.id}')">+ Período</button>`}
         <div style="margin-top:8px;display:flex;gap:16px;">
           <div class="stat-box" style="flex:1;"><div class="stat-label">Dias Usados</div><div class="stat-value blue">${totalVacDays}</div></div>
           <div class="stat-box" style="flex:1;"><div class="stat-label">Dias Restantes</div><div class="stat-value ${remainingDays<0?'red':'green'}">${remainingDays}</div></div>
@@ -1486,6 +1619,7 @@ function calcLiquido(pd) {
 }
 
 function toggleFolhaPaga(eid) {
+  if (!canWrite()) return;
   if (!appData.employeePayments) appData.employeePayments = {};
   if (!appData.employeePayments[eid]) appData.employeePayments[eid] = {};
   appData.employeePayments[eid].folhaPaga = !appData.employeePayments[eid].folhaPaga;
@@ -1673,13 +1807,17 @@ const SHIFT_TYPES = [
 
 const EMP_COLORS = ['#1e40af','#065f46','#92400e','#5b21b6','#9f1239','#0c4a6e'];
 
-function renderCalendar(type) {
+function renderCalendar(type, opts = {}) {
   const month = type === 'escala' ? calEscalaMonth : calFeriasMonth;
   const year  = type === 'escala' ? calEscalaYear  : calFeriasYear;
-  const gridId = `cal-${type}-grid`;
-  const titleId = `cal-${type}-title`;
+  const gridId = opts.portal ? `cal-emp-${type}-grid` : `cal-${type}-grid`;
+  const titleId = opts.portal ? `cal-emp-${type}-title` : `cal-${type}-title`;
+  const filterEmpId = opts.filterEmpId || null;
+  const gridEl = document.getElementById(gridId);
+  const titleEl = document.getElementById(titleId);
+  if (!gridEl || !titleEl) return;
 
-  document.getElementById(titleId).textContent = `${MONTHS[month]} ${year}`;
+  titleEl.textContent = `${MONTHS[month]} ${year}`;
 
   const firstDay = new Date(year, month, 1).getDay();
   const daysInMonth = new Date(year, month+1, 0).getDate();
@@ -1701,24 +1839,31 @@ function renderCalendar(type) {
 
     if (type === 'escala') {
       const dayEvents = (appData.escala.events||{})[dateStr] || [];
-      dayEvents.forEach(ev=>{
+      dayEvents
+        .filter(ev => !filterEmpId || ev.empId === filterEmpId)
+        .forEach(ev=>{
         const t = SHIFT_TYPES.find(s=>s.value===ev.type)||{cls:'',label:ev.type};
         const emp = (appData.employees.list||[]).find(e=>e.id===ev.empId);
-        eventsHTML += `<div class="cal-event ${t.cls}">${escHtml(emp?emp.name.split(' ')[0]:'?')}</div>`;
+        const label = filterEmpId ? t.label.split(' ').pop() : (emp ? emp.name.split(' ')[0] : '?');
+        eventsHTML += `<div class="cal-event ${t.cls}" title="${escHtml(t.label)}">${escHtml(label)}</div>`;
       });
     } else {
-      (appData.employees.list||[]).forEach((emp,idx)=>{
+      const emps = filterEmpId
+        ? (appData.employees.list||[]).filter(e => e.id === filterEmpId)
+        : (appData.employees.list||[]);
+      emps.forEach((emp,idx)=>{
         (emp.ferias?.periods||[]).forEach(p=>{
           if (!p.start||!p.end) return;
           if (dateStr >= p.start && dateStr <= p.end) {
-            eventsHTML += `<div class="cal-event ferias" style="background:${EMP_COLORS[idx%EMP_COLORS.length]}22;color:${EMP_COLORS[idx%EMP_COLORS.length]};">${escHtml(emp.name.split(' ')[0])}</div>`;
+            const color = EMP_COLORS[idx % EMP_COLORS.length];
+            eventsHTML += `<div class="cal-event ferias" style="background:${color}22;color:${color};">${filterEmpId ? 'Férias' : escHtml(emp.name.split(' ')[0])}</div>`;
           }
         });
       });
     }
 
-    const clickAttr = type === 'escala' ? `onclick="openShiftModal('${dateStr}')"` : '';
-    html += `<div class="cal-day ${isToday?'today':''}" ${clickAttr}>
+    const clickAttr = (type === 'escala' && canWrite()) ? `onclick="openShiftModal('${dateStr}')"` : '';
+    html += `<div class="cal-day ${isToday?'today':''}" ${clickAttr} style="${!canWrite() && type==='escala' ? 'cursor:default;' : ''}">
       <div class="cal-day-num">${d}</div>${eventsHTML}
     </div>`;
   }
@@ -1729,24 +1874,31 @@ function renderCalendar(type) {
     html += `<div class="cal-day other-month"><div class="cal-day-num">${d}</div></div>`;
   }
   html += '</div>';
-  document.getElementById(gridId).innerHTML = html;
+  gridEl.innerHTML = html;
 
-  if (type === 'escala') renderShiftSummary();
-  if (type === 'ferias') renderFeriasLegend();
+  if (type === 'escala') renderShiftSummary(opts.portal ? 'shift-summary-emp' : 'shift-summary', filterEmpId);
+  if (type === 'ferias' && !opts.portal) renderFeriasLegend();
 }
 
-function renderShiftSummary() {
-  const container = document.getElementById('shift-summary');
+function renderShiftSummary(containerId = 'shift-summary', filterEmpId = null) {
+  const container = document.getElementById(containerId);
+  if (!container) return;
   const counts = {};
   Object.values(appData.escala.events||{}).forEach(dayEvs=>{
-    dayEvs.forEach(ev=>{ if (ev.type === 'remunerado') counts[ev.empId] = (counts[ev.empId]||0) + 1; });
+    dayEvs.forEach(ev=>{
+      if (ev.type === 'remunerado' && (!filterEmpId || ev.empId === filterEmpId)) {
+        counts[ev.empId] = (counts[ev.empId]||0) + 1;
+      }
+    });
   });
-  const emps = appData.employees.list||[];
-  if (emps.length === 0) { container.innerHTML = '<div class="text-gray text-sm">Nenhum funcionário.</div>'; return; }
+  const emps = filterEmpId
+    ? (appData.employees.list||[]).filter(e => e.id === filterEmpId)
+    : (appData.employees.list||[]);
+  if (emps.length === 0) { container.innerHTML = '<div class="text-gray text-sm">Nenhum plantão neste mês.</div>'; return; }
   container.innerHTML = emps.map(e=>`
     <div class="shift-box">
       <div class="shift-box-name">${escHtml(e.name.split(' ')[0])}</div>
-      <div class="shift-box-count">${counts[e.id]||0} <span style="font-size:12px;font-weight:400;color:var(--gray-400);">plantões</span></div>
+      <div class="shift-box-count">${counts[e.id]||0} <span style="font-size:12px;font-weight:400;color:var(--gray-400);">plantões remunerados</span></div>
     </div>`).join('');
 }
 
@@ -1762,15 +1914,18 @@ function renderFeriasLegend() {
 function prevCalMonth(type) {
   if (type==='escala') { calEscalaMonth--; if(calEscalaMonth<0){calEscalaMonth=11;calEscalaYear--;} }
   else { calFeriasMonth--; if(calFeriasMonth<0){calFeriasMonth=11;calFeriasYear--;} }
-  renderCalendar(type);
+  if (isEmployeeView()) renderEmployeePortal();
+  else renderCalendar(type);
 }
 function nextCalMonth(type) {
   if (type==='escala') { calEscalaMonth++; if(calEscalaMonth>11){calEscalaMonth=0;calEscalaYear++;} }
   else { calFeriasMonth++; if(calFeriasMonth>11){calFeriasMonth=0;calFeriasYear++;} }
-  renderCalendar(type);
+  if (isEmployeeView()) renderEmployeePortal();
+  else renderCalendar(type);
 }
 
 function openShiftModal(dateStr) {
+  if (!canWrite()) return;
   const emps = appData.employees.list||[];
   if (emps.length === 0) return alert('Cadastre funcionários primeiro.');
   const existing = (appData.escala.events||{})[dateStr]||[];
@@ -1808,6 +1963,7 @@ function openShiftModal(dateStr) {
 }
 
 function confirmAddShift(dateStr) {
+  if (!canWrite()) return;
   const empId = document.getElementById('m-shift-emp').value;
   const type = document.getElementById('m-shift-type').value;
   if (!appData.escala.events) appData.escala.events = {};
@@ -1818,6 +1974,7 @@ function confirmAddShift(dateStr) {
 }
 
 function removeShiftEvent(dateStr, idx) {
+  if (!canWrite()) return;
   appData.escala.events[dateStr].splice(idx, 1);
   if (appData.escala.events[dateStr].length === 0) delete appData.escala.events[dateStr];
   saveEscala().then(()=>{ renderCalendar('escala'); openShiftModal(dateStr); });
@@ -1827,10 +1984,11 @@ function removeShiftEvent(dateStr, idx) {
 // TABS
 // =============================================
 function showTab(name, btn) {
+  if (isEmployeeView() && name !== 'minha-area') return;
   document.querySelectorAll('.tab-pane').forEach(p=>p.classList.remove('active'));
   document.querySelectorAll('.navtab').forEach(b=>b.classList.remove('active'));
   document.getElementById('tab-'+name).classList.add('active');
-  btn.classList.add('active');
+  if (btn) btn.classList.add('active');
 }
 
 // =============================================
