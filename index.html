@@ -457,35 +457,10 @@ window.addEventListener('unhandledrejection', function(e) {
   <div class="content">
     <!-- ===== MINHA ÁREA (FUNCIONÁRIO) ===== -->
     <div class="tab-pane" id="tab-minha-area">
-      <div class="viewer-notice">ℹ️ Modo somente leitura — você está visualizando apenas os seus próprios dados.</div>
+      <div class="viewer-notice">ℹ️ Modo somente leitura — aqui você vê apenas a sua folha, receitas, descontos e férias. Use as abas <strong>Escala</strong> e <strong>Férias</strong> para consultar a agenda de toda a equipe.</div>
       <div class="section-title" id="employee-portal-title">Minha Área</div>
       <div class="section-desc" id="employee-portal-period">Carregando...</div>
       <div id="employee-portal-salary"></div>
-      <div class="card" style="margin-top:16px;">
-        <div class="card-title" style="margin-bottom:12px;">📅 Meus Plantões</div>
-        <div class="legend">
-          <div class="legend-item"><div class="legend-dot" style="background:#dc2626;"></div>Plantão Remunerado</div>
-          <div class="legend-item"><div class="legend-dot" style="background:#6b7280;"></div>Não Remunerado</div>
-          <div class="legend-item"><div class="legend-dot" style="background:#2563eb;"></div>Hora Extra</div>
-          <div class="legend-item"><div class="legend-dot" style="background:#ea580c;"></div>Meio Plantão</div>
-        </div>
-        <div class="calendar-header">
-          <button class="btn btn-ghost btn-sm" onclick="prevCalMonth('escala')">← Anterior</button>
-          <span id="cal-emp-escala-title" style="font-weight:600;"></span>
-          <button class="btn btn-ghost btn-sm" onclick="nextCalMonth('escala')">Próximo →</button>
-        </div>
-        <div id="cal-emp-escala-grid"></div>
-        <div class="shift-summary" id="shift-summary-emp" style="margin-top:16px;"></div>
-      </div>
-      <div class="card">
-        <div class="card-title" style="margin-bottom:12px;">🌴 Minhas Férias</div>
-        <div class="calendar-header">
-          <button class="btn btn-ghost btn-sm" onclick="prevCalMonth('ferias')">← Anterior</button>
-          <span id="cal-emp-ferias-title" style="font-weight:600;"></span>
-          <button class="btn btn-ghost btn-sm" onclick="nextCalMonth('ferias')">Próximo →</button>
-        </div>
-        <div id="cal-emp-ferias-grid"></div>
-      </div>
     </div>
 
     <!-- ===== DASHBOARD ===== -->
@@ -633,7 +608,7 @@ window.addEventListener('unhandledrejection', function(e) {
     <!-- ===== ESCALA ===== -->
     <div class="tab-pane" id="tab-escala">
       <div class="section-title">📅 Escala de Plantões</div>
-      <div class="section-desc">Gerencie a escala de trabalho dos funcionários</div>
+      <div class="section-desc" id="escala-desc">Gerencie a escala de trabalho dos funcionários</div>
       <div class="legend">
         <div class="legend-item"><div class="legend-dot" style="background:#dc2626;"></div>Plantão Remunerado</div>
         <div class="legend-item"><div class="legend-dot" style="background:#6b7280;"></div>Não Remunerado</div>
@@ -657,7 +632,7 @@ window.addEventListener('unhandledrejection', function(e) {
     <!-- ===== FÉRIAS ===== -->
     <div class="tab-pane" id="tab-ferias">
       <div class="section-title">🌴 Calendário de Férias</div>
-      <div class="section-desc">Visualize os períodos de férias dos funcionários</div>
+      <div class="section-desc" id="ferias-desc">Visualize os períodos de férias dos funcionários</div>
       <div class="legend" id="ferias-legend"></div>
       <div class="card">
         <div class="calendar-header">
@@ -813,21 +788,36 @@ function updateUserUI() {
   document.getElementById('employee-badge-el').classList.toggle('hidden', !isEmployeeView());
 }
 
+function updateEmployeeTabLabels() {
+  const escalaDesc = document.getElementById('escala-desc');
+  const feriasDesc = document.getElementById('ferias-desc');
+  if (isEmployeeView()) {
+    if (escalaDesc) escalaDesc.textContent = 'Visualize a escala de todos os colegas (somente leitura)';
+    if (feriasDesc) feriasDesc.textContent = 'Visualize as férias de todos os colegas (somente leitura)';
+  } else {
+    if (escalaDesc) escalaDesc.textContent = 'Gerencie a escala de trabalho dos funcionários';
+    if (feriasDesc) feriasDesc.textContent = 'Visualize os períodos de férias dos funcionários';
+  }
+}
+
 function applyRoleVisibility() {
-  const adminTabs = ['tab-dashboard-btn','tab-empresa-btn','tab-pessoal-btn','tab-funcionarios-btn','tab-escala-btn','tab-ferias-btn'];
+  const hiddenForEmployee = ['tab-dashboard-btn','tab-empresa-btn','tab-pessoal-btn','tab-funcionarios-btn'];
   const minhaAreaBtn = document.getElementById('tab-minha-area-btn');
 
   if (isEmployeeView()) {
-    adminTabs.forEach(id => { const el = document.getElementById(id); if (el) el.style.display = 'none'; });
+    hiddenForEmployee.forEach(id => { const el = document.getElementById(id); if (el) el.style.display = 'none'; });
+    ['tab-escala-btn','tab-ferias-btn'].forEach(id => { const el = document.getElementById(id); if (el) el.style.display = ''; });
     if (minhaAreaBtn) minhaAreaBtn.style.display = '';
     document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
     document.querySelectorAll('.navtab').forEach(b => b.classList.remove('active'));
     document.getElementById('tab-minha-area').classList.add('active');
     if (minhaAreaBtn) minhaAreaBtn.classList.add('active');
+    updateEmployeeTabLabels();
     return;
   }
 
   if (minhaAreaBtn) minhaAreaBtn.style.display = 'none';
+  updateEmployeeTabLabels();
   if (!isAdmin) {
     ['empresa-admin-controls','pessoal-admin-controls','func-admin-controls'].forEach(id => {
       const el = document.getElementById(id); if (el) el.style.display = 'none';
@@ -975,6 +965,8 @@ async function copyFromPreviousMonth() {
 function renderAll() {
   if (isEmployeeView()) {
     renderEmployeePortal();
+    renderCalendar('escala');
+    renderCalendar('ferias');
     return;
   }
   renderBlocks('empresa');
@@ -1008,9 +1000,6 @@ function renderEmployeePortal() {
     div.innerHTML = buildEmployeeCard(emp, pd, true);
     salaryEl.appendChild(div);
   }
-
-  renderCalendar('escala', { portal: true, filterEmpId: employeeOwnId });
-  renderCalendar('ferias', { portal: true, filterEmpId: employeeOwnId });
 }
 
 // =============================================
@@ -1807,12 +1796,11 @@ const SHIFT_TYPES = [
 
 const EMP_COLORS = ['#1e40af','#065f46','#92400e','#5b21b6','#9f1239','#0c4a6e'];
 
-function renderCalendar(type, opts = {}) {
+function renderCalendar(type) {
   const month = type === 'escala' ? calEscalaMonth : calFeriasMonth;
   const year  = type === 'escala' ? calEscalaYear  : calFeriasYear;
-  const gridId = opts.portal ? `cal-emp-${type}-grid` : `cal-${type}-grid`;
-  const titleId = opts.portal ? `cal-emp-${type}-title` : `cal-${type}-title`;
-  const filterEmpId = opts.filterEmpId || null;
+  const gridId = `cal-${type}-grid`;
+  const titleId = `cal-${type}-title`;
   const gridEl = document.getElementById(gridId);
   const titleEl = document.getElementById(titleId);
   if (!gridEl || !titleEl) return;
@@ -1839,24 +1827,17 @@ function renderCalendar(type, opts = {}) {
 
     if (type === 'escala') {
       const dayEvents = (appData.escala.events||{})[dateStr] || [];
-      dayEvents
-        .filter(ev => !filterEmpId || ev.empId === filterEmpId)
-        .forEach(ev=>{
+      dayEvents.forEach(ev=>{
         const t = SHIFT_TYPES.find(s=>s.value===ev.type)||{cls:'',label:ev.type};
         const emp = (appData.employees.list||[]).find(e=>e.id===ev.empId);
-        const label = filterEmpId ? t.label.split(' ').pop() : (emp ? emp.name.split(' ')[0] : '?');
-        eventsHTML += `<div class="cal-event ${t.cls}" title="${escHtml(t.label)}">${escHtml(label)}</div>`;
+        eventsHTML += `<div class="cal-event ${t.cls}">${escHtml(emp?emp.name.split(' ')[0]:'?')}</div>`;
       });
     } else {
-      const emps = filterEmpId
-        ? (appData.employees.list||[]).filter(e => e.id === filterEmpId)
-        : (appData.employees.list||[]);
-      emps.forEach((emp,idx)=>{
+      (appData.employees.list||[]).forEach((emp,idx)=>{
         (emp.ferias?.periods||[]).forEach(p=>{
           if (!p.start||!p.end) return;
           if (dateStr >= p.start && dateStr <= p.end) {
-            const color = EMP_COLORS[idx % EMP_COLORS.length];
-            eventsHTML += `<div class="cal-event ferias" style="background:${color}22;color:${color};">${filterEmpId ? 'Férias' : escHtml(emp.name.split(' ')[0])}</div>`;
+            eventsHTML += `<div class="cal-event ferias" style="background:${EMP_COLORS[idx%EMP_COLORS.length]}22;color:${EMP_COLORS[idx%EMP_COLORS.length]};">${escHtml(emp.name.split(' ')[0])}</div>`;
           }
         });
       });
@@ -1876,29 +1857,23 @@ function renderCalendar(type, opts = {}) {
   html += '</div>';
   gridEl.innerHTML = html;
 
-  if (type === 'escala') renderShiftSummary(opts.portal ? 'shift-summary-emp' : 'shift-summary', filterEmpId);
-  if (type === 'ferias' && !opts.portal) renderFeriasLegend();
+  if (type === 'escala') renderShiftSummary();
+  if (type === 'ferias') renderFeriasLegend();
 }
 
-function renderShiftSummary(containerId = 'shift-summary', filterEmpId = null) {
-  const container = document.getElementById(containerId);
+function renderShiftSummary() {
+  const container = document.getElementById('shift-summary');
   if (!container) return;
   const counts = {};
   Object.values(appData.escala.events||{}).forEach(dayEvs=>{
-    dayEvs.forEach(ev=>{
-      if (ev.type === 'remunerado' && (!filterEmpId || ev.empId === filterEmpId)) {
-        counts[ev.empId] = (counts[ev.empId]||0) + 1;
-      }
-    });
+    dayEvs.forEach(ev=>{ if (ev.type === 'remunerado') counts[ev.empId] = (counts[ev.empId]||0) + 1; });
   });
-  const emps = filterEmpId
-    ? (appData.employees.list||[]).filter(e => e.id === filterEmpId)
-    : (appData.employees.list||[]);
-  if (emps.length === 0) { container.innerHTML = '<div class="text-gray text-sm">Nenhum plantão neste mês.</div>'; return; }
+  const emps = appData.employees.list||[];
+  if (emps.length === 0) { container.innerHTML = '<div class="text-gray text-sm">Nenhum funcionário.</div>'; return; }
   container.innerHTML = emps.map(e=>`
     <div class="shift-box">
       <div class="shift-box-name">${escHtml(e.name.split(' ')[0])}</div>
-      <div class="shift-box-count">${counts[e.id]||0} <span style="font-size:12px;font-weight:400;color:var(--gray-400);">plantões remunerados</span></div>
+      <div class="shift-box-count">${counts[e.id]||0} <span style="font-size:12px;font-weight:400;color:var(--gray-400);">plantões</span></div>
     </div>`).join('');
 }
 
@@ -1914,14 +1889,12 @@ function renderFeriasLegend() {
 function prevCalMonth(type) {
   if (type==='escala') { calEscalaMonth--; if(calEscalaMonth<0){calEscalaMonth=11;calEscalaYear--;} }
   else { calFeriasMonth--; if(calFeriasMonth<0){calFeriasMonth=11;calFeriasYear--;} }
-  if (isEmployeeView()) renderEmployeePortal();
-  else renderCalendar(type);
+  renderCalendar(type);
 }
 function nextCalMonth(type) {
   if (type==='escala') { calEscalaMonth++; if(calEscalaMonth>11){calEscalaMonth=0;calEscalaYear++;} }
   else { calFeriasMonth++; if(calFeriasMonth>11){calFeriasMonth=0;calFeriasYear++;} }
-  if (isEmployeeView()) renderEmployeePortal();
-  else renderCalendar(type);
+  renderCalendar(type);
 }
 
 function openShiftModal(dateStr) {
@@ -1984,7 +1957,7 @@ function removeShiftEvent(dateStr, idx) {
 // TABS
 // =============================================
 function showTab(name, btn) {
-  if (isEmployeeView() && name !== 'minha-area') return;
+  if (isEmployeeView() && !['minha-area','escala','ferias'].includes(name)) return;
   document.querySelectorAll('.tab-pane').forEach(p=>p.classList.remove('active'));
   document.querySelectorAll('.navtab').forEach(b=>b.classList.remove('active'));
   document.getElementById('tab-'+name).classList.add('active');
