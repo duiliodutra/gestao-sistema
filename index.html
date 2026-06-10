@@ -407,7 +407,7 @@ window.addEventListener('unhandledrejection', function(e) {
 </script>
 
 <!-- AUTH SCREEN -->
-<div id="auth-screen" class="hidden">
+<div id="auth-screen" style="display:none;">
   <div class="auth-card">
     <div class="auth-logo">📊</div>
     <div class="auth-title">Sistema de Gestão</div>
@@ -703,7 +703,9 @@ let appData = {
 // =============================================
 function init() {
   populateMonthYear();
+  const authTimeout = setTimeout(showAuthScreen, 8000);
   auth.onAuthStateChanged(async user => {
+    clearTimeout(authTimeout);
     if (user) {
       currentUser = user;
       await checkUserRole();
@@ -733,7 +735,7 @@ function showAuthScreen() {
 }
 
 function loadApp() {
-  document.getElementById('auth-screen').classList.add('hidden');
+  document.getElementById('auth-screen').style.display = 'none';
   document.getElementById('app').style.display = 'flex';
   document.getElementById('loading').style.display = 'none';
   updateUserUI();
@@ -1871,27 +1873,12 @@ function set(id, val) {
   if (el) el.textContent = val;
 }
 
-// Google Sign In — popup no desktop, redirect no mobile
-const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
-
-// Handle redirect result on page load
-auth.getRedirectResult().then(result => {
-  if (result && result.user) {
-    // Already handled by onAuthStateChanged
-  }
-}).catch(e => {
-  const el = document.getElementById('auth-error');
-  if (el) el.textContent = 'Erro ao entrar: ' + e.message;
-});
-
+// Google Sign In
 document.getElementById('google-signin-btn').addEventListener('click', async () => {
   const provider = new firebase.auth.GoogleAuthProvider();
+  provider.setCustomParameters({ prompt: 'select_account' });
   try {
-    if (isMobile) {
-      await auth.signInWithRedirect(provider);
-    } else {
-      await auth.signInWithPopup(provider);
-    }
+    await auth.signInWithPopup(provider);
   } catch(e) {
     const el = document.getElementById('auth-error');
     if (el) el.textContent = 'Erro ao entrar: ' + e.message;
