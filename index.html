@@ -1,0 +1,1697 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Gestão — Sistema</title>
+<style>
+  :root {
+    --primary: #1a56db;
+    --primary-light: #e8f0fe;
+    --success: #0e9f6e;
+    --success-light: #d1fae5;
+    --danger: #e02424;
+    --danger-light: #fde8e8;
+    --warning: #d97706;
+    --warning-light: #fef3c7;
+    --gray-50: #f9fafb;
+    --gray-100: #f3f4f6;
+    --gray-200: #e5e7eb;
+    --gray-300: #d1d5db;
+    --gray-400: #9ca3af;
+    --gray-500: #6b7280;
+    --gray-600: #4b5563;
+    --gray-700: #374151;
+    --gray-800: #1f2937;
+    --gray-900: #111827;
+    --radius: 8px;
+    --radius-lg: 12px;
+    --shadow: 0 1px 3px rgba(0,0,0,0.08);
+    --shadow-md: 0 4px 12px rgba(0,0,0,0.1);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: var(--gray-50);
+    color: var(--gray-800);
+    min-height: 100vh;
+    font-size: 14px;
+  }
+
+  /* AUTH SCREEN */
+  #auth-screen {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, #1a56db 0%, #0e9f6e 100%);
+  }
+  .auth-card {
+    background: white;
+    border-radius: 16px;
+    padding: 48px 40px;
+    text-align: center;
+    max-width: 400px;
+    width: 90%;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.15);
+  }
+  .auth-logo { font-size: 48px; margin-bottom: 8px; }
+  .auth-title { font-size: 22px; font-weight: 700; color: var(--gray-900); margin-bottom: 4px; }
+  .auth-sub { color: var(--gray-500); margin-bottom: 32px; font-size: 14px; }
+  .auth-access-note {
+    background: var(--gray-50);
+    border: 1px solid var(--gray-200);
+    border-radius: var(--radius);
+    padding: 12px;
+    font-size: 12px;
+    color: var(--gray-500);
+    margin-top: 16px;
+    text-align: left;
+  }
+  #google-signin-btn {
+    width: 100%;
+    padding: 12px 20px;
+    background: white;
+    border: 2px solid var(--gray-200);
+    border-radius: var(--radius);
+    font-size: 15px;
+    font-weight: 500;
+    color: var(--gray-700);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    transition: all 0.2s;
+  }
+  #google-signin-btn:hover { border-color: var(--primary); color: var(--primary); background: var(--primary-light); }
+  #auth-error { color: var(--danger); font-size: 13px; margin-top: 12px; }
+
+  /* TOP BAR */
+  #app { display: none; min-height: 100vh; flex-direction: column; }
+  .topbar {
+    background: white;
+    border-bottom: 1px solid var(--gray-200);
+    padding: 0 20px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 52px;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+  .topbar-brand { font-weight: 700; font-size: 16px; color: var(--gray-900); display: flex; align-items: center; gap: 8px; }
+  .topbar-brand span { color: var(--primary); }
+  .topbar-right { display: flex; align-items: center; gap: 12px; }
+  .user-badge {
+    display: flex; align-items: center; gap: 8px;
+    font-size: 13px; color: var(--gray-600);
+  }
+  .user-avatar {
+    width: 30px; height: 30px; border-radius: 50%;
+    background: var(--primary-light); display: flex; align-items: center; justify-content: center;
+    font-size: 12px; font-weight: 600; color: var(--primary);
+  }
+  .admin-badge {
+    background: var(--primary-light); color: var(--primary);
+    padding: 2px 8px; border-radius: 20px; font-size: 11px; font-weight: 600;
+  }
+  .month-selector {
+    display: flex; align-items: center; gap: 8px;
+  }
+  .month-selector select, .month-selector button {
+    padding: 5px 10px; border: 1px solid var(--gray-200); border-radius: var(--radius);
+    background: white; cursor: pointer; font-size: 13px; color: var(--gray-700);
+  }
+  .month-selector button { background: var(--primary); color: white; border-color: var(--primary); font-weight: 500; }
+  .btn-logout { padding: 5px 12px; border: 1px solid var(--gray-200); border-radius: var(--radius); background: white; cursor: pointer; color: var(--gray-600); font-size: 13px; }
+  .btn-logout:hover { background: var(--danger-light); color: var(--danger); border-color: var(--danger); }
+
+  /* NAV TABS */
+  .navtabs {
+    background: white;
+    border-bottom: 1px solid var(--gray-200);
+    display: flex;
+    overflow-x: auto;
+    padding: 0 16px;
+    gap: 4px;
+  }
+  .navtabs::-webkit-scrollbar { height: 3px; }
+  .navtab {
+    padding: 12px 16px;
+    border: none;
+    background: none;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--gray-500);
+    white-space: nowrap;
+    border-bottom: 2px solid transparent;
+    transition: all 0.2s;
+  }
+  .navtab.active { color: var(--primary); border-bottom-color: var(--primary); }
+  .navtab:hover:not(.active) { color: var(--gray-700); }
+
+  /* MAIN CONTENT */
+  .content { flex: 1; padding: 20px; max-width: 1200px; margin: 0 auto; width: 100%; }
+  .tab-pane { display: none; }
+  .tab-pane.active { display: block; }
+
+  /* CARDS & BLOCKS */
+  .card {
+    background: white;
+    border: 1px solid var(--gray-200);
+    border-radius: var(--radius-lg);
+    padding: 20px;
+    margin-bottom: 16px;
+    box-shadow: var(--shadow);
+  }
+  .card-header {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 16px; padding-bottom: 12px; border-bottom: 1px solid var(--gray-100);
+  }
+  .card-title { font-size: 15px; font-weight: 600; color: var(--gray-800); }
+  .card-subtitle { font-size: 12px; color: var(--gray-400); margin-top: 2px; }
+
+  /* SUMMARY GRID */
+  .summary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; margin-bottom: 16px; }
+  .stat-box {
+    background: var(--gray-50);
+    border: 1px solid var(--gray-200);
+    border-radius: var(--radius);
+    padding: 14px 16px;
+  }
+  .stat-label { font-size: 11px; color: var(--gray-500); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; }
+  .stat-value { font-size: 20px; font-weight: 700; color: var(--gray-900); }
+  .stat-value.green { color: var(--success); }
+  .stat-value.red { color: var(--danger); }
+  .stat-value.blue { color: var(--primary); }
+  .stat-value.orange { color: var(--warning); }
+
+  /* TABLE */
+  .data-table { width: 100%; border-collapse: collapse; }
+  .data-table th {
+    text-align: left; padding: 8px 12px; font-size: 11px; font-weight: 600;
+    color: var(--gray-500); text-transform: uppercase; letter-spacing: 0.5px;
+    border-bottom: 1px solid var(--gray-200); background: var(--gray-50);
+  }
+  .data-table td { padding: 10px 12px; border-bottom: 1px solid var(--gray-100); vertical-align: middle; }
+  .data-table tr:last-child td { border-bottom: none; }
+  .data-table tr:hover td { background: var(--gray-50); }
+
+  /* STATUS BADGES */
+  .badge {
+    display: inline-flex; align-items: center; gap: 4px;
+    padding: 3px 8px; border-radius: 20px; font-size: 11px; font-weight: 600;
+  }
+  .badge-paid { background: var(--success-light); color: var(--success); }
+  .badge-pending { background: var(--warning-light); color: var(--warning); }
+  .badge-overdue { background: var(--danger-light); color: var(--danger); }
+  .badge-empresa { background: #dbeafe; color: #1e40af; }
+  .badge-pessoal { background: #ede9fe; color: #5b21b6; }
+
+  /* BUTTONS */
+  .btn {
+    padding: 7px 14px; border-radius: var(--radius); border: none; cursor: pointer;
+    font-size: 13px; font-weight: 500; display: inline-flex; align-items: center; gap: 6px;
+    transition: all 0.15s;
+  }
+  .btn-primary { background: var(--primary); color: white; }
+  .btn-primary:hover { background: #1648c2; }
+  .btn-success { background: var(--success); color: white; }
+  .btn-success:hover { background: #0c8a60; }
+  .btn-danger { background: var(--danger); color: white; }
+  .btn-danger:hover { background: #c51f1f; }
+  .btn-ghost { background: white; color: var(--gray-600); border: 1px solid var(--gray-200); }
+  .btn-ghost:hover { background: var(--gray-50); }
+  .btn-sm { padding: 4px 10px; font-size: 12px; }
+  .btn-icon { padding: 5px 8px; min-width: auto; }
+
+  /* MODAL */
+  .modal-overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 1000;
+    display: flex; align-items: center; justify-content: center; padding: 20px;
+  }
+  .modal {
+    background: white; border-radius: var(--radius-lg); padding: 24px;
+    max-width: 520px; width: 100%; max-height: 90vh; overflow-y: auto;
+    box-shadow: var(--shadow-md);
+  }
+  .modal-title { font-size: 17px; font-weight: 700; margin-bottom: 20px; }
+  .modal-footer { display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--gray-200); }
+
+  /* FORM */
+  .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px; }
+  .form-row.full { grid-template-columns: 1fr; }
+  .form-group { display: flex; flex-direction: column; gap: 5px; }
+  .form-label { font-size: 12px; font-weight: 600; color: var(--gray-600); }
+  .form-control {
+    padding: 8px 12px; border: 1px solid var(--gray-200); border-radius: var(--radius);
+    font-size: 14px; color: var(--gray-800); background: white; outline: none; width: 100%;
+  }
+  .form-control:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(26,86,219,0.1); }
+  textarea.form-control { resize: vertical; min-height: 80px; }
+
+  /* ALERT ITEMS */
+  .alert-item {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 10px 14px; border-radius: var(--radius); border: 1px solid;
+    margin-bottom: 8px; gap: 12px;
+  }
+  .alert-item.danger { background: var(--danger-light); border-color: #fca5a5; }
+  .alert-item.warning { background: var(--warning-light); border-color: #fcd34d; }
+  .alert-item.ok { background: var(--success-light); border-color: #6ee7b7; }
+  .alert-info { flex: 1; min-width: 0; }
+  .alert-name { font-weight: 600; font-size: 13px; color: var(--gray-800); }
+  .alert-meta { font-size: 11px; color: var(--gray-500); margin-top: 2px; }
+  .alert-value { font-weight: 700; white-space: nowrap; }
+
+  /* CASH FLOW */
+  .cashflow-inputs { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin-bottom: 16px; }
+  .cashflow-row { display: flex; align-items: center; gap: 10px; }
+  .cashflow-label { font-size: 13px; color: var(--gray-600); min-width: 140px; }
+  .cashflow-input { flex: 1; padding: 7px 10px; border: 1px solid var(--gray-200); border-radius: var(--radius); font-size: 14px; }
+  .cashflow-total {
+    background: var(--primary-light); border: 1px solid #bfdbfe;
+    border-radius: var(--radius); padding: 14px 16px; text-align: center;
+    font-size: 22px; font-weight: 700; color: var(--primary); margin-top: 12px;
+  }
+  .cashflow-total.positive { background: var(--success-light); border-color: #6ee7b7; color: var(--success); }
+  .cashflow-total.negative { background: var(--danger-light); border-color: #fca5a5; color: var(--danger); }
+
+  /* ACCOUNT BLOCKS */
+  .account-block {
+    background: white; border: 1px solid var(--gray-200); border-radius: var(--radius-lg);
+    margin-bottom: 16px; overflow: hidden;
+  }
+  .account-block-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 14px 18px; background: var(--gray-50); border-bottom: 1px solid var(--gray-200);
+    cursor: pointer;
+  }
+  .block-name { font-weight: 600; font-size: 14px; color: var(--gray-800); }
+  .block-total { font-weight: 700; font-size: 15px; color: var(--primary); }
+  .block-actions { display: flex; gap: 6px; align-items: center; }
+  .account-block-body { padding: 16px 18px; }
+
+  /* EMPLOYEE CARD */
+  .employee-card { border: 1px solid var(--gray-200); border-radius: var(--radius-lg); margin-bottom: 16px; overflow: hidden; }
+  .employee-header { background: var(--gray-50); padding: 14px 18px; border-bottom: 1px solid var(--gray-200); display: flex; justify-content: space-between; align-items: center; }
+  .employee-name { font-weight: 700; font-size: 15px; }
+  .employee-body { padding: 16px 18px; }
+  .emp-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  @media (max-width: 640px) { .emp-grid { grid-template-columns: 1fr; } }
+
+  /* CALENDAR */
+  .calendar-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+  .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; }
+  .cal-header-day { text-align: center; font-size: 11px; font-weight: 600; color: var(--gray-400); padding: 6px 0; text-transform: uppercase; }
+  .cal-day {
+    min-height: 80px; padding: 4px; border: 1px solid var(--gray-100);
+    border-radius: 4px; font-size: 11px; cursor: pointer; background: white;
+    transition: background 0.15s;
+  }
+  .cal-day:hover { background: var(--primary-light); }
+  .cal-day.other-month { background: var(--gray-50); color: var(--gray-300); }
+  .cal-day.today { border-color: var(--primary); background: var(--primary-light); }
+  .cal-day-num { font-weight: 600; font-size: 12px; color: var(--gray-700); margin-bottom: 3px; }
+  .cal-day.other-month .cal-day-num { color: var(--gray-300); }
+  .cal-event {
+    font-size: 9px; padding: 1px 4px; border-radius: 3px; margin-bottom: 1px;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 500;
+  }
+  .cal-event.remunerado { background: #dbeafe; color: #1e40af; }
+  .cal-event.nao-remunerado { background: var(--gray-100); color: var(--gray-600); }
+  .cal-event.hora-extra { background: #fef3c7; color: #92400e; }
+  .cal-event.meio-plantao { background: #ede9fe; color: #5b21b6; }
+  .cal-event.ferias { background: var(--success-light); color: var(--success); }
+
+  /* LEGEND */
+  .legend { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
+  .legend-item { display: flex; align-items: center; gap: 6px; font-size: 12px; }
+  .legend-dot { width: 12px; height: 12px; border-radius: 3px; }
+
+  /* SECTION TITLE */
+  .section-title { font-size: 18px; font-weight: 700; color: var(--gray-900); margin-bottom: 4px; }
+  .section-desc { font-size: 13px; color: var(--gray-400); margin-bottom: 20px; }
+
+  /* LOADING OVERLAY */
+  #loading { position: fixed; inset: 0; background: white; display: flex; align-items: center; justify-content: center; z-index: 9999; }
+  .spinner { width: 36px; height: 36px; border: 3px solid var(--gray-200); border-top-color: var(--primary); border-radius: 50%; animation: spin 0.7s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* COPY MONTH BANNER */
+  .copy-banner {
+    background: #eff6ff; border: 1px solid #bfdbfe; border-radius: var(--radius); padding: 12px 16px;
+    display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; gap: 12px;
+  }
+  .copy-banner-text { font-size: 13px; color: #1e40af; }
+
+  /* SHIFT SUMMARY */
+  .shift-summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; margin-top: 16px; }
+  .shift-box { background: var(--gray-50); border: 1px solid var(--gray-200); border-radius: var(--radius); padding: 10px 12px; }
+  .shift-box-name { font-size: 11px; color: var(--gray-500); margin-bottom: 4px; }
+  .shift-box-count { font-size: 18px; font-weight: 700; color: var(--primary); }
+
+  /* VACATION PERIOD */
+  .period-row { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; }
+  .period-row input { flex: 1; padding: 6px 10px; border: 1px solid var(--gray-200); border-radius: var(--radius); font-size: 13px; }
+
+  /* RESPONSIVE */
+  @media (max-width: 600px) {
+    .form-row { grid-template-columns: 1fr; }
+    .summary-grid { grid-template-columns: 1fr 1fr; }
+    .topbar { padding: 0 12px; }
+    .content { padding: 12px; }
+    .cal-day { min-height: 60px; }
+    .month-selector select { max-width: 100px; }
+  }
+
+  .hidden { display: none !important; }
+  .flex { display: flex; }
+  .gap-2 { gap: 8px; }
+  .gap-1 { gap: 4px; }
+  .text-right { text-align: right; }
+  .font-bold { font-weight: 700; }
+  .text-sm { font-size: 13px; }
+  .text-xs { font-size: 11px; }
+  .text-gray { color: var(--gray-500); }
+  .mt-1 { margin-top: 8px; }
+  .mt-2 { margin-top: 16px; }
+  .mb-1 { margin-bottom: 8px; }
+  .w-full { width: 100%; }
+
+  /* viewer mode info */
+  .viewer-notice { background: #eff6ff; border: 1px solid #bfdbfe; padding: 10px 14px; border-radius: var(--radius); font-size: 12px; color: #1e40af; margin-bottom: 16px; }
+</style>
+</head>
+<body>
+
+<!-- LOADING -->
+<div id="loading"><div class="spinner"></div></div>
+
+<!-- AUTH SCREEN -->
+<div id="auth-screen" class="hidden">
+  <div class="auth-card">
+    <div class="auth-logo">📊</div>
+    <div class="auth-title">Sistema de Gestão</div>
+    <div class="auth-sub">Empresa &amp; Pessoal — Acesso seguro</div>
+    <button id="google-signin-btn">
+      <svg width="18" height="18" viewBox="0 0 18 18"><path fill="#4285F4" d="M16.51 8H8.98v3h4.3c-.18 1-.74 1.48-1.6 2.04v2.01h2.6a7.8 7.8 0 0 0 2.38-5.88c0-.57-.05-.66-.15-1.18z"/><path fill="#34A853" d="M8.98 17c2.16 0 3.97-.72 5.3-1.94l-2.6-2a4.8 4.8 0 0 1-7.18-2.54H1.83v2.07A8 8 0 0 0 8.98 17z"/><path fill="#FBBC05" d="M4.5 10.52a4.8 4.8 0 0 1 0-3.04V5.41H1.83a8 8 0 0 0 0 7.18l2.67-2.07z"/><path fill="#EA4335" d="M8.98 4.18c1.17 0 2.23.4 3.06 1.2l2.3-2.3A8 8 0 0 0 1.83 5.4L4.5 7.49a4.77 4.77 0 0 1 4.48-3.31z"/></svg>
+      Entrar com Google
+    </button>
+    <div id="auth-error"></div>
+    <div class="auth-access-note">
+      ℹ️ Administrador: duiliodudu@gmail.com<br>
+      Funcionários têm acesso limitado (somente visualização).
+    </div>
+  </div>
+</div>
+
+<!-- MAIN APP -->
+<div id="app">
+  <div class="topbar">
+    <div class="topbar-brand">📊 <span>Gestão</span></div>
+    <div class="topbar-right">
+      <div class="month-selector">
+        <select id="month-select"></select>
+        <select id="year-select"></select>
+        <button onclick="applyMonthYear()">▶</button>
+      </div>
+      <div class="user-badge">
+        <div class="user-avatar" id="user-initial">?</div>
+        <span id="user-name-label" class="hidden" style="font-size:12px;"></span>
+        <span id="admin-badge-el" class="admin-badge hidden">Admin</span>
+      </div>
+      <button class="btn-logout" onclick="signOut()">Sair</button>
+    </div>
+  </div>
+
+  <div class="navtabs" id="navtabs-container">
+    <button class="navtab active" onclick="showTab('dashboard', this)">🏠 Painel</button>
+    <button class="navtab" id="tab-empresa-btn" onclick="showTab('empresa', this)">🏢 Empresa</button>
+    <button class="navtab" id="tab-pessoal-btn" onclick="showTab('pessoal', this)">👤 Pessoal</button>
+    <button class="navtab" id="tab-funcionarios-btn" onclick="showTab('funcionarios', this)">👥 Funcionários</button>
+    <button class="navtab" onclick="showTab('escala', this)">📅 Escala</button>
+    <button class="navtab" onclick="showTab('ferias', this)">🌴 Férias</button>
+  </div>
+
+  <div class="content">
+    <!-- ===== DASHBOARD ===== -->
+    <div class="tab-pane active" id="tab-dashboard">
+      <div class="section-title">Painel Principal</div>
+      <div class="section-desc" id="dashboard-period-label">Carregando...</div>
+
+      <!-- COPY BANNER -->
+      <div class="copy-banner" id="copy-banner" style="display:none;">
+        <div class="copy-banner-text">📋 Nenhuma conta cadastrada neste mês. Deseja copiar as contas do mês anterior?</div>
+        <div style="display:flex;gap:8px;">
+          <button class="btn btn-primary btn-sm" onclick="copyFromPreviousMonth()">Copiar</button>
+          <button class="btn btn-ghost btn-sm" onclick="document.getElementById('copy-banner').style.display='none'">Ignorar</button>
+        </div>
+      </div>
+
+      <!-- SUMMARY CARDS -->
+      <div class="card">
+        <div class="card-header">
+          <div>
+            <div class="card-title">Resumo Financeiro</div>
+            <div class="card-subtitle">Empresa + Pessoal + Funcionários</div>
+          </div>
+        </div>
+        <div class="summary-grid">
+          <div class="stat-box">
+            <div class="stat-label">🏢 Total Empresa</div>
+            <div class="stat-value blue" id="dash-empresa-total">R$ 0,00</div>
+          </div>
+          <div class="stat-box">
+            <div class="stat-label">👤 Total Pessoal</div>
+            <div class="stat-value blue" id="dash-pessoal-total">R$ 0,00</div>
+          </div>
+          <div class="stat-box">
+            <div class="stat-label">👥 Folha Funcionários</div>
+            <div class="stat-value orange" id="dash-func-total">R$ 0,00</div>
+          </div>
+          <div class="stat-box">
+            <div class="stat-label">📊 Total Geral</div>
+            <div class="stat-value red" id="dash-total-geral">R$ 0,00</div>
+          </div>
+          <div class="stat-box">
+            <div class="stat-label">✅ Já Pago</div>
+            <div class="stat-value green" id="dash-paid">R$ 0,00</div>
+          </div>
+          <div class="stat-box">
+            <div class="stat-label">⏳ Em Aberto</div>
+            <div class="stat-value red" id="dash-pending">R$ 0,00</div>
+          </div>
+        </div>
+
+        <!-- CASHFLOW -->
+        <div class="card-title" style="margin-bottom:12px;">Previsão de Caixa</div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;margin-bottom:12px;">
+          <div>
+            <div class="form-label">💰 Dinheiro em Conta</div>
+            <input type="number" class="form-control cashflow-input" id="cf-em-conta" placeholder="R$ 0,00" oninput="updateCashflow()">
+          </div>
+          <div>
+            <div class="form-label">✅ Já Recebido</div>
+            <input type="number" class="form-control cashflow-input" id="cf-recebido" placeholder="R$ 0,00" oninput="updateCashflow()">
+          </div>
+          <div>
+            <div class="form-label">📈 Previsão de Recebimento</div>
+            <input type="number" class="form-control cashflow-input" id="cf-previsao" placeholder="R$ 0,00" oninput="updateCashflow()">
+          </div>
+        </div>
+        <div class="cashflow-total" id="cashflow-result">Saldo Final: R$ 0,00</div>
+      </div>
+
+      <!-- ALERTS -->
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">⚠️ Alertas de Vencimento</div>
+        </div>
+        <div id="alerts-container"><p class="text-gray text-sm">Nenhum alerta para exibir.</p></div>
+      </div>
+
+      <!-- FULL REPORT TABLE -->
+      <div class="card">
+        <div class="card-header"><div class="card-title">📋 Relatório Completo do Mês</div></div>
+        <div style="overflow-x:auto;">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Grupo</th>
+                <th>Bloco</th>
+                <th>Descrição</th>
+                <th>Vencimento</th>
+                <th>Valor</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody id="report-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== EMPRESA ===== -->
+    <div class="tab-pane" id="tab-empresa">
+      <div class="flex" style="justify-content:space-between;align-items:flex-start;margin-bottom:20px;">
+        <div>
+          <div class="section-title">🏢 Contas da Empresa</div>
+          <div class="section-desc">Gerencie blocos de contas por categoria</div>
+        </div>
+        <div id="empresa-admin-controls">
+          <button class="btn btn-primary" onclick="addBlock('empresa')">+ Novo Bloco</button>
+        </div>
+      </div>
+      <div id="empresa-blocks"></div>
+    </div>
+
+    <!-- ===== PESSOAL ===== -->
+    <div class="tab-pane" id="tab-pessoal">
+      <div class="flex" style="justify-content:space-between;align-items:flex-start;margin-bottom:20px;">
+        <div>
+          <div class="section-title">👤 Contas Pessoais</div>
+          <div class="section-desc">Seus gastos e compromissos pessoais</div>
+        </div>
+        <div id="pessoal-admin-controls">
+          <button class="btn btn-primary" onclick="addBlock('pessoal')">+ Novo Bloco</button>
+        </div>
+      </div>
+      <div id="pessoal-blocks"></div>
+    </div>
+
+    <!-- ===== FUNCIONÁRIOS ===== -->
+    <div class="tab-pane" id="tab-funcionarios">
+      <div class="flex" style="justify-content:space-between;align-items:flex-start;margin-bottom:20px;">
+        <div>
+          <div class="section-title">👥 Funcionários</div>
+          <div class="section-desc">Controle de pagamentos, férias e 13º</div>
+        </div>
+        <div id="func-admin-controls">
+          <button class="btn btn-primary" onclick="addEmployee()">+ Novo Funcionário</button>
+        </div>
+      </div>
+      <div id="employees-container"></div>
+    </div>
+
+    <!-- ===== ESCALA ===== -->
+    <div class="tab-pane" id="tab-escala">
+      <div class="section-title">📅 Escala de Plantões</div>
+      <div class="section-desc">Gerencie a escala de trabalho dos funcionários</div>
+      <div class="legend">
+        <div class="legend-item"><div class="legend-dot" style="background:#dbeafe;"></div>Plantão Remunerado</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#e5e7eb;"></div>Não Remunerado</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#fef3c7;"></div>Hora Extra</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#ede9fe;"></div>Meio Plantão</div>
+      </div>
+      <div class="card">
+        <div class="calendar-header">
+          <button class="btn btn-ghost btn-sm" onclick="prevCalMonth('escala')">← Anterior</button>
+          <span id="cal-escala-title" style="font-weight:600;"></span>
+          <button class="btn btn-ghost btn-sm" onclick="nextCalMonth('escala')">Próximo →</button>
+        </div>
+        <div id="cal-escala-grid"></div>
+      </div>
+      <div class="card">
+        <div class="card-title" style="margin-bottom:12px;">Resumo de Plantões Remunerados</div>
+        <div class="shift-summary" id="shift-summary"></div>
+      </div>
+    </div>
+
+    <!-- ===== FÉRIAS ===== -->
+    <div class="tab-pane" id="tab-ferias">
+      <div class="section-title">🌴 Calendário de Férias</div>
+      <div class="section-desc">Visualize os períodos de férias dos funcionários</div>
+      <div class="legend" id="ferias-legend"></div>
+      <div class="card">
+        <div class="calendar-header">
+          <button class="btn btn-ghost btn-sm" onclick="prevCalMonth('ferias')">← Anterior</button>
+          <span id="cal-ferias-title" style="font-weight:600;"></span>
+          <button class="btn btn-ghost btn-sm" onclick="nextCalMonth('ferias')">Próximo →</button>
+        </div>
+        <div id="cal-ferias-grid"></div>
+      </div>
+    </div>
+  </div><!-- /content -->
+</div><!-- /app -->
+
+<!-- MODAL CONTAINER -->
+<div id="modal-overlay" class="modal-overlay hidden" onclick="closeModalOnOverlay(event)">
+  <div class="modal" id="modal-box"></div>
+</div>
+
+<!-- Firebase SDKs -->
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+
+<script>
+// =============================================
+// FIREBASE CONFIG — SUBSTITUA COM OS SEUS DADOS
+// =============================================
+const firebaseConfig = {
+  apiKey: "COLE_SUA_API_KEY_AQUI",
+  authDomain: "COLE_SEU_AUTH_DOMAIN.firebaseapp.com",
+  projectId: "COLE_SEU_PROJECT_ID",
+  storageBucket: "COLE_SEU_PROJECT_ID.appspot.com",
+  messagingSenderId: "COLE_SEU_SENDER_ID",
+  appId: "COLE_SEU_APP_ID"
+};
+
+firebase.initializeApp(firebaseConfig);
+const auth = firebase.auth();
+const db = firebase.firestore();
+
+// =============================================
+// STATE
+// =============================================
+const ADMIN_EMAIL = "duiliodudu@gmail.com";
+let currentUser = null;
+let isAdmin = false;
+let isEmployee = false;
+let employeeOwnId = null; // if user is an employee, their ID
+let currentMonth = new Date().getMonth(); // 0-indexed
+let currentYear = new Date().getFullYear();
+let calEscalaMonth = currentMonth;
+let calEscalaYear = currentYear;
+let calFeriasMonth = currentMonth;
+let calFeriasYear = currentYear;
+
+let appData = {
+  empresa: { blocks: {} },
+  pessoal: { blocks: {} },
+  employees: {},
+  escala: {},
+  cashflow: {}
+};
+
+// =============================================
+// INIT
+// =============================================
+function init() {
+  populateMonthYear();
+  auth.onAuthStateChanged(async user => {
+    if (user) {
+      currentUser = user;
+      await checkUserRole();
+      loadApp();
+    } else {
+      showAuthScreen();
+    }
+  });
+}
+
+async function checkUserRole() {
+  isAdmin = currentUser.email === ADMIN_EMAIL;
+  if (!isAdmin) {
+    // Check if this user is a registered employee
+    const snap = await db.collection('global').doc('employees').get();
+    if (snap.exists) {
+      const emps = snap.data().list || [];
+      const found = emps.find(e => e.email && e.email.toLowerCase() === currentUser.email.toLowerCase());
+      if (found) {
+        isEmployee = true;
+        employeeOwnId = found.id;
+      }
+    }
+  }
+}
+
+function showAuthScreen() {
+  document.getElementById('loading').style.display = 'none';
+  document.getElementById('auth-screen').classList.remove('hidden');
+  document.getElementById('app').style.display = 'none';
+}
+
+function loadApp() {
+  document.getElementById('auth-screen').classList.add('hidden');
+  document.getElementById('app').style.display = 'flex';
+  document.getElementById('loading').style.display = 'none';
+  updateUserUI();
+  applyRoleVisibility();
+  loadMonthData();
+}
+
+function updateUserUI() {
+  const name = currentUser.displayName || currentUser.email;
+  document.getElementById('user-initial').textContent = name.charAt(0).toUpperCase();
+  document.getElementById('user-name-label').textContent = name.split(' ')[0];
+  if (isAdmin) document.getElementById('admin-badge-el').classList.remove('hidden');
+}
+
+function applyRoleVisibility() {
+  if (!isAdmin) {
+    // Hide admin controls
+    ['empresa-admin-controls','pessoal-admin-controls','func-admin-controls'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.style.display = 'none';
+    });
+    // Hide personal and empresa tabs for non-admin non-employee
+    if (!isAdmin) {
+      const tabs = ['tab-empresa-btn','tab-pessoal-btn','tab-funcionarios-btn'];
+      tabs.forEach(id => {
+        const el = document.getElementById(id);
+        if (el && !isAdmin) el.style.display = 'none';
+      });
+    }
+  }
+}
+
+// =============================================
+// SIGN IN / OUT
+// =============================================
+document.getElementById('google-signin-btn').addEventListener('click', async () => {
+  const provider = new firebase.auth.GoogleAuthProvider();
+  try {
+    await auth.signInWithPopup(provider);
+  } catch (e) {
+    document.getElementById('auth-error').textContent = 'Erro ao entrar: ' + e.message;
+  }
+});
+
+function signOut() {
+  auth.signOut();
+}
+
+// =============================================
+// MONTH/YEAR SELECTORS
+// =============================================
+const MONTHS = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+
+function populateMonthYear() {
+  const ms = document.getElementById('month-select');
+  const ys = document.getElementById('year-select');
+  ms.innerHTML = MONTHS.map((m,i) => `<option value="${i}" ${i===currentMonth?'selected':''}>${m}</option>`).join('');
+  for (let y = 2023; y <= 2030; y++) {
+    ys.innerHTML += `<option value="${y}" ${y===currentYear?'selected':''}>${y}</option>`;
+  }
+}
+
+function applyMonthYear() {
+  currentMonth = parseInt(document.getElementById('month-select').value);
+  currentYear = parseInt(document.getElementById('year-select').value);
+  loadMonthData();
+}
+
+function getMonthKey() { return `${currentYear}-${String(currentMonth+1).padStart(2,'0')}`; }
+
+// =============================================
+// DATA LOAD
+// =============================================
+async function loadMonthData() {
+  const key = getMonthKey();
+  document.getElementById('dashboard-period-label').textContent = `${MONTHS[currentMonth]} ${currentYear}`;
+
+  // Load empresa blocks
+  const eDoc = await db.collection('months').doc(key).collection('empresa').doc('data').get();
+  appData.empresa = eDoc.exists ? eDoc.data() : { blocks: {} };
+  if (!appData.empresa.blocks) appData.empresa.blocks = {};
+
+  // Load pessoal blocks
+  const pDoc = await db.collection('months').doc(key).collection('pessoal').doc('data').get();
+  appData.pessoal = pDoc.exists ? pDoc.data() : { blocks: {} };
+  if (!appData.pessoal.blocks) appData.pessoal.blocks = {};
+
+  // Load cashflow
+  const cfDoc = await db.collection('months').doc(key).collection('cashflow').doc('data').get();
+  appData.cashflow = cfDoc.exists ? cfDoc.data() : {};
+  if (appData.cashflow.emConta) document.getElementById('cf-em-conta').value = appData.cashflow.emConta;
+  if (appData.cashflow.recebido) document.getElementById('cf-recebido').value = appData.cashflow.recebido;
+  if (appData.cashflow.previsao) document.getElementById('cf-previsao').value = appData.cashflow.previsao;
+
+  // Load employees (global)
+  const empDoc = await db.collection('global').doc('employees').get();
+  appData.employees = empDoc.exists ? empDoc.data() : { list: [] };
+  if (!appData.employees.list) appData.employees.list = [];
+
+  // Load employee payment data for month
+  const epDoc = await db.collection('months').doc(key).collection('employees').doc('payments').get();
+  appData.employeePayments = epDoc.exists ? epDoc.data() : {};
+
+  // Load escala
+  const esDoc = await db.collection('months').doc(key).collection('escala').doc('data').get();
+  appData.escala = esDoc.exists ? esDoc.data() : { events: {} };
+  if (!appData.escala.events) appData.escala.events = {};
+
+  // Check if month is empty → show copy banner
+  const isEmpty = Object.keys(appData.empresa.blocks).length === 0 &&
+                  Object.keys(appData.pessoal.blocks).length === 0;
+  document.getElementById('copy-banner').style.display = (isEmpty && isAdmin) ? 'flex' : 'none';
+
+  renderAll();
+}
+
+async function saveEmpresa() {
+  await db.collection('months').doc(getMonthKey()).collection('empresa').doc('data').set(appData.empresa);
+}
+async function savePessoal() {
+  await db.collection('months').doc(getMonthKey()).collection('pessoal').doc('data').set(appData.pessoal);
+}
+async function saveEmployees() {
+  await db.collection('global').doc('employees').set(appData.employees);
+}
+async function saveEmployeePayments() {
+  await db.collection('months').doc(getMonthKey()).collection('employees').doc('payments').set(appData.employeePayments);
+}
+async function saveEscala() {
+  await db.collection('months').doc(getMonthKey()).collection('escala').doc('data').set(appData.escala);
+}
+async function saveCashflow() {
+  await db.collection('months').doc(getMonthKey()).collection('cashflow').doc('data').set(appData.cashflow);
+}
+
+// =============================================
+// COPY FROM PREVIOUS MONTH
+// =============================================
+async function copyFromPreviousMonth() {
+  let pm = currentMonth - 1, py = currentYear;
+  if (pm < 0) { pm = 11; py--; }
+  const prevKey = `${py}-${String(pm+1).padStart(2,'0')}`;
+
+  const eDoc = await db.collection('months').doc(prevKey).collection('empresa').doc('data').get();
+  const pDoc = await db.collection('months').doc(prevKey).collection('pessoal').doc('data').get();
+
+  function advanceDate(dateStr) {
+    if (!dateStr) return dateStr;
+    const parts = dateStr.split('-');
+    if (parts.length !== 3) return dateStr;
+    return `${currentYear}-${String(currentMonth+1).padStart(2,'0')}-${parts[2]}`;
+  }
+
+  function copyBlocks(src) {
+    const newBlocks = {};
+    Object.entries(src.blocks || {}).forEach(([bid, block]) => {
+      newBlocks[bid] = {
+        ...block,
+        items: (block.items || []).map(item => ({
+          ...item,
+          paid: false,
+          dueDate: advanceDate(item.dueDate)
+        }))
+      };
+    });
+    return { blocks: newBlocks };
+  }
+
+  if (eDoc.exists) appData.empresa = copyBlocks(eDoc.data());
+  if (pDoc.exists) appData.pessoal = copyBlocks(pDoc.data());
+
+  await saveEmpresa();
+  await savePessoal();
+  document.getElementById('copy-banner').style.display = 'none';
+  renderAll();
+}
+
+// =============================================
+// RENDER ALL
+// =============================================
+function renderAll() {
+  renderBlocks('empresa');
+  renderBlocks('pessoal');
+  renderEmployees();
+  renderDashboard();
+  renderCalendar('escala');
+  renderCalendar('ferias');
+  updateCashflow();
+}
+
+// =============================================
+// BLOCKS (empresa / pessoal)
+// =============================================
+function renderBlocks(group) {
+  const container = document.getElementById(`${group}-blocks`);
+  const data = appData[group].blocks;
+  container.innerHTML = '';
+
+  if (Object.keys(data).length === 0) {
+    container.innerHTML = `<div class="text-gray text-sm" style="padding:20px;text-align:center;">Nenhum bloco cadastrado. ${isAdmin ? 'Clique em "+ Novo Bloco" para adicionar.' : ''}</div>`;
+    return;
+  }
+
+  Object.entries(data).forEach(([bid, block]) => {
+    const total = (block.items || []).reduce((s,i) => s + (parseFloat(i.value)||0), 0);
+    const paidTotal = (block.items || []).filter(i=>i.paid).reduce((s,i) => s + (parseFloat(i.value)||0), 0);
+    const pendingTotal = total - paidTotal;
+
+    const div = document.createElement('div');
+    div.className = 'account-block';
+    div.innerHTML = `
+      <div class="account-block-header">
+        <div>
+          <div class="block-name">${escHtml(block.name)}</div>
+          <div style="font-size:11px;color:var(--gray-400);">Pago: ${fmtBRL(paidTotal)} / Aberto: ${fmtBRL(pendingTotal)}</div>
+        </div>
+        <div class="block-actions">
+          <div class="block-total">${fmtBRL(total)}</div>
+          ${isAdmin ? `<button class="btn btn-sm btn-ghost" onclick="addItemToBlock('${group}','${bid}')">+ Item</button>
+          <button class="btn btn-sm btn-ghost" onclick="editBlockName('${group}','${bid}')">✏️</button>
+          <button class="btn btn-sm btn-danger" onclick="deleteBlock('${group}','${bid}')">🗑️</button>` : ''}
+        </div>
+      </div>
+      <div class="account-block-body">
+        ${renderBlockItems(group, bid, block.items || [])}
+      </div>`;
+    container.appendChild(div);
+  });
+}
+
+function renderBlockItems(group, bid, items) {
+  if (items.length === 0) return '<div class="text-gray text-sm">Nenhum item neste bloco.</div>';
+
+  return `<table class="data-table"><thead><tr><th>Descrição</th><th>Vencimento</th><th>Valor</th><th>Status</th>${isAdmin?'<th>Ações</th>':''}</tr></thead><tbody>
+    ${items.map((item, idx) => {
+      const statusClass = item.paid ? 'badge-paid' : (isOverdue(item.dueDate) ? 'badge-overdue' : 'badge-pending');
+      const statusText = item.paid ? 'Pago' : (isOverdue(item.dueDate) ? 'Vencido' : 'Em aberto');
+      return `<tr>
+        <td>${escHtml(item.desc)}</td>
+        <td>${fmtDate(item.dueDate)}</td>
+        <td class="font-bold">${fmtBRL(item.value)}</td>
+        <td><span class="badge ${statusClass}">${statusText}</span></td>
+        ${isAdmin ? `<td style="display:flex;gap:4px;">
+          <button class="btn btn-sm ${item.paid?'btn-ghost':'btn-success'}" onclick="togglePaid('${group}','${bid}',${idx})">${item.paid?'Reabrir':'✓ Pago'}</button>
+          <button class="btn btn-sm btn-ghost" onclick="editItem('${group}','${bid}',${idx})">✏️</button>
+          <button class="btn btn-sm btn-danger" onclick="deleteItem('${group}','${bid}',${idx})">🗑️</button>
+        </td>` : ''}
+      </tr>`;
+    }).join('')}
+  </tbody></table>`;
+}
+
+function addBlock(group) {
+  openModal(`
+    <div class="modal-title">Novo Bloco — ${group === 'empresa' ? 'Empresa' : 'Pessoal'}</div>
+    <div class="form-group"><div class="form-label">Nome do Bloco</div>
+    <input type="text" class="form-control" id="m-block-name" placeholder="Ex: Aluguel, Energia, Crédito..."></div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal()">Cancelar</button>
+      <button class="btn btn-primary" onclick="confirmAddBlock('${group}')">Criar Bloco</button>
+    </div>`);
+  setTimeout(()=>document.getElementById('m-block-name').focus(),50);
+}
+
+function confirmAddBlock(group) {
+  const name = document.getElementById('m-block-name').value.trim();
+  if (!name) return alert('Digite um nome para o bloco.');
+  const bid = 'b' + Date.now();
+  appData[group].blocks[bid] = { name, items: [] };
+  (group === 'empresa' ? saveEmpresa() : savePessoal()).then(() => {
+    renderBlocks(group);
+    renderDashboard();
+    closeModal();
+  });
+}
+
+function editBlockName(group, bid) {
+  const block = appData[group].blocks[bid];
+  openModal(`
+    <div class="modal-title">Renomear Bloco</div>
+    <div class="form-group"><div class="form-label">Nome</div>
+    <input type="text" class="form-control" id="m-block-name" value="${escHtml(block.name)}"></div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal()">Cancelar</button>
+      <button class="btn btn-primary" onclick="confirmEditBlockName('${group}','${bid}')">Salvar</button>
+    </div>`);
+}
+
+function confirmEditBlockName(group, bid) {
+  const name = document.getElementById('m-block-name').value.trim();
+  if (!name) return;
+  appData[group].blocks[bid].name = name;
+  (group === 'empresa' ? saveEmpresa() : savePessoal()).then(() => { renderBlocks(group); closeModal(); });
+}
+
+function deleteBlock(group, bid) {
+  if (!confirm('Excluir este bloco e todos os itens?')) return;
+  delete appData[group].blocks[bid];
+  (group === 'empresa' ? saveEmpresa() : savePessoal()).then(() => { renderBlocks(group); renderDashboard(); });
+}
+
+function addItemToBlock(group, bid) {
+  openModal(`
+    <div class="modal-title">Novo Item</div>
+    <div class="form-row"><div class="form-group">
+      <div class="form-label">Descrição</div>
+      <input type="text" class="form-control" id="m-item-desc" placeholder="Nome da conta">
+    </div><div class="form-group">
+      <div class="form-label">Vencimento</div>
+      <input type="date" class="form-control" id="m-item-date">
+    </div></div>
+    <div class="form-row"><div class="form-group">
+      <div class="form-label">Valor (R$)</div>
+      <input type="number" step="0.01" class="form-control" id="m-item-value" placeholder="0,00">
+    </div></div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal()">Cancelar</button>
+      <button class="btn btn-primary" onclick="confirmAddItem('${group}','${bid}')">Adicionar</button>
+    </div>`);
+}
+
+function confirmAddItem(group, bid) {
+  const desc = document.getElementById('m-item-desc').value.trim();
+  const dueDate = document.getElementById('m-item-date').value;
+  const value = parseFloat(document.getElementById('m-item-value').value) || 0;
+  if (!desc) return alert('Informe a descrição.');
+  if (!appData[group].blocks[bid].items) appData[group].blocks[bid].items = [];
+  appData[group].blocks[bid].items.push({ desc, dueDate, value, paid: false });
+  (group === 'empresa' ? saveEmpresa() : savePessoal()).then(() => { renderBlocks(group); renderDashboard(); closeModal(); });
+}
+
+function editItem(group, bid, idx) {
+  const item = appData[group].blocks[bid].items[idx];
+  openModal(`
+    <div class="modal-title">Editar Item</div>
+    <div class="form-row"><div class="form-group">
+      <div class="form-label">Descrição</div>
+      <input type="text" class="form-control" id="m-item-desc" value="${escHtml(item.desc)}">
+    </div><div class="form-group">
+      <div class="form-label">Vencimento</div>
+      <input type="date" class="form-control" id="m-item-date" value="${item.dueDate||''}">
+    </div></div>
+    <div class="form-row"><div class="form-group">
+      <div class="form-label">Valor (R$)</div>
+      <input type="number" step="0.01" class="form-control" id="m-item-value" value="${item.value||0}">
+    </div></div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal()">Cancelar</button>
+      <button class="btn btn-primary" onclick="confirmEditItem('${group}','${bid}',${idx})">Salvar</button>
+    </div>`);
+}
+
+function confirmEditItem(group, bid, idx) {
+  const desc = document.getElementById('m-item-desc').value.trim();
+  const dueDate = document.getElementById('m-item-date').value;
+  const value = parseFloat(document.getElementById('m-item-value').value) || 0;
+  if (!desc) return;
+  appData[group].blocks[bid].items[idx] = { ...appData[group].blocks[bid].items[idx], desc, dueDate, value };
+  (group === 'empresa' ? saveEmpresa() : savePessoal()).then(() => { renderBlocks(group); renderDashboard(); closeModal(); });
+}
+
+function deleteItem(group, bid, idx) {
+  if (!confirm('Remover este item?')) return;
+  appData[group].blocks[bid].items.splice(idx, 1);
+  (group === 'empresa' ? saveEmpresa() : savePessoal()).then(() => { renderBlocks(group); renderDashboard(); });
+}
+
+function togglePaid(group, bid, idx) {
+  appData[group].blocks[bid].items[idx].paid = !appData[group].blocks[bid].items[idx].paid;
+  (group === 'empresa' ? saveEmpresa() : savePessoal()).then(() => { renderBlocks(group); renderDashboard(); });
+}
+
+// =============================================
+// DASHBOARD
+// =============================================
+function renderDashboard() {
+  let eTotal=0, pTotal=0, funcTotal=0, paid=0, pending=0;
+
+  // Empresa
+  Object.values(appData.empresa.blocks||{}).forEach(b=>{
+    (b.items||[]).forEach(i=>{
+      const v = parseFloat(i.value)||0;
+      eTotal+=v;
+      if(i.paid) paid+=v; else pending+=v;
+    });
+  });
+
+  // Pessoal
+  Object.values(appData.pessoal.blocks||{}).forEach(b=>{
+    (b.items||[]).forEach(i=>{
+      const v = parseFloat(i.value)||0;
+      pTotal+=v;
+      if(i.paid) paid+=v; else pending+=v;
+    });
+  });
+
+  // Funcionários (folha)
+  (appData.employees.list||[]).forEach(emp=>{
+    const pd = (appData.employeePayments||{})[emp.id]||{};
+    const salario = parseFloat(pd.salario||pd.salarioBruto||emp.salarioBase||0)||0;
+    funcTotal += salario;
+  });
+
+  set('dash-empresa-total', fmtBRL(eTotal));
+  set('dash-pessoal-total', fmtBRL(pTotal));
+  set('dash-func-total', fmtBRL(funcTotal));
+  set('dash-total-geral', fmtBRL(eTotal+pTotal+funcTotal));
+  set('dash-paid', fmtBRL(paid));
+  set('dash-pending', fmtBRL(pending));
+
+  renderAlerts();
+  renderReport();
+}
+
+function renderAlerts() {
+  const container = document.getElementById('alerts-container');
+  const today = new Date(); today.setHours(0,0,0,0);
+  const in7 = new Date(today); in7.setDate(in7.getDate()+7);
+  const alerts = [];
+
+  function collectItems(group, label) {
+    Object.entries(appData[group].blocks||{}).forEach(([bid,block])=>{
+      (block.items||[]).forEach((item,idx)=>{
+        if (item.paid) return;
+        const due = item.dueDate ? new Date(item.dueDate+'T00:00:00') : null;
+        if (!due) return;
+        const diff = Math.ceil((due-today)/(1000*60*60*24));
+        if (diff <= 7) alerts.push({...item, diff, group, bid, idx, label, blockName: block.name});
+      });
+    });
+  }
+  collectItems('empresa','Empresa');
+  collectItems('pessoal','Pessoal');
+
+  alerts.sort((a,b)=>a.diff-b.diff);
+
+  if (alerts.length === 0) {
+    container.innerHTML = '<div class="text-gray text-sm">✅ Nenhuma conta vencendo nos próximos 7 dias.</div>';
+    return;
+  }
+
+  container.innerHTML = alerts.map(a=>{
+    const cls = a.diff < 0 ? 'danger' : (a.diff <= 3 ? 'warning' : 'ok');
+    const diffText = a.diff < 0 ? `Venceu há ${Math.abs(a.diff)} dias` : (a.diff === 0 ? 'Vence hoje' : `Vence em ${a.diff} dias`);
+    return `<div class="alert-item ${cls}">
+      <div class="alert-info">
+        <div class="alert-name">${escHtml(a.desc)}</div>
+        <div class="alert-meta">${a.label} · ${a.blockName} · ${fmtDate(a.dueDate)} · ${diffText}</div>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <div class="alert-value">${fmtBRL(a.value)}</div>
+        ${isAdmin ? `<button class="btn btn-sm btn-success" onclick="togglePaid('${a.group}','${a.bid}',${a.idx})">✓ Pago</button>` : ''}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function renderReport() {
+  const tbody = document.getElementById('report-tbody');
+  let rows = [];
+
+  function collect(group, label, badgeCls) {
+    Object.values(appData[group].blocks||{}).forEach(block=>{
+      (block.items||[]).forEach(item=>{
+        rows.push({...item, label, badgeCls, blockName: block.name});
+      });
+    });
+  }
+  collect('empresa','Empresa','badge-empresa');
+  collect('pessoal','Pessoal','badge-pessoal');
+
+  if (rows.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--gray-400);padding:20px;">Nenhuma conta cadastrada neste mês.</td></tr>';
+    return;
+  }
+
+  rows.sort((a,b)=>(a.dueDate||'').localeCompare(b.dueDate||''));
+
+  tbody.innerHTML = rows.map(r=>{
+    const sc = r.paid ? 'badge-paid' : (isOverdue(r.dueDate)?'badge-overdue':'badge-pending');
+    const st = r.paid ? 'Pago' : (isOverdue(r.dueDate)?'Vencido':'Em aberto');
+    return `<tr>
+      <td><span class="badge ${r.badgeCls}">${r.label}</span></td>
+      <td>${escHtml(r.blockName)}</td>
+      <td>${escHtml(r.desc)}</td>
+      <td>${fmtDate(r.dueDate)}</td>
+      <td class="font-bold">${fmtBRL(r.value)}</td>
+      <td><span class="badge ${sc}">${st}</span></td>
+    </tr>`;
+  }).join('');
+}
+
+function updateCashflow() {
+  const emConta = parseFloat(document.getElementById('cf-em-conta').value)||0;
+  const recebido = parseFloat(document.getElementById('cf-recebido').value)||0;
+  const previsao = parseFloat(document.getElementById('cf-previsao').value)||0;
+
+  let totalDespesas = 0;
+  Object.values(appData.empresa.blocks||{}).forEach(b=>(b.items||[]).forEach(i=>{ if(!i.paid) totalDespesas+=parseFloat(i.value)||0; }));
+  Object.values(appData.pessoal.blocks||{}).forEach(b=>(b.items||[]).forEach(i=>{ if(!i.paid) totalDespesas+=parseFloat(i.value)||0; }));
+
+  const total = (emConta + recebido + previsao) - totalDespesas;
+  const el = document.getElementById('cashflow-result');
+  el.textContent = `Saldo Final Estimado: ${fmtBRL(total)}`;
+  el.className = 'cashflow-total ' + (total >= 0 ? 'positive' : 'negative');
+
+  // Save debounced
+  appData.cashflow = { emConta, recebido, previsao };
+  clearTimeout(window._cfTimer);
+  window._cfTimer = setTimeout(saveCashflow, 1500);
+}
+
+// =============================================
+// EMPLOYEES
+// =============================================
+function renderEmployees() {
+  const container = document.getElementById('employees-container');
+  const list = appData.employees.list || [];
+
+  if (list.length === 0) {
+    container.innerHTML = `<div class="text-gray text-sm" style="padding:20px;text-align:center;">${isAdmin?'Nenhum funcionário. Clique em "+ Novo Funcionário".':'Nenhum funcionário cadastrado.'}</div>`;
+    return;
+  }
+
+  // Filter if employee role
+  const filtered = (isEmployee && !isAdmin) ? list.filter(e=>e.id===employeeOwnId) : list;
+
+  container.innerHTML = '';
+  filtered.forEach(emp => {
+    const pd = (appData.employeePayments||{})[emp.id] || {};
+    const div = document.createElement('div');
+    div.className = 'employee-card';
+    div.innerHTML = buildEmployeeCard(emp, pd);
+    container.appendChild(div);
+  });
+}
+
+function buildEmployeeCard(emp, pd) {
+  const vac = emp.ferias || { periods: [] };
+  const thirteenth = pd.decimoTerceiro || {};
+  const canEdit = isAdmin;
+
+  const periodsHTML = (vac.periods || []).map((p,i)=>`
+    <div class="period-row">
+      <input type="date" value="${p.start||''}" ${canEdit?`onchange="updateVacPeriod('${emp.id}',${i},'start',this.value)"`:'readonly'} placeholder="Início">
+      <span>→</span>
+      <input type="date" value="${p.end||''}" ${canEdit?`onchange="updateVacPeriod('${emp.id}',${i},'end',this.value)"`:'readonly'} placeholder="Fim">
+      <span class="text-xs text-gray">${calcPeriodDays(p.start,p.end)} dias</span>
+      ${canEdit?`<button class="btn btn-sm btn-danger btn-icon" onclick="removeVacPeriod('${emp.id}',${i})">✕</button>`:''}
+    </div>`).join('');
+
+  const totalVacDays = (vac.periods||[]).reduce((s,p)=>s+calcPeriodDays(p.start,p.end),0);
+  const vacEntitlement = parseInt(emp.diasFerias||30);
+  const remainingDays = vacEntitlement - totalVacDays;
+
+  return `
+    <div class="employee-header">
+      <div>
+        <div class="employee-name">${escHtml(emp.name)}</div>
+        <div class="text-xs text-gray">${escHtml(emp.cargo||'')} ${emp.email?'· '+emp.email:''}</div>
+      </div>
+      ${canEdit?`<div style="display:flex;gap:6px;">
+        <button class="btn btn-sm btn-ghost" onclick="editEmployee('${emp.id}')">✏️ Editar</button>
+        <button class="btn btn-sm btn-danger" onclick="deleteEmployee('${emp.id}')">🗑️</button>
+      </div>`:''}
+    </div>
+    <div class="employee-body">
+      <div class="emp-grid">
+        <!-- PAGAMENTO -->
+        <div>
+          <div class="card-title" style="margin-bottom:10px;">💰 Pagamento — ${MONTHS[currentMonth]}</div>
+          <div class="form-group mb-1"><div class="form-label">Salário Base</div>
+            <input type="number" class="form-control" value="${pd.salarioBruto||emp.salarioBase||''}" ${canEdit?`onchange="updateEmpPayment('${emp.id}','salarioBruto',this.value)"`:' readonly'} placeholder="0,00">
+          </div>
+          <div class="form-group mb-1"><div class="form-label">Horas Extras (R$)</div>
+            <input type="number" class="form-control" value="${pd.horasExtras||''}" ${canEdit?`onchange="updateEmpPayment('${emp.id}','horasExtras',this.value)"`:' readonly'} placeholder="0,00">
+          </div>
+          <div class="form-group mb-1"><div class="form-label">Adiantamento</div>
+            <input type="number" class="form-control" value="${pd.adiantamento||''}" ${canEdit?`onchange="updateEmpPayment('${emp.id}','adiantamento',this.value)"`:' readonly'} placeholder="0,00">
+          </div>
+          <div class="form-group mb-1"><div class="form-label">INSS/Outros Descontos</div>
+            <input type="number" class="form-control" value="${pd.descontos||''}" ${canEdit?`onchange="updateEmpPayment('${emp.id}','descontos',this.value)"`:' readonly'} placeholder="0,00">
+          </div>
+          <div style="background:var(--primary-light);border-radius:var(--radius);padding:10px 12px;margin-top:8px;font-weight:700;color:var(--primary);">
+            Líquido: ${fmtBRL(calcLiquido(pd, emp))}
+          </div>
+        </div>
+
+        <!-- DÉCIMO TERCEIRO -->
+        <div>
+          <div class="card-title" style="margin-bottom:10px;">🎄 13º Salário</div>
+          <div class="form-group mb-1"><div class="form-label">Valor Total do 13º</div>
+            <input type="number" class="form-control" value="${thirteenth.valorTotal||''}" ${canEdit?`onchange="updateDecimo('${emp.id}','valorTotal',this.value)"`:' readonly'} placeholder="0,00">
+          </div>
+          <div class="form-group mb-1"><div class="form-label">Valor Pago até Agora</div>
+            <input type="number" class="form-control" value="${thirteenth.valorPago||''}" ${canEdit?`onchange="updateDecimo('${emp.id}','valorPago',this.value)"`:' readonly'} placeholder="0,00">
+          </div>
+          <div class="form-group mb-1"><div class="form-label">Data do Último Pagamento</div>
+            <input type="date" class="form-control" value="${thirteenth.dataUltimoPgto||''}" ${canEdit?`onchange="updateDecimo('${emp.id}','dataUltimoPgto',this.value)"`:' readonly'}>
+          </div>
+          <div class="form-group mb-1"><div class="form-label">Forma de Pagamento</div>
+            <input type="text" class="form-control" value="${thirteenth.forma||''}" ${canEdit?`onchange="updateDecimo('${emp.id}','forma',this.value)"`:' readonly'} placeholder="Ex: PIX, Depósito...">
+          </div>
+          <div style="background:var(--warning-light);border-radius:var(--radius);padding:10px 12px;margin-top:8px;font-size:13px;color:var(--warning);">
+            Restante: ${fmtBRL((parseFloat(thirteenth.valorTotal)||0)-(parseFloat(thirteenth.valorPago)||0))}
+          </div>
+        </div>
+      </div>
+
+      <!-- FÉRIAS -->
+      <div style="margin-top:16px;">
+        <div class="card-title" style="margin-bottom:10px;">🌴 Férias (Direito: ${vacEntitlement} dias)</div>
+        ${periodsHTML || '<div class="text-gray text-sm">Nenhum período registrado.</div>'}
+        ${canEdit?`<button class="btn btn-ghost btn-sm mt-1" onclick="addVacPeriod('${emp.id}')">+ Período</button>`:''}
+        <div style="margin-top:8px;display:flex;gap:16px;">
+          <div class="stat-box" style="flex:1;"><div class="stat-label">Dias Usados</div><div class="stat-value blue">${totalVacDays}</div></div>
+          <div class="stat-box" style="flex:1;"><div class="stat-label">Dias Restantes</div><div class="stat-value ${remainingDays<0?'red':'green'}">${remainingDays}</div></div>
+        </div>
+      </div>
+    </div>`;
+}
+
+function calcLiquido(pd, emp) {
+  const bruto = parseFloat(pd.salarioBruto||emp.salarioBase||0);
+  const extras = parseFloat(pd.horasExtras||0);
+  const adian = parseFloat(pd.adiantamento||0);
+  const desc = parseFloat(pd.descontos||0);
+  return bruto + extras - adian - desc;
+}
+
+function addEmployee() {
+  openModal(`
+    <div class="modal-title">Novo Funcionário</div>
+    <div class="form-row">
+      <div class="form-group"><div class="form-label">Nome</div><input type="text" class="form-control" id="m-emp-name"></div>
+      <div class="form-group"><div class="form-label">Cargo</div><input type="text" class="form-control" id="m-emp-cargo"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><div class="form-label">Salário Base (R$)</div><input type="number" class="form-control" id="m-emp-salario"></div>
+      <div class="form-group"><div class="form-label">E-mail Google (acesso)</div><input type="email" class="form-control" id="m-emp-email" placeholder="funcionario@gmail.com"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><div class="form-label">Dias de Férias/ano</div><input type="number" class="form-control" id="m-emp-ferias" value="30"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal()">Cancelar</button>
+      <button class="btn btn-primary" onclick="confirmAddEmployee()">Adicionar</button>
+    </div>`);
+}
+
+function confirmAddEmployee() {
+  const name = document.getElementById('m-emp-name').value.trim();
+  if (!name) return alert('Informe o nome.');
+  const emp = {
+    id: 'emp' + Date.now(),
+    name,
+    cargo: document.getElementById('m-emp-cargo').value.trim(),
+    salarioBase: parseFloat(document.getElementById('m-emp-salario').value)||0,
+    email: document.getElementById('m-emp-email').value.trim().toLowerCase(),
+    diasFerias: parseInt(document.getElementById('m-emp-ferias').value)||30,
+    ferias: { periods: [] }
+  };
+  if (!appData.employees.list) appData.employees.list = [];
+  appData.employees.list.push(emp);
+  saveEmployees().then(()=>{ renderEmployees(); renderCalendar('ferias'); closeModal(); });
+}
+
+function editEmployee(eid) {
+  const emp = appData.employees.list.find(e=>e.id===eid);
+  if (!emp) return;
+  openModal(`
+    <div class="modal-title">Editar Funcionário</div>
+    <div class="form-row">
+      <div class="form-group"><div class="form-label">Nome</div><input type="text" class="form-control" id="m-emp-name" value="${escHtml(emp.name)}"></div>
+      <div class="form-group"><div class="form-label">Cargo</div><input type="text" class="form-control" id="m-emp-cargo" value="${escHtml(emp.cargo||'')}"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><div class="form-label">Salário Base (R$)</div><input type="number" class="form-control" id="m-emp-salario" value="${emp.salarioBase||0}"></div>
+      <div class="form-group"><div class="form-label">E-mail Google</div><input type="email" class="form-control" id="m-emp-email" value="${emp.email||''}"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><div class="form-label">Dias de Férias/ano</div><input type="number" class="form-control" id="m-emp-ferias" value="${emp.diasFerias||30}"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal()">Cancelar</button>
+      <button class="btn btn-primary" onclick="confirmEditEmployee('${eid}')">Salvar</button>
+    </div>`);
+}
+
+function confirmEditEmployee(eid) {
+  const emp = appData.employees.list.find(e=>e.id===eid);
+  if (!emp) return;
+  emp.name = document.getElementById('m-emp-name').value.trim();
+  emp.cargo = document.getElementById('m-emp-cargo').value.trim();
+  emp.salarioBase = parseFloat(document.getElementById('m-emp-salario').value)||0;
+  emp.email = document.getElementById('m-emp-email').value.trim().toLowerCase();
+  emp.diasFerias = parseInt(document.getElementById('m-emp-ferias').value)||30;
+  saveEmployees().then(()=>{ renderEmployees(); closeModal(); });
+}
+
+function deleteEmployee(eid) {
+  if (!confirm('Excluir este funcionário?')) return;
+  appData.employees.list = appData.employees.list.filter(e=>e.id!==eid);
+  saveEmployees().then(()=>{ renderEmployees(); renderCalendar('ferias'); });
+}
+
+function updateEmpPayment(eid, field, val) {
+  if (!appData.employeePayments) appData.employeePayments = {};
+  if (!appData.employeePayments[eid]) appData.employeePayments[eid] = {};
+  appData.employeePayments[eid][field] = parseFloat(val)||val;
+  clearTimeout(window._epTimer);
+  window._epTimer = setTimeout(()=>{ saveEmployeePayments(); renderEmployees(); renderDashboard(); }, 800);
+}
+
+function updateDecimo(eid, field, val) {
+  if (!appData.employeePayments) appData.employeePayments = {};
+  if (!appData.employeePayments[eid]) appData.employeePayments[eid] = {};
+  if (!appData.employeePayments[eid].decimoTerceiro) appData.employeePayments[eid].decimoTerceiro = {};
+  appData.employeePayments[eid].decimoTerceiro[field] = val;
+  clearTimeout(window._dtTimer);
+  window._dtTimer = setTimeout(saveEmployeePayments, 800);
+}
+
+function addVacPeriod(eid) {
+  const emp = appData.employees.list.find(e=>e.id===eid);
+  if (!emp) return;
+  if (!emp.ferias) emp.ferias = { periods: [] };
+  if (emp.ferias.periods.length >= 3) return alert('Máximo de 3 períodos de férias.');
+  emp.ferias.periods.push({ start: '', end: '' });
+  saveEmployees().then(()=>renderEmployees());
+}
+
+function removeVacPeriod(eid, idx) {
+  const emp = appData.employees.list.find(e=>e.id===eid);
+  if (!emp) return;
+  emp.ferias.periods.splice(idx, 1);
+  saveEmployees().then(()=>{ renderEmployees(); renderCalendar('ferias'); });
+}
+
+function updateVacPeriod(eid, idx, field, val) {
+  const emp = appData.employees.list.find(e=>e.id===eid);
+  if (!emp) return;
+  emp.ferias.periods[idx][field] = val;
+  clearTimeout(window._vpTimer);
+  window._vpTimer = setTimeout(()=>{ saveEmployees(); renderEmployees(); renderCalendar('ferias'); }, 600);
+}
+
+function calcPeriodDays(start, end) {
+  if (!start || !end) return 0;
+  const s = new Date(start+'T00:00:00');
+  const e = new Date(end+'T00:00:00');
+  const diff = Math.ceil((e-s)/(1000*60*60*24)) + 1;
+  return Math.max(0, diff);
+}
+
+// =============================================
+// CALENDARS
+// =============================================
+const SHIFT_TYPES = [
+  { value: 'remunerado', label: 'Plantão Remunerado', cls: 'remunerado' },
+  { value: 'nao-remunerado', label: 'Não Remunerado', cls: 'nao-remunerado' },
+  { value: 'hora-extra', label: 'Hora Extra', cls: 'hora-extra' },
+  { value: 'meio-plantao', label: 'Meio Plantão', cls: 'meio-plantao' }
+];
+
+const EMP_COLORS = ['#1e40af','#065f46','#92400e','#5b21b6','#9f1239','#0c4a6e'];
+
+function renderCalendar(type) {
+  const month = type === 'escala' ? calEscalaMonth : calFeriasMonth;
+  const year  = type === 'escala' ? calEscalaYear  : calFeriasYear;
+
+  const gridId = `cal-${type}-grid`;
+  const titleId = `cal-${type}-title`;
+
+  document.getElementById(titleId).textContent = `${MONTHS[month]} ${year}`;
+
+  const firstDay = new Date(year, month, 1).getDay(); // 0=Sun
+  const daysInMonth = new Date(year, month+1, 0).getDate();
+  const prevDays = new Date(year, month, 0).getDate();
+
+  let html = '<div class="cal-grid">';
+  ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'].forEach(d=>{
+    html += `<div class="cal-header-day">${d}</div>`;
+  });
+
+  // Fill leading empty days
+  for (let i = 0; i < firstDay; i++) {
+    const d = prevDays - firstDay + i + 1;
+    html += `<div class="cal-day other-month"><div class="cal-day-num">${d}</div></div>`;
+  }
+
+  const today = new Date(); today.setHours(0,0,0,0);
+
+  for (let d = 1; d <= daysInMonth; d++) {
+    const dateStr = `${year}-${String(month+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const isToday = (new Date(dateStr+'T00:00:00').getTime() === today.getTime());
+    let eventsHTML = '';
+
+    if (type === 'escala') {
+      const dayEvents = (appData.escala.events||{})[dateStr] || [];
+      dayEvents.forEach(ev=>{
+        const t = SHIFT_TYPES.find(s=>s.value===ev.type)||{cls:'',label:ev.type};
+        const emp = (appData.employees.list||[]).find(e=>e.id===ev.empId);
+        eventsHTML += `<div class="cal-event ${t.cls}" title="${escHtml(emp?emp.name:'?')} — ${t.label}">${escHtml(emp?emp.name.split(' ')[0]:'?')}</div>`;
+      });
+    } else {
+      (appData.employees.list||[]).forEach((emp,idx)=>{
+        (emp.ferias?.periods||[]).forEach(p=>{
+          if (!p.start||!p.end) return;
+          if (dateStr >= p.start && dateStr <= p.end) {
+            eventsHTML += `<div class="cal-event ferias" style="background:${EMP_COLORS[idx%EMP_COLORS.length]}22;color:${EMP_COLORS[idx%EMP_COLORS.length]};" title="${escHtml(emp.name)}">${escHtml(emp.name.split(' ')[0])}</div>`;
+          }
+        });
+      });
+    }
+
+    const clickAttr = (type === 'escala' && isAdmin) ? `onclick="openShiftModal('${dateStr}')"` : '';
+    html += `<div class="cal-day ${isToday?'today':''}" ${clickAttr}>
+      <div class="cal-day-num">${d}</div>
+      ${eventsHTML}
+    </div>`;
+  }
+
+  // trailing
+  const total = firstDay + daysInMonth;
+  const trailing = total % 7 === 0 ? 0 : 7 - (total % 7);
+  for (let d = 1; d <= trailing; d++) {
+    html += `<div class="cal-day other-month"><div class="cal-day-num">${d}</div></div>`;
+  }
+
+  html += '</div>';
+  document.getElementById(gridId).innerHTML = html;
+
+  if (type === 'escala') renderShiftSummary();
+  if (type === 'ferias') renderFeriasLegend();
+}
+
+function renderShiftSummary() {
+  const container = document.getElementById('shift-summary');
+  const counts = {};
+  Object.values(appData.escala.events||{}).forEach(dayEvs=>{
+    dayEvs.forEach(ev=>{
+      if (ev.type === 'remunerado') {
+        counts[ev.empId] = (counts[ev.empId]||0) + 1;
+      }
+    });
+  });
+  const emps = appData.employees.list||[];
+  if (emps.length === 0) { container.innerHTML = '<div class="text-gray text-sm">Nenhum funcionário.</div>'; return; }
+  container.innerHTML = emps.map(e=>`
+    <div class="shift-box">
+      <div class="shift-box-name">${escHtml(e.name.split(' ')[0])}</div>
+      <div class="shift-box-count">${counts[e.id]||0} <span style="font-size:12px;font-weight:400;color:var(--gray-400);">plantões</span></div>
+    </div>`).join('');
+}
+
+function renderFeriasLegend() {
+  const legend = document.getElementById('ferias-legend');
+  legend.innerHTML = (appData.employees.list||[]).map((e,i)=>`
+    <div class="legend-item">
+      <div class="legend-dot" style="background:${EMP_COLORS[i%EMP_COLORS.length]};"></div>
+      ${escHtml(e.name)}
+    </div>`).join('');
+}
+
+function prevCalMonth(type) {
+  if (type==='escala') { calEscalaMonth--; if(calEscalaMonth<0){calEscalaMonth=11;calEscalaYear--;} }
+  else { calFeriasMonth--; if(calFeriasMonth<0){calFeriasMonth=11;calFeriasYear--;} }
+  renderCalendar(type);
+}
+function nextCalMonth(type) {
+  if (type==='escala') { calEscalaMonth++; if(calEscalaMonth>11){calEscalaMonth=0;calEscalaYear++;} }
+  else { calFeriasMonth++; if(calFeriasMonth>11){calFeriasMonth=0;calFeriasYear++;} }
+  renderCalendar(type);
+}
+
+function openShiftModal(dateStr) {
+  const emps = appData.employees.list||[];
+  if (emps.length === 0) return alert('Cadastre funcionários primeiro.');
+  const existing = (appData.escala.events||{})[dateStr]||[];
+
+  const existingRows = existing.map((ev,idx)=>{
+    const t = SHIFT_TYPES.find(s=>s.value===ev.type)||SHIFT_TYPES[0];
+    const emp = emps.find(e=>e.id===ev.empId);
+    return `<div style="display:flex;gap:8px;align-items:center;margin-bottom:6px;">
+      <span style="flex:1;font-size:13px;">${escHtml(emp?emp.name:'?')} — ${t.label}</span>
+      <button class="btn btn-sm btn-danger btn-icon" onclick="removeShiftEvent('${dateStr}',${idx})">✕</button>
+    </div>`;
+  }).join('');
+
+  openModal(`
+    <div class="modal-title">Escala — ${fmtDate(dateStr)}</div>
+    <div style="margin-bottom:12px;">${existingRows || '<div class="text-gray text-sm">Nenhum plantão neste dia.</div>'}</div>
+    <hr style="margin:12px 0;border-color:var(--gray-200);">
+    <div class="card-title" style="margin-bottom:10px;">Adicionar Plantão</div>
+    <div class="form-row">
+      <div class="form-group"><div class="form-label">Funcionário</div>
+        <select class="form-control" id="m-shift-emp">
+          ${emps.map(e=>`<option value="${e.id}">${escHtml(e.name)}</option>`).join('')}
+        </select>
+      </div>
+      <div class="form-group"><div class="form-label">Tipo</div>
+        <select class="form-control" id="m-shift-type">
+          ${SHIFT_TYPES.map(t=>`<option value="${t.value}">${t.label}</option>`).join('')}
+        </select>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal()">Fechar</button>
+      <button class="btn btn-primary" onclick="confirmAddShift('${dateStr}')">Adicionar</button>
+    </div>`);
+}
+
+function confirmAddShift(dateStr) {
+  const empId = document.getElementById('m-shift-emp').value;
+  const type = document.getElementById('m-shift-type').value;
+  if (!appData.escala.events) appData.escala.events = {};
+  if (!appData.escala.events[dateStr]) appData.escala.events[dateStr] = [];
+  appData.escala.events[dateStr].push({ empId, type });
+  saveEscala().then(()=>{ renderCalendar('escala'); closeModal(); });
+}
+
+function removeShiftEvent(dateStr, idx) {
+  appData.escala.events[dateStr].splice(idx, 1);
+  if (appData.escala.events[dateStr].length === 0) delete appData.escala.events[dateStr];
+  saveEscala().then(()=>{ renderCalendar('escala'); closeModal(); });
+}
+
+// =============================================
+// TABS
+// =============================================
+function showTab(name, btn) {
+  document.querySelectorAll('.tab-pane').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.navtab').forEach(b=>b.classList.remove('active'));
+  document.getElementById('tab-'+name).classList.add('active');
+  btn.classList.add('active');
+}
+
+// =============================================
+// MODAL
+// =============================================
+function openModal(html) {
+  document.getElementById('modal-box').innerHTML = html;
+  document.getElementById('modal-overlay').classList.remove('hidden');
+}
+function closeModal() {
+  document.getElementById('modal-overlay').classList.add('hidden');
+}
+function closeModalOnOverlay(e) {
+  if (e.target === document.getElementById('modal-overlay')) closeModal();
+}
+
+// =============================================
+// UTILS
+// =============================================
+function fmtBRL(val) {
+  return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(parseFloat(val)||0);
+}
+function fmtDate(dateStr) {
+  if (!dateStr) return '—';
+  const parts = dateStr.split('-');
+  return `${parts[2]}/${parts[1]}/${parts[0]}`;
+}
+function isOverdue(dateStr) {
+  if (!dateStr) return false;
+  const due = new Date(dateStr+'T00:00:00');
+  const today = new Date(); today.setHours(0,0,0,0);
+  return due < today;
+}
+function escHtml(str) {
+  if (!str) return '';
+  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+function set(id, val) {
+  const el = document.getElementById(id);
+  if (el) el.textContent = val;
+}
+
+// =============================================
+// START
+// =============================================
+init();
+</script>
+</body>
+</html>
