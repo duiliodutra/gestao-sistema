@@ -1787,13 +1787,14 @@ function confirmAddShift(dateStr) {
   if (!appData.escala.events) appData.escala.events = {};
   if (!appData.escala.events[dateStr]) appData.escala.events[dateStr] = [];
   appData.escala.events[dateStr].push({ empId, type });
-  saveEscala().then(()=>{ renderCalendar('escala'); closeModal(); });
+  // Reopen modal with updated list instead of closing
+  saveEscala().then(()=>{ renderCalendar('escala'); openShiftModal(dateStr); });
 }
 
 function removeShiftEvent(dateStr, idx) {
   appData.escala.events[dateStr].splice(idx, 1);
   if (appData.escala.events[dateStr].length === 0) delete appData.escala.events[dateStr];
-  saveEscala().then(()=>{ renderCalendar('escala'); closeModal(); });
+  saveEscala().then(()=>{ renderCalendar('escala'); openShiftModal(dateStr); });
 }
 
 // =============================================
