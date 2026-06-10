@@ -1197,13 +1197,31 @@ function updateCashflow() {
   const recebido = parseFloat(document.getElementById('cf-recebido').value)||0;
   const previsao = parseFloat(document.getElementById('cf-previsao').value)||0;
 
-  let totalDespesas = 0;
-  Object.values(appData.empresa.blocks||{}).forEach(b=>(b.items||[]).forEach(i=>{ if(!i.paid) totalDespesas+=parseFloat(i.value)||0; }));
-  Object.values(appData.pessoal.blocks||{}).forEach(b=>(b.items||[]).forEach(i=>{ if(!i.paid) totalDespesas+=parseFloat(i.value)||0; }));
+  // Contas empresa em aberto
+  let despesasEmpresa = 0;
+  Object.values(appData.empresa.blocks||{}).forEach(b=>(b.items||[]).forEach(i=>{ if(!i.paid) despesasEmpresa+=parseFloat(i.value)||0; }));
 
+  // Contas pessoal em aberto
+  let despesasPessoal = 0;
+  Object.values(appData.pessoal.blocks||{}).forEach(b=>(b.items||[]).forEach(i=>{ if(!i.paid) despesasPessoal+=parseFloat(i.value)||0; }));
+
+  // Folha de funcionários (líquido de cada um)
+  let folha = 0;
+  (appData.employees.list||[]).forEach(emp => {
+    const pd = (appData.employeePayments||{})[emp.id]||{};
+    folha += calcLiquido(pd);
+  });
+
+  const totalDespesas = despesasEmpresa + despesasPessoal + folha;
   const total = (emConta + recebido + previsao) - totalDespesas;
+
   const el = document.getElementById('cashflow-result');
-  el.textContent = `Saldo Final Estimado: ${fmtBRL(total)}`;
+  el.innerHTML = `
+    <div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:8px;font-size:13px;opacity:0.85;">
+      <span>➕ Entradas: ${fmtBRL(emConta+recebido+previsao)}</span>
+      <span>➖ Empresa: ${fmtBRL(despesasEmpresa)} &nbsp;|&nbsp; Pessoal: ${fmtBRL(despesasPessoal)} &nbsp;|&nbsp; Folha: ${fmtBRL(folha)}</span>
+    </div>
+    <div style="font-size:20px;font-weight:700;">Saldo Final Estimado: ${fmtBRL(total)}</div>`;
   el.className = 'cashflow-total ' + (total >= 0 ? 'positive' : 'negative');
 
   appData.cashflow = { emConta, recebido, previsao };
@@ -1250,6 +1268,7 @@ function renderEmployees() {
   container.innerHTML = '';
   const div = document.createElement('div');
   div.className = 'employee-card';
+  div.dataset.empid = emp.id;
   div.innerHTML = buildEmployeeCard(emp, pd);
   container.appendChild(div);
 }
@@ -1322,7 +1341,7 @@ function buildEmployeeCard(emp, pd) {
           ${receitasHTML || '<div class="text-gray text-sm" style="margin-bottom:8px;">Nenhuma receita. Clique em + Receita.</div>'}
           <div style="background:var(--success-light);border-radius:var(--radius);padding:8px 12px;margin-top:4px;display:flex;justify-content:space-between;">
             <span style="font-size:12px;color:var(--success);">Total Receitas</span>
-            <span style="font-weight:700;color:var(--success);">${fmtBRL(totalReceitas)}</span>
+            <span class="emp-total-receitas" style="font-weight:700;color:var(--success);">${fmtBRL(totalReceitas)}</span>
           </div>
         </div>
         <div>
@@ -1338,13 +1357,13 @@ function buildEmployeeCard(emp, pd) {
           ${descontosHTML || '<div class="text-gray text-sm" style="margin-bottom:8px;">Nenhum desconto. Clique em + Desconto.</div>'}
           <div style="background:var(--danger-light);border-radius:var(--radius);padding:8px 12px;margin-top:4px;display:flex;justify-content:space-between;">
             <span style="font-size:12px;color:var(--danger);">Total Descontos</span>
-            <span style="font-weight:700;color:var(--danger);">${fmtBRL(totalDescontos)}</span>
+            <span class="emp-total-descontos" style="font-weight:700;color:var(--danger);">${fmtBRL(totalDescontos)}</span>
           </div>
         </div>
       </div>
       <div style="background:var(--primary-light);border-radius:var(--radius);padding:12px 16px;margin-top:12px;display:flex;justify-content:space-between;align-items:center;">
         <span style="font-weight:600;color:var(--primary);font-size:15px;">💵 Líquido a Pagar</span>
-        <span style="font-weight:700;color:var(--primary);font-size:20px;">${fmtBRL(liquido)}</span>
+        <span class="emp-liquido" style="font-weight:700;color:var(--primary);font-size:20px;">${fmtBRL(liquido)}</span>
       </div>
       <div style="margin-top:16px;">
         <div class="card-title" style="margin-bottom:10px;">🎄 13º Salário</div>
@@ -1368,7 +1387,7 @@ function buildEmployeeCard(emp, pd) {
         </div>
         <div style="background:var(--warning-light);border-radius:var(--radius);padding:10px 12px;margin-top:8px;display:flex;justify-content:space-between;">
           <span style="font-size:13px;color:var(--warning);">Restante do 13º</span>
-          <span style="font-weight:700;color:var(--warning);">${fmtBRL((parseFloat(thirteenth.valorTotal)||0)-(parseFloat(thirteenth.valorPago)||0))}</span>
+          <span class="emp-decimo-restante" style="font-weight:700;color:var(--warning);">${fmtBRL((parseFloat(thirteenth.valorTotal)||0)-(parseFloat(thirteenth.valorPago)||0))}</span>
         </div>
       </div>
       <div style="margin-top:16px;">
@@ -1407,8 +1426,25 @@ function updateEmpLine(eid, tipo, idx, field, val) {
   if (!appData.employeePayments[eid]) appData.employeePayments[eid] = {};
   if (!appData.employeePayments[eid][tipo]) appData.employeePayments[eid][tipo] = [];
   appData.employeePayments[eid][tipo][idx][field] = field === 'valor' ? (parseFloat(val)||0) : val;
+  // Update totals in place without re-rendering the whole card
+  updateEmpTotalsInPlace(eid);
   clearTimeout(window._epTimer);
-  window._epTimer = setTimeout(()=>{ saveEmployeePayments(); renderEmployees(); renderDashboard(); }, 800);
+  window._epTimer = setTimeout(()=>{ saveEmployeePayments(); renderDashboard(); }, 1500);
+}
+
+function updateEmpTotalsInPlace(eid) {
+  const pd = (appData.employeePayments||{})[eid] || {};
+  const totalR = (pd.receitas||[]).reduce((s,r)=>s+(parseFloat(r.valor)||0),0);
+  const totalD = (pd.descontos_list||[]).reduce((s,d)=>s+(parseFloat(d.valor)||0),0);
+  const liq = totalR - totalD;
+  const card = document.querySelector(`[data-empid="${eid}"]`);
+  if (!card) return;
+  const trEl = card.querySelector('.emp-total-receitas');
+  const tdEl = card.querySelector('.emp-total-descontos');
+  const liqEl = card.querySelector('.emp-liquido');
+  if (trEl) trEl.textContent = fmtBRL(totalR);
+  if (tdEl) tdEl.textContent = fmtBRL(totalD);
+  if (liqEl) liqEl.textContent = fmtBRL(liq);
 }
 
 
@@ -1501,8 +1537,13 @@ function updateDecimo(eid, field, val) {
   if (!appData.employeePayments[eid]) appData.employeePayments[eid] = {};
   if (!appData.employeePayments[eid].decimoTerceiro) appData.employeePayments[eid].decimoTerceiro = {};
   appData.employeePayments[eid].decimoTerceiro[field] = val;
+  // Update restante in place
+  const pd = appData.employeePayments[eid];
+  const restante = (parseFloat(pd.decimoTerceiro.valorTotal)||0) - (parseFloat(pd.decimoTerceiro.valorPago)||0);
+  const card = document.querySelector(`[data-empid="${eid}"]`);
+  if (card) { const el = card.querySelector('.emp-decimo-restante'); if (el) el.textContent = fmtBRL(restante); }
   clearTimeout(window._dtTimer);
-  window._dtTimer = setTimeout(saveEmployeePayments, 800);
+  window._dtTimer = setTimeout(saveEmployeePayments, 1500);
 }
 
 function addVacPeriod(eid) {
