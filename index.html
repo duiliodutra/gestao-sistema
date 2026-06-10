@@ -493,7 +493,7 @@
         <div class="card-title" style="margin-bottom:12px;">Previsão de Caixa</div>
         <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;margin-bottom:12px;">
           <div>
-            <div class="form-label">💰 Dinheiro em Conta</div>
+            <div class="form-label">💰 Em Conta</div>
             <input type="number" class="form-control cashflow-input" id="cf-em-conta" placeholder="R$ 0,00" oninput="updateCashflow()">
           </div>
           <div>
@@ -505,7 +505,7 @@
             <input type="number" class="form-control cashflow-input" id="cf-previsao" placeholder="R$ 0,00" oninput="updateCashflow()">
           </div>
         </div>
-        <div class="cashflow-total" id="cashflow-result">Saldo Final: R$ 0,00</div>
+        <div id="cashflow-result"></div>
       </div>
 
       <!-- ALERTS -->
@@ -1193,44 +1193,78 @@ function renderReport() {
 }
 
 function updateCashflow() {
-  const emConta = parseFloat(document.getElementById('cf-em-conta').value)||0;
+  const emConta  = parseFloat(document.getElementById('cf-em-conta').value)||0;
   const recebido = parseFloat(document.getElementById('cf-recebido').value)||0;
   const previsao = parseFloat(document.getElementById('cf-previsao').value)||0;
 
-  // Contas empresa em aberto
+  // Somar todas as contas em aberto
   let despesasEmpresa = 0;
   Object.values(appData.empresa.blocks||{}).forEach(b=>(b.items||[]).forEach(i=>{ if(!i.paid) despesasEmpresa+=parseFloat(i.value)||0; }));
 
-  // Contas pessoal em aberto
   let despesasPessoal = 0;
   Object.values(appData.pessoal.blocks||{}).forEach(b=>(b.items||[]).forEach(i=>{ if(!i.paid) despesasPessoal+=parseFloat(i.value)||0; }));
 
-  // Folha de funcionários (líquido de cada um)
   let folha = 0;
   (appData.employees.list||[]).forEach(emp => {
     const pd = (appData.employeePayments||{})[emp.id]||{};
     folha += calcLiquido(pd);
   });
 
-  const totalDespesas = despesasEmpresa + despesasPessoal + folha;
-  // Saldo = Dinheiro em conta + Previsão total de recebimento - Despesas
-  // "Já recebido" mostra andamento mas não soma duas vezes
-  const total = (emConta + previsao) - totalDespesas;
-  const percentRecebido = previsao > 0 ? Math.min(100, Math.round((recebido/previsao)*100)) : 0;
+  const totalContas = despesasEmpresa + despesasPessoal + folha;
+
+  // Lógica:
+  // Falta = Total contas - Em conta  (quanto falta para cobrir tudo)
+  // Previsão de fechamento = Previsão de recebimento - Falta
+  const falta = totalContas - emConta;
+  const prevFechamento = previsao - falta;
 
   const el = document.getElementById('cashflow-result');
+  el.className = '';
   el.innerHTML = `
-    <div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:10px;font-size:13px;">
-      <span>💰 Em conta: <b>${fmtBRL(emConta)}</b></span>
-      <span>📈 Previsão recebimento: <b>${fmtBRL(previsao)}</b>
-        <span style="margin-left:6px;background:rgba(0,0,0,0.08);padding:2px 7px;border-radius:10px;font-size:11px;">${percentRecebido}% já recebido</span>
-      </span>
-      <span>➖ Despesas: <b>${fmtBRL(totalDespesas)}</b>
-        <span style="font-size:11px;opacity:0.7;margin-left:4px;">(Empresa ${fmtBRL(despesasEmpresa)} + Pessoal ${fmtBRL(despesasPessoal)} + Folha ${fmtBRL(folha)})</span>
-      </span>
-    </div>
-    <div style="font-size:20px;font-weight:700;">Saldo Final Estimado: ${fmtBRL(total)}</div>`;
-  el.className = 'cashflow-total ' + (total >= 0 ? 'positive' : 'negative');
+    <div style="border:1px solid var(--gray-200);border-radius:var(--radius-lg);overflow:hidden;margin-top:4px;">
+      <table style="width:100%;border-collapse:collapse;font-size:14px;">
+        <thead>
+          <tr style="background:var(--gray-700);color:white;">
+            <th colspan="2" style="padding:10px 14px;text-align:center;letter-spacing:0.5px;font-size:13px;">CONTAS RESTANTES</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${Object.values(appData.empresa.blocks||{}).map(b=>{
+            const v=(b.items||[]).filter(i=>!i.paid).reduce((s,i)=>s+(parseFloat(i.value)||0),0);
+            return v>0?`<tr style="background:#16a34a;color:white;"><td style="padding:7px 14px;">${escHtml(b.name)}</td><td style="padding:7px 14px;text-align:right;font-weight:600;">${fmtBRL(v)}</td></tr>`:'';
+          }).join('')}
+          ${Object.values(appData.pessoal.blocks||{}).map(b=>{
+            const v=(b.items||[]).filter(i=>!i.paid).reduce((s,i)=>s+(parseFloat(i.value)||0),0);
+            return v>0?`<tr style="background:#16a34a;color:white;"><td style="padding:7px 14px;">${escHtml(b.name)}</td><td style="padding:7px 14px;text-align:right;font-weight:600;">${fmtBRL(v)}</td></tr>`:'';
+          }).join('')}
+          ${folha>0?`<tr style="background:#16a34a;color:white;"><td style="padding:7px 14px;">Funcionários</td><td style="padding:7px 14px;text-align:right;font-weight:600;">${fmtBRL(folha)}</td></tr>`:''}
+          <tr style="background:#dc2626;color:white;font-weight:700;">
+            <td style="padding:9px 14px;">Total</td>
+            <td style="padding:9px 14px;text-align:right;">${fmtBRL(totalContas)}</td>
+          </tr>
+          <tr style="background:var(--gray-50);">
+            <td style="padding:8px 14px;color:var(--gray-700);">Em conta</td>
+            <td style="padding:8px 14px;text-align:right;font-weight:600;">${fmtBRL(emConta)}</td>
+          </tr>
+          <tr style="background:${falta>0?'#dc2626':'#16a34a'};color:white;font-weight:700;">
+            <td style="padding:9px 14px;">${falta>0?'Falta':'Sobra'}</td>
+            <td style="padding:9px 14px;text-align:right;">${fmtBRL(Math.abs(falta))}</td>
+          </tr>
+          <tr style="background:var(--gray-50);">
+            <td style="padding:8px 14px;color:var(--gray-700);">Prev. de recebimento</td>
+            <td style="padding:8px 14px;text-align:right;font-weight:600;">${fmtBRL(previsao)}</td>
+          </tr>
+          <tr style="background:var(--gray-50);">
+            <td style="padding:8px 14px;color:var(--gray-700);">Recebido</td>
+            <td style="padding:8px 14px;text-align:right;font-weight:600;">${fmtBRL(recebido)}</td>
+          </tr>
+          <tr style="background:${prevFechamento>=0?'#16a34a':'#dc2626'};color:white;font-weight:700;font-size:15px;">
+            <td style="padding:10px 14px;">Prev. de fechamento</td>
+            <td style="padding:10px 14px;text-align:right;">${fmtBRL(prevFechamento)}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>`;
 
   appData.cashflow = { emConta, recebido, previsao };
   clearTimeout(window._cfTimer);
