@@ -392,6 +392,18 @@
 
 <!-- LOADING -->
 <div id="loading"><div class="spinner"></div></div>
+<div id="global-error" style="display:none;position:fixed;top:0;left:0;right:0;background:#dc2626;color:white;padding:12px 16px;font-size:13px;z-index:99999;word-break:break-all;"></div>
+
+<script>
+window.onerror = function(msg, src, line, col, err) {
+  var el = document.getElementById('global-error');
+  if (el) { el.style.display='block'; el.textContent = 'Erro: ' + msg + ' (linha ' + line + ')'; }
+};
+window.addEventListener('unhandledrejection', function(e) {
+  var el = document.getElementById('global-error');
+  if (el) { el.style.display='block'; el.textContent = 'Erro: ' + (e.reason && e.reason.message ? e.reason.message : e.reason); }
+});
+</script>
 
 <!-- AUTH SCREEN -->
 <div id="auth-screen" class="hidden">
