@@ -1787,7 +1787,12 @@ function switchEmpTab(eid) {
 }
 
 function buildEmployeeCard(emp, pd, readOnly = false) {
-  const thirteenth = pd.decimoTerceiro || {};
+  if (!pd.decimoTerceiro) pd.decimoTerceiro = {};
+  pd.decimoTerceiro = normalizeDecimoTerceiro(pd.decimoTerceiro);
+  const thirteenth = pd.decimoTerceiro;
+  const decimoPago = getDecimoPago(thirteenth);
+  const decimoLancado = getDecimoLancado(thirteenth);
+  const decimoRestante = (parseFloat(thirteenth.valorTotal) || 0) - decimoPago;
   const receitas = pd.receitas || [];
   const descontos_list = pd.descontos_list || [];
 
@@ -1881,27 +1886,34 @@ function buildEmployeeCard(emp, pd, readOnly = false) {
       </div>
       <div style="margin-top:16px;">
         <div class="card-title" style="margin-bottom:10px;">🎄 13º Salário</div>
-        <div class="emp-grid">
-          <div>
-            <div class="form-group mb-1"><div class="form-label">Valor Total do 13º</div>
-              ${readOnly ? `<div class="form-control" style="background:var(--gray-50);">${fmtBRL(thirteenth.valorTotal||0)}</div>` : `<input type="number" class="form-control" value="${thirteenth.valorTotal||''}" onchange="updateDecimo('${emp.id}','valorTotal',this.value)" placeholder="0,00">`}
-            </div>
-            <div class="form-group mb-1"><div class="form-label">Valor Pago até Agora</div>
-              ${readOnly ? `<div class="form-control" style="background:var(--gray-50);">${fmtBRL(thirteenth.valorPago||0)}</div>` : `<input type="number" class="form-control" value="${thirteenth.valorPago||''}" onchange="updateDecimo('${emp.id}','valorPago',this.value)" placeholder="0,00">`}
-            </div>
-          </div>
-          <div>
-            <div class="form-group mb-1"><div class="form-label">Data do Último Pagamento</div>
-              ${readOnly ? `<div class="form-control" style="background:var(--gray-50);">${fmtDate(thirteenth.dataUltimoPgto)}</div>` : `<input type="date" class="form-control" value="${thirteenth.dataUltimoPgto||''}" onchange="updateDecimo('${emp.id}','dataUltimoPgto',this.value)">`}
-            </div>
-            <div class="form-group mb-1"><div class="form-label">Forma de Pagamento</div>
-              ${readOnly ? `<div class="form-control" style="background:var(--gray-50);">${escHtml(thirteenth.forma||'—')}</div>` : `<input type="text" class="form-control" value="${thirteenth.forma||''}" onchange="updateDecimo('${emp.id}','forma',this.value)" placeholder="Ex: PIX, Depósito...">`}
-            </div>
-          </div>
+        <div class="form-group mb-1"><div class="form-label">Valor Total do 13º</div>
+          ${readOnly
+            ? `<div class="form-control" style="background:var(--gray-50);">${fmtBRL(thirteenth.valorTotal||0)}</div>`
+            : `<input type="number" step="0.01" class="form-control" value="${thirteenth.valorTotal||''}" onchange="updateDecimo('${emp.id}','valorTotal',this.value)" placeholder="0,00">`}
         </div>
-        <div style="background:var(--warning-light);border-radius:var(--radius);padding:10px 12px;margin-top:8px;display:flex;justify-content:space-between;">
-          <span style="font-size:13px;color:var(--warning);">Restante do 13º</span>
-          <span class="emp-decimo-restante" style="font-weight:700;color:var(--warning);">${fmtBRL((parseFloat(thirteenth.valorTotal)||0)-(parseFloat(thirteenth.valorPago)||0))}</span>
+        <div class="form-label" style="margin:12px 0 6px;">Pagamentos parcelados</div>
+        ${readOnly
+          ? ((thirteenth.pagamentos||[]).length
+            ? (thirteenth.pagamentos||[]).map(pg=>`<div class="vac-pgto-row" style="background:var(--gray-50);padding:6px 10px;border-radius:var(--radius);margin-bottom:4px;">
+                <span class="text-sm">${escHtml(pg.desc||'Parcela')}</span>
+                <span class="font-bold">${fmtBRL(pg.valor)}</span>
+                <span class="text-xs text-gray">${fmtDate(pg.dataPgto)} ${pg.pago?'✅':'⏳'}</span>
+              </div>`).join('')
+            : '<div class="text-gray text-sm">Nenhuma parcela lançada.</div>')
+          : `${(thirteenth.pagamentos||[]).map((pg,pi)=>`
+            <div class="vac-pgto-row">
+              <input type="text" placeholder="Ex: 1ª parcela" value="${escHtml(pg.desc||'')}" onchange="updateDecimoPagamento('${emp.id}',${pi},'desc',this.value)">
+              <input type="number" step="0.01" placeholder="Valor" value="${pg.valor||''}" style="max-width:110px;" onchange="updateDecimoPagamento('${emp.id}',${pi},'valor',this.value)">
+              <input type="date" value="${pg.dataPgto||''}" style="max-width:140px;" onchange="updateDecimoPagamento('${emp.id}',${pi},'dataPgto',this.value)">
+              <input type="text" placeholder="Forma" value="${escHtml(pg.forma||'')}" style="max-width:100px;" onchange="updateDecimoPagamento('${emp.id}',${pi},'forma',this.value)">
+              <button class="btn btn-sm ${pg.pago?'btn-ghost':'btn-success'}" onclick="toggleDecimoPagamento('${emp.id}',${pi})">${pg.pago?'✅ Pago':'Marcar pago'}</button>
+              <button class="btn btn-sm btn-danger btn-icon" onclick="removeDecimoPagamento('${emp.id}',${pi})">✕</button>
+            </div>`).join('') || '<div class="text-gray text-xs" style="margin-bottom:6px;">Nenhuma parcela lançada.</div>'}
+            <button class="btn btn-ghost btn-sm" onclick="addDecimoPagamento('${emp.id}')">+ Parcela</button>`}
+        <div style="margin-top:10px;display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px;">
+          <div class="stat-box"><div class="stat-label">Total lançado</div><div class="stat-value blue emp-decimo-lancado">${fmtBRL(decimoLancado)}</div></div>
+          <div class="stat-box"><div class="stat-label">Já pago</div><div class="stat-value green emp-decimo-pago">${fmtBRL(decimoPago)}</div></div>
+          <div class="stat-box"><div class="stat-label">Restante</div><div class="stat-value orange emp-decimo-restante">${fmtBRL(decimoRestante)}</div></div>
         </div>
       </div>
       <div style="margin-top:16px;">
@@ -2059,18 +2071,111 @@ function updateEmpPayment(eid, field, val) {
   window._epTimer = setTimeout(()=>{ saveEmployeePayments(); renderEmployees(); renderDashboard(); }, 800);
 }
 
-function updateDecimo(eid, field, val) {
-  if (!appData.employeePayments) appData.employeePayments = {};
-  if (!appData.employeePayments[eid]) appData.employeePayments[eid] = {};
-  if (!appData.employeePayments[eid].decimoTerceiro) appData.employeePayments[eid].decimoTerceiro = {};
-  appData.employeePayments[eid].decimoTerceiro[field] = val;
-  // Update restante in place
-  const pd = appData.employeePayments[eid];
-  const restante = (parseFloat(pd.decimoTerceiro.valorTotal)||0) - (parseFloat(pd.decimoTerceiro.valorPago)||0);
+function normalizeDecimoTerceiro(dt) {
+  if (!dt) dt = {};
+  if (!dt.pagamentos) {
+    dt.pagamentos = [];
+    if (parseFloat(dt.valorPago) > 0) {
+      dt.pagamentos.push({
+        desc: 'Pagamento anterior',
+        valor: dt.valorPago,
+        dataPgto: dt.dataUltimoPgto || '',
+        forma: dt.forma || '',
+        pago: true
+      });
+    }
+  }
+  return dt;
+}
+
+function getDecimoPago(dt) {
+  return (dt.pagamentos || []).filter(p => p.pago).reduce((s, p) => s + (parseFloat(p.valor) || 0), 0);
+}
+
+function getDecimoLancado(dt) {
+  return (dt.pagamentos || []).reduce((s, p) => s + (parseFloat(p.valor) || 0), 0);
+}
+
+function syncDecimoTotals(eid) {
+  const dt = appData.employeePayments?.[eid]?.decimoTerceiro;
+  if (!dt) return;
+  dt.valorPago = getDecimoPago(dt);
+  const paid = dt.pagamentos?.filter(p => p.pago && p.dataPgto).sort((a, b) => (b.dataPgto || '').localeCompare(a.dataPgto || ''));
+  if (paid?.length) {
+    dt.dataUltimoPgto = paid[0].dataPgto;
+    dt.forma = paid[0].forma || dt.forma || '';
+  }
+}
+
+function updateDecimoTotalsInPlace(eid) {
+  const dt = normalizeDecimoTerceiro(appData.employeePayments?.[eid]?.decimoTerceiro || {});
   const card = document.querySelector(`[data-empid="${eid}"]`);
-  if (card) { const el = card.querySelector('.emp-decimo-restante'); if (el) el.textContent = fmtBRL(restante); }
+  if (!card) return;
+  const pago = getDecimoPago(dt);
+  const lancado = getDecimoLancado(dt);
+  const restante = (parseFloat(dt.valorTotal) || 0) - pago;
+  const elPago = card.querySelector('.emp-decimo-pago');
+  const elLancado = card.querySelector('.emp-decimo-lancado');
+  const elRestante = card.querySelector('.emp-decimo-restante');
+  if (elPago) elPago.textContent = fmtBRL(pago);
+  if (elLancado) elLancado.textContent = fmtBRL(lancado);
+  if (elRestante) elRestante.textContent = fmtBRL(restante);
+}
+
+function scheduleDecimoSave() {
   clearTimeout(window._dtTimer);
   window._dtTimer = setTimeout(saveEmployeePayments, 1500);
+}
+
+function updateDecimo(eid, field, val) {
+  if (!canWrite()) return;
+  if (!appData.employeePayments) appData.employeePayments = {};
+  if (!appData.employeePayments[eid]) appData.employeePayments[eid] = {};
+  appData.employeePayments[eid].decimoTerceiro = normalizeDecimoTerceiro(appData.employeePayments[eid].decimoTerceiro);
+  appData.employeePayments[eid].decimoTerceiro[field] = field === 'valorTotal' ? (parseFloat(val) || 0) : val;
+  syncDecimoTotals(eid);
+  updateDecimoTotalsInPlace(eid);
+  scheduleDecimoSave();
+}
+
+function addDecimoPagamento(eid) {
+  if (!canWrite()) return;
+  if (!appData.employeePayments) appData.employeePayments = {};
+  if (!appData.employeePayments[eid]) appData.employeePayments[eid] = {};
+  appData.employeePayments[eid].decimoTerceiro = normalizeDecimoTerceiro(appData.employeePayments[eid].decimoTerceiro);
+  appData.employeePayments[eid].decimoTerceiro.pagamentos.push({ desc: '', valor: '', dataPgto: '', forma: '', pago: false });
+  saveEmployeePayments().then(() => renderEmployees());
+}
+
+function removeDecimoPagamento(eid, pi) {
+  if (!canWrite()) return;
+  const dt = appData.employeePayments?.[eid]?.decimoTerceiro;
+  if (!dt?.pagamentos) return;
+  dt.pagamentos.splice(pi, 1);
+  syncDecimoTotals(eid);
+  scheduleDecimoSave();
+  renderEmployees();
+}
+
+function updateDecimoPagamento(eid, pi, field, val) {
+  if (!canWrite()) return;
+  const pg = appData.employeePayments?.[eid]?.decimoTerceiro?.pagamentos?.[pi];
+  if (!pg) return;
+  if (field === 'valor') pg[field] = parseFloat(val) || 0;
+  else pg[field] = val;
+  syncDecimoTotals(eid);
+  updateDecimoTotalsInPlace(eid);
+  scheduleDecimoSave();
+}
+
+function toggleDecimoPagamento(eid, pi) {
+  if (!canWrite()) return;
+  const pg = appData.employeePayments?.[eid]?.decimoTerceiro?.pagamentos?.[pi];
+  if (!pg) return;
+  pg.pago = !pg.pago;
+  syncDecimoTotals(eid);
+  scheduleDecimoSave();
+  renderEmployees();
 }
 
 function normalizeFerias(emp) {
