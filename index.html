@@ -210,8 +210,12 @@
   .badge-paid { background: var(--success-light); color: var(--success); }
   .badge-pending { background: var(--warning-light); color: var(--warning); }
   .badge-overdue { background: var(--danger-light); color: var(--danger); }
+  .badge-receita { background: #dbeafe; color: #1e40af; }
+  .badge-despesa { background: #fee2e2; color: #991b1b; }
   .badge-empresa { background: #dbeafe; color: #1e40af; }
   .badge-pessoal { background: #ede9fe; color: #5b21b6; }
+  .value-receita { color: var(--success) !important; }
+  .value-despesa { color: var(--gray-800); }
 
   /* BUTTONS */
   .btn {
@@ -322,6 +326,8 @@
   .cf-group-label:first-of-type { margin-top: 0; padding-top: 0; border-top: none; }
   .cf-line-subtotal { font-weight: 600; color: var(--gray-800); }
   .cf-line-subtotal .cf-line-value { color: var(--primary); }
+  .cf-line-receita .cf-line-name { color: var(--success); }
+  .cf-line-receita .cf-line-value { color: var(--success); }
   .cf-line {
     display: flex; justify-content: space-between; align-items: center;
     padding: 6px 0; font-size: 13px; color: var(--gray-700); gap: 12px;
@@ -586,11 +592,11 @@ window.addEventListener('unhandledrejection', function(e) {
         </div>
         <div class="summary-grid">
           <div class="stat-box">
-            <div class="stat-label">🏢 Total Empresa</div>
+            <div class="stat-label">🏢 Saldo Empresa</div>
             <div class="stat-value blue" id="dash-empresa-total">R$ 0,00</div>
           </div>
           <div class="stat-box">
-            <div class="stat-label">👤 Total Pessoal</div>
+            <div class="stat-label">👤 Saldo Pessoal</div>
             <div class="stat-value blue" id="dash-pessoal-total">R$ 0,00</div>
           </div>
           <div class="stat-box">
@@ -602,11 +608,11 @@ window.addEventListener('unhandledrejection', function(e) {
             <div class="stat-value red" id="dash-total-geral">R$ 0,00</div>
           </div>
           <div class="stat-box">
-            <div class="stat-label">✅ Já Pago</div>
+            <div class="stat-label">✅ Quitado / Recebido</div>
             <div class="stat-value green" id="dash-paid">R$ 0,00</div>
           </div>
           <div class="stat-box">
-            <div class="stat-label">⏳ Em Aberto</div>
+            <div class="stat-label">⏳ Saldo em Aberto</div>
             <div class="stat-value red" id="dash-pending">R$ 0,00</div>
           </div>
         </div>
@@ -645,7 +651,7 @@ window.addEventListener('unhandledrejection', function(e) {
       <div class="flex" style="justify-content:space-between;align-items:flex-start;margin-bottom:16px;">
         <div>
           <div class="section-title">🏢 Contas da Empresa</div>
-          <div class="section-desc">Gerencie blocos de contas por categoria</div>
+          <div class="section-desc">Despesas e receitas da empresa, organizadas por bloco</div>
         </div>
         <div id="empresa-admin-controls">
           <button class="btn btn-primary" onclick="addBlock('empresa')">+ Novo Bloco</button>
@@ -660,7 +666,7 @@ window.addEventListener('unhandledrejection', function(e) {
       <div class="flex" style="justify-content:space-between;align-items:flex-start;margin-bottom:16px;">
         <div>
           <div class="section-title">👤 Contas Pessoais</div>
-          <div class="section-desc">Seus gastos e compromissos pessoais</div>
+          <div class="section-desc">Despesas, recebimentos e compromissos pessoais</div>
         </div>
         <div id="pessoal-admin-controls">
           <button class="btn btn-primary" onclick="addBlock('pessoal')">+ Novo Bloco</button>
@@ -1004,6 +1010,7 @@ function itemExistsInBlocks(blocks, blockName, item) {
   if (!block) return false;
   return (block.items || []).some(ci =>
     ci.desc === item.desc &&
+    getItemTipo(ci) === getItemTipo(item) &&
     Math.abs((parseFloat(ci.value) || 0) - (parseFloat(item.value) || 0)) < 0.01
   );
 }
@@ -1050,6 +1057,7 @@ function applyNewItemsToMonth(newItems) {
       desc: item.desc,
       dueDate: advanceDateToCurrentMonth(item.dueDate),
       value: item.value,
+      tipo: getItemTipo(item),
       paid: false
     });
   });
@@ -1114,6 +1122,8 @@ async function loadMonthData() {
   const pDoc = await db.collection('months').doc(key).collection('pessoal').doc('data').get();
   appData.pessoal = pDoc.exists ? pDoc.data() : { blocks: {} };
   if (!appData.pessoal.blocks) appData.pessoal.blocks = {};
+  sortGroupBlocks('empresa');
+  sortGroupBlocks('pessoal');
 
   const cfDoc = await db.collection('months').doc(key).collection('cashflow').doc('data').get();
   appData.cashflow = cfDoc.exists ? cfDoc.data() : {};
@@ -1142,10 +1152,12 @@ async function loadMonthData() {
 
 async function saveEmpresa() {
   if (!canWrite()) return;
+  sortGroupBlocks('empresa');
   await db.collection('months').doc(getMonthKey()).collection('empresa').doc('data').set(appData.empresa);
 }
 async function savePessoal() {
   if (!canWrite()) return;
+  sortGroupBlocks('pessoal');
   await db.collection('months').doc(getMonthKey()).collection('pessoal').doc('data').set(appData.pessoal);
 }
 async function saveEmployees() {
@@ -1189,6 +1201,7 @@ async function copyFromPreviousMonth() {
         ...block,
         items: (block.items || []).map(item => ({
           ...item,
+          tipo: getItemTipo(item),
           paid: false,
           dueDate: advanceDateToCurrentMonth(item.dueDate)
         }))
@@ -1341,6 +1354,68 @@ function renderEmployeePortal() {
 // =============================================
 const activeBlockTab = { empresa: null, pessoal: null };
 
+function getItemTipo(item) { return item?.tipo === 'receita' ? 'receita' : 'despesa'; }
+function isReceitaItem(item) { return getItemTipo(item) === 'receita'; }
+
+function sortItemsByDate(items) {
+  if (!items || items.length < 2) return items;
+  items.sort((a, b) => {
+    const da = a.dueDate || '';
+    const db = b.dueDate || '';
+    if (!da && !db) return (a.desc || '').localeCompare(b.desc || '', 'pt-BR');
+    if (!da) return 1;
+    if (!db) return -1;
+    const cmp = da.localeCompare(db);
+    return cmp !== 0 ? cmp : (a.desc || '').localeCompare(b.desc || '', 'pt-BR');
+  });
+  return items;
+}
+
+function sortGroupBlocks(group) {
+  Object.values(appData[group]?.blocks || {}).forEach(block => {
+    if (block.items?.length) sortItemsByDate(block.items);
+  });
+}
+
+function calcBlockTotals(items) {
+  const t = { despesas: 0, receitas: 0, despesasAberto: 0, receitasAberto: 0, despesasPago: 0, receitasRecebido: 0 };
+  (items || []).forEach(i => {
+    const v = parseFloat(i.value) || 0;
+    if (isReceitaItem(i)) {
+      t.receitas += v;
+      if (i.paid) t.receitasRecebido += v; else t.receitasAberto += v;
+    } else {
+      t.despesas += v;
+      if (i.paid) t.despesasPago += v; else t.despesasAberto += v;
+    }
+  });
+  t.net = t.despesas - t.receitas;
+  t.netAberto = t.despesasAberto - t.receitasAberto;
+  return t;
+}
+
+function calcGroupTotals(blocks) {
+  const t = { despesas: 0, receitas: 0, despesasAberto: 0, receitasAberto: 0, despesasPago: 0, receitasRecebido: 0 };
+  Object.values(blocks || {}).forEach(b => {
+    const bt = calcBlockTotals(b.items);
+    Object.keys(t).forEach(k => { if (k !== 'net' && k !== 'netAberto' && bt[k] !== undefined) t[k] += bt[k]; });
+  });
+  t.net = t.despesas - t.receitas;
+  t.netAberto = t.despesasAberto - t.receitasAberto;
+  return t;
+}
+
+function itemStatusInfo(item) {
+  const receita = isReceitaItem(item);
+  if (item.paid) {
+    return { cls: 'badge-paid', text: receita ? 'Recebido' : 'Pago', btn: receita ? 'Reabrir' : 'Reabrir', action: receita ? '✓ Recebido' : '✓ Pago' };
+  }
+  if (isOverdue(item.dueDate)) {
+    return { cls: 'badge-overdue', text: receita ? 'Atrasado' : 'Vencido', action: receita ? '✓ Recebido' : '✓ Pago' };
+  }
+  return { cls: 'badge-pending', text: receita ? 'A receber' : 'Em aberto', action: receita ? '✓ Recebido' : '✓ Pago' };
+}
+
 function renderBlocks(group) {
   const subtabs = document.getElementById(`${group}-subtabs`);
   const container = document.getElementById(`${group}-blocks`);
@@ -1362,22 +1437,20 @@ function renderBlocks(group) {
   if (subtabs) {
     subtabs.innerHTML = entries.map(([bid, block]) => {
       const isActive = bid === activeBlockTab[group];
-      const total = (block.items||[]).reduce((s,i)=>s+(parseFloat(i.value)||0),0);
-      const pending = (block.items||[]).filter(i=>!i.paid).reduce((s,i)=>s+(parseFloat(i.value)||0),0);
+      const bt = calcBlockTotals(block.items);
+      const pending = bt.netAberto;
       return `<button onclick="switchBlockTab('${group}','${bid}')" style="
         padding:9px 16px;border:none;background:none;cursor:pointer;font-size:13px;font-weight:500;
         color:${isActive ? 'var(--primary)' : 'var(--gray-500)'};
         border-bottom:${isActive ? '2px solid var(--primary)' : '2px solid transparent'};
         margin-bottom:-2px;transition:all 0.15s;white-space:nowrap;display:flex;flex-direction:column;align-items:flex-start;gap:2px;
-      "><span>${escHtml(block.name)}</span><span style="font-size:10px;font-weight:400;color:${pending>0?'var(--warning)':'var(--success)'};">${fmtBRL(total)}</span></button>`;
+      "><span>${escHtml(block.name)}</span><span style="font-size:10px;font-weight:400;color:${pending>0?'var(--warning)':(pending<0?'var(--success)':'var(--gray-400)')};">${fmtBRL(bt.net)}</span></button>`;
     }).join('');
   }
 
   // Render active block only
   const [bid, block] = entries.find(([b]) => b === activeBlockTab[group]);
-  const total = (block.items || []).reduce((s,i) => s + (parseFloat(i.value)||0), 0);
-  const paidTotal = (block.items || []).filter(i=>i.paid).reduce((s,i) => s + (parseFloat(i.value)||0), 0);
-  const pendingTotal = total - paidTotal;
+  const bt = calcBlockTotals(block.items);
 
   container.innerHTML = '';
   const div = document.createElement('div');
@@ -1386,11 +1459,15 @@ function renderBlocks(group) {
     <div class="account-block-header">
       <div>
         <div class="block-name">${escHtml(block.name)}</div>
-        <div style="font-size:11px;color:var(--gray-400);">Pago: ${fmtBRL(paidTotal)} / Aberto: ${fmtBRL(pendingTotal)}</div>
+        <div style="font-size:11px;color:var(--gray-400);">
+          Desp. pago ${fmtBRL(bt.despesasPago)} · em aberto ${fmtBRL(bt.despesasAberto)}
+          ${bt.receitas > 0 ? ` · Rec. recebido ${fmtBRL(bt.receitasRecebido)} · a receber ${fmtBRL(bt.receitasAberto)}` : ''}
+        </div>
       </div>
       <div class="block-actions">
-        <div class="block-total">${fmtBRL(total)}</div>
-        <button class="btn btn-sm btn-ghost" onclick="addItemToBlock('${group}','${bid}')">+ Item</button>
+        <div class="block-total" title="Despesas menos receitas">${fmtBRL(bt.net)}</div>
+        <button class="btn btn-sm btn-ghost" onclick="addItemToBlock('${group}','${bid}','despesa')">+ Despesa</button>
+        <button class="btn btn-sm btn-ghost" onclick="addItemToBlock('${group}','${bid}','receita')">+ Receita</button>
         <button class="btn btn-sm btn-ghost" onclick="editBlockName('${group}','${bid}')">✏️</button>
         <button class="btn btn-sm btn-danger" onclick="deleteBlock('${group}','${bid}')">🗑️</button>
       </div>
@@ -1407,24 +1484,40 @@ function switchBlockTab(group, bid) {
 }
 
 function renderBlockItems(group, bid, items) {
-  if (items.length === 0) return '<div class="text-gray text-sm">Nenhum item neste bloco.</div>';
-  return `<table class="data-table"><thead><tr><th>Descrição</th><th>Vencimento</th><th>Valor</th><th>Status</th><th>Ações</th></tr></thead><tbody>
+  if (items.length === 0) return '<div class="text-gray text-sm">Nenhum item neste bloco. Use + Despesa ou + Receita.</div>';
+  sortItemsByDate(items);
+  return `<table class="data-table"><thead><tr><th>Tipo</th><th>Descrição</th><th>Data</th><th>Valor</th><th>Status</th><th>Ações</th></tr></thead><tbody>
     ${items.map((item, idx) => {
-      const statusClass = item.paid ? 'badge-paid' : (isOverdue(item.dueDate) ? 'badge-overdue' : 'badge-pending');
-      const statusText = item.paid ? 'Pago' : (isOverdue(item.dueDate) ? 'Vencido' : 'Em aberto');
+      const receita = isReceitaItem(item);
+      const st = itemStatusInfo(item);
       return `<tr>
+        <td><span class="badge ${receita ? 'badge-receita' : 'badge-despesa'}">${receita ? 'Receita' : 'Despesa'}</span></td>
         <td>${escHtml(item.desc)}</td>
         <td>${fmtDate(item.dueDate)}</td>
-        <td class="font-bold">${fmtBRL(item.value)}</td>
-        <td><span class="badge ${statusClass}">${statusText}</span></td>
+        <td class="font-bold ${receita ? 'value-receita' : 'value-despesa'}">${fmtBRL(item.value)}</td>
+        <td><span class="badge ${st.cls}">${st.text}</span></td>
         <td style="display:flex;gap:4px;">
-          <button class="btn btn-sm ${item.paid?'btn-ghost':'btn-success'}" onclick="togglePaid('${group}','${bid}',${idx})">${item.paid?'Reabrir':'✓ Pago'}</button>
+          <button class="btn btn-sm ${item.paid?'btn-ghost':'btn-success'}" onclick="togglePaid('${group}','${bid}',${idx})">${item.paid?'Reabrir':st.action}</button>
           <button class="btn btn-sm btn-ghost" onclick="editItem('${group}','${bid}',${idx})">✏️</button>
           <button class="btn btn-sm btn-danger" onclick="deleteItem('${group}','${bid}',${idx})">🗑️</button>
         </td>
       </tr>`;
     }).join('')}
   </tbody></table>`;
+}
+
+function itemTipoSelectHtml(selected) {
+  return `<div class="form-group"><div class="form-label">Tipo</div>
+    <select class="form-control" id="m-item-tipo" onchange="updateItemDateLabel()">
+      <option value="despesa" ${selected === 'despesa' ? 'selected' : ''}>Despesa (conta a pagar)</option>
+      <option value="receita" ${selected === 'receita' ? 'selected' : ''}>Receita (valor a receber)</option>
+    </select></div>`;
+}
+
+function updateItemDateLabel() {
+  const tipo = document.getElementById('m-item-tipo')?.value || 'despesa';
+  const lbl = document.getElementById('m-item-date-label');
+  if (lbl) lbl.textContent = tipo === 'receita' ? 'Data prevista' : 'Vencimento';
 }
 
 function addBlock(group) {
@@ -1445,7 +1538,7 @@ function confirmAddBlock(group) {
   const bid = 'b' + Date.now();
   appData[group].blocks[bid] = { name, items: [] };
   activeBlockTab[group] = bid;
-  (group === 'empresa' ? saveEmpresa() : savePessoal()).then(() => { renderBlocks(group); renderDashboard(); closeModal(); });
+  (group === 'empresa' ? saveEmpresa() : savePessoal()).then(() => { renderBlocks(group); renderDashboard(); updateCashflow(); closeModal(); });
 }
 
 function editBlockName(group, bid) {
@@ -1470,17 +1563,18 @@ function confirmEditBlockName(group, bid) {
 function deleteBlock(group, bid) {
   if (!confirm('Excluir este bloco e todos os itens?')) return;
   delete appData[group].blocks[bid];
-  (group === 'empresa' ? saveEmpresa() : savePessoal()).then(() => { renderBlocks(group); renderDashboard(); });
+  (group === 'empresa' ? saveEmpresa() : savePessoal()).then(() => { renderBlocks(group); renderDashboard(); updateCashflow(); });
 }
 
-function addItemToBlock(group, bid) {
+function addItemToBlock(group, bid, tipo = 'despesa') {
   openModal(`
-    <div class="modal-title">Novo Item</div>
+    <div class="modal-title">Novo ${tipo === 'receita' ? 'Receita' : 'Despesa'}</div>
+    ${itemTipoSelectHtml(tipo)}
     <div class="form-row"><div class="form-group">
       <div class="form-label">Descrição</div>
-      <input type="text" class="form-control" id="m-item-desc" placeholder="Nome da conta">
+      <input type="text" class="form-control" id="m-item-desc" placeholder="${tipo === 'receita' ? 'Ex: Aluguel recebido, cliente X...' : 'Nome da conta'}">
     </div><div class="form-group">
-      <div class="form-label">Vencimento</div>
+      <div class="form-label" id="m-item-date-label">${tipo === 'receita' ? 'Data prevista' : 'Vencimento'}</div>
       <input type="date" class="form-control" id="m-item-date">
     </div></div>
     <div class="form-row"><div class="form-group">
@@ -1497,21 +1591,24 @@ function confirmAddItem(group, bid) {
   const desc = document.getElementById('m-item-desc').value.trim();
   const dueDate = document.getElementById('m-item-date').value;
   const value = parseFloat(document.getElementById('m-item-value').value) || 0;
+  const tipo = document.getElementById('m-item-tipo')?.value === 'receita' ? 'receita' : 'despesa';
   if (!desc) return alert('Informe a descrição.');
   if (!appData[group].blocks[bid].items) appData[group].blocks[bid].items = [];
-  appData[group].blocks[bid].items.push({ desc, dueDate, value, paid: false });
-  (group === 'empresa' ? saveEmpresa() : savePessoal()).then(() => { renderBlocks(group); renderDashboard(); closeModal(); });
+  appData[group].blocks[bid].items.push({ desc, dueDate, value, tipo, paid: false });
+  (group === 'empresa' ? saveEmpresa() : savePessoal()).then(() => { renderBlocks(group); renderDashboard(); updateCashflow(); closeModal(); });
 }
 
 function editItem(group, bid, idx) {
   const item = appData[group].blocks[bid].items[idx];
+  const tipo = getItemTipo(item);
   openModal(`
     <div class="modal-title">Editar Item</div>
+    ${itemTipoSelectHtml(tipo)}
     <div class="form-row"><div class="form-group">
       <div class="form-label">Descrição</div>
       <input type="text" class="form-control" id="m-item-desc" value="${escHtml(item.desc)}">
     </div><div class="form-group">
-      <div class="form-label">Vencimento</div>
+      <div class="form-label" id="m-item-date-label">${tipo === 'receita' ? 'Data prevista' : 'Vencimento'}</div>
       <input type="date" class="form-control" id="m-item-date" value="${item.dueDate||''}">
     </div></div>
     <div class="form-row"><div class="form-group">
@@ -1528,56 +1625,48 @@ function confirmEditItem(group, bid, idx) {
   const desc = document.getElementById('m-item-desc').value.trim();
   const dueDate = document.getElementById('m-item-date').value;
   const value = parseFloat(document.getElementById('m-item-value').value) || 0;
+  const tipo = document.getElementById('m-item-tipo')?.value === 'receita' ? 'receita' : 'despesa';
   if (!desc) return;
-  appData[group].blocks[bid].items[idx] = { ...appData[group].blocks[bid].items[idx], desc, dueDate, value };
-  (group === 'empresa' ? saveEmpresa() : savePessoal()).then(() => { renderBlocks(group); renderDashboard(); closeModal(); });
+  appData[group].blocks[bid].items[idx] = { ...appData[group].blocks[bid].items[idx], desc, dueDate, value, tipo };
+  (group === 'empresa' ? saveEmpresa() : savePessoal()).then(() => { renderBlocks(group); renderDashboard(); updateCashflow(); closeModal(); });
 }
 
 function deleteItem(group, bid, idx) {
   if (!confirm('Remover este item?')) return;
   appData[group].blocks[bid].items.splice(idx, 1);
-  (group === 'empresa' ? saveEmpresa() : savePessoal()).then(() => { renderBlocks(group); renderDashboard(); });
+  (group === 'empresa' ? saveEmpresa() : savePessoal()).then(() => { renderBlocks(group); renderDashboard(); updateCashflow(); });
 }
 
 function togglePaid(group, bid, idx) {
   if (!canWrite()) return;
   appData[group].blocks[bid].items[idx].paid = !appData[group].blocks[bid].items[idx].paid;
-  (group === 'empresa' ? saveEmpresa() : savePessoal()).then(() => { renderBlocks(group); renderDashboard(); });
+  (group === 'empresa' ? saveEmpresa() : savePessoal()).then(() => { renderBlocks(group); renderDashboard(); updateCashflow(); });
 }
 
 // =============================================
 // DASHBOARD
 // =============================================
 function renderDashboard() {
-  let eTotal=0, pTotal=0, funcTotal=0, paid=0, pending=0;
-
-  Object.values(appData.empresa.blocks||{}).forEach(b=>{
-    (b.items||[]).forEach(i=>{
-      const v = parseFloat(i.value)||0;
-      eTotal+=v;
-      if(i.paid) paid+=v; else pending+=v;
-    });
-  });
-
-  Object.values(appData.pessoal.blocks||{}).forEach(b=>{
-    (b.items||[]).forEach(i=>{
-      const v = parseFloat(i.value)||0;
-      pTotal+=v;
-      if(i.paid) paid+=v; else pending+=v;
-    });
-  });
+  const eT = calcGroupTotals(appData.empresa.blocks);
+  const pT = calcGroupTotals(appData.pessoal.blocks);
+  let funcTotal = 0, folhaPago = 0, folhaAberto = 0;
 
   (appData.employees.list||[]).forEach(emp=>{
     const pd = (appData.employeePayments||{})[emp.id]||{};
     const salario = calcLiquido(pd);
     funcTotal += salario;
-    if(pd.folhaPaga) paid+=salario; else pending+=salario;
+    if (pd.folhaPaga) folhaPago += salario; else folhaAberto += salario;
   });
+
+  const eTotal = eT.net;
+  const pTotal = pT.net;
+  const paid = eT.despesasPago + eT.receitasRecebido + pT.despesasPago + pT.receitasRecebido + folhaPago;
+  const pending = eT.netAberto + pT.netAberto + folhaAberto;
 
   set('dash-empresa-total', fmtBRL(eTotal));
   set('dash-pessoal-total', fmtBRL(pTotal));
   set('dash-func-total', fmtBRL(funcTotal));
-  set('dash-total-geral', fmtBRL(eTotal+pTotal+funcTotal));
+  set('dash-total-geral', fmtBRL(eTotal + pTotal + funcTotal));
   set('dash-paid', fmtBRL(paid));
   set('dash-pending', fmtBRL(pending));
 
@@ -1602,37 +1691,55 @@ function renderAlerts() {
   }
   collectItems('empresa','Empresa');
   collectItems('pessoal','Pessoal');
-  alerts.sort((a,b)=>a.diff-b.diff);
+  alerts.sort((a, b) => {
+    const da = a.dueDate || '';
+    const db = b.dueDate || '';
+    if (da && db && da !== db) return da.localeCompare(db);
+    return a.diff - b.diff;
+  });
 
   if (alerts.length === 0) {
-    container.innerHTML = '<div class="text-gray text-sm">✅ Nenhuma conta vencendo nos próximos 7 dias.</div>';
+    container.innerHTML = '<div class="text-gray text-sm">✅ Nenhuma conta ou recebimento previsto nos próximos 7 dias.</div>';
     return;
   }
 
   function renderAlertRow(a) {
     const icon = a.group === 'empresa' ? '🏢' : '👤';
+    const receita = isReceitaItem(a);
     const cls = a.diff < 0 ? 'danger' : (a.diff <= 3 ? 'warning' : 'ok');
-    const diffText = a.diff < 0 ? `Venceu há ${Math.abs(a.diff)} dias` : (a.diff === 0 ? 'Vence hoje' : `Vence em ${a.diff} dias`);
+    const diffText = receita
+      ? (a.diff < 0 ? `Atrasado há ${Math.abs(a.diff)} dias` : (a.diff === 0 ? 'Previsto hoje' : `Previsto em ${a.diff} dias`))
+      : (a.diff < 0 ? `Venceu há ${Math.abs(a.diff)} dias` : (a.diff === 0 ? 'Vence hoje' : `Vence em ${a.diff} dias`));
+    const tipoBadge = receita ? '<span class="badge badge-receita" style="margin-right:6px;">Receita</span>' : '';
     return `<div class="alert-item ${cls}">
       <span class="alert-type-icon" title="${a.label}">${icon}</span>
       <div class="alert-info">
-        <div class="alert-name">${escHtml(a.desc)}</div>
+        <div class="alert-name">${tipoBadge}${escHtml(a.desc)}</div>
         <div class="alert-meta">${escHtml(a.blockName)} · ${fmtDate(a.dueDate)} · <span class="alert-due ${cls}">${diffText}</span></div>
       </div>
       <div class="alert-actions">
-        <div class="alert-value">${fmtBRL(a.value)}</div>
-        <button class="btn btn-sm btn-success" onclick="togglePaid('${a.group}','${a.bid}',${a.idx})">✓ Pago</button>
+        <div class="alert-value ${receita ? 'value-receita' : ''}">${fmtBRL(a.value)}</div>
+        <button class="btn btn-sm btn-success" onclick="togglePaid('${a.group}','${a.bid}',${a.idx})">${receita ? '✓ Recebido' : '✓ Pago'}</button>
       </div>
     </div>`;
   }
 
   function renderAlertGroup(title, items) {
     if (!items.length) return '';
-    const subtotal = items.reduce((s, a) => s + (parseFloat(a.value) || 0), 0);
+    let despesas = 0, receitas = 0;
+    items.forEach(a => {
+      const v = parseFloat(a.value) || 0;
+      if (isReceitaItem(a)) receitas += v; else despesas += v;
+    });
+    const subtotalLine = receitas > 0
+      ? `<div class="alert-group-subtotal"><span>Despesas</span><span>${fmtBRL(despesas)}</span></div>
+         <div class="alert-group-subtotal"><span>Receitas</span><span class="value-receita">${fmtBRL(receitas)}</span></div>
+         <div class="alert-group-subtotal"><span>Saldo ${title}</span><span>${fmtBRL(despesas - receitas)}</span></div>`
+      : `<div class="alert-group-subtotal"><span>Subtotal ${title}</span><span>${fmtBRL(despesas)}</span></div>`;
     return `<div class="alert-group">
       <div class="alert-group-label">${title}</div>
       ${items.map(renderAlertRow).join('')}
-      <div class="alert-group-subtotal"><span>Subtotal ${title}</span><span>${fmtBRL(subtotal)}</span></div>
+      ${subtotalLine}
     </div>`;
   }
 
@@ -1651,12 +1758,12 @@ function updateCashflow() {
   const recebido = parseFloat(document.getElementById('cf-recebido').value)||0;
   const previsao = parseFloat(document.getElementById('cf-previsao').value)||0;
 
-  // Somar todas as contas em aberto
-  let despesasEmpresa = 0;
-  Object.values(appData.empresa.blocks||{}).forEach(b=>(b.items||[]).forEach(i=>{ if(!i.paid) despesasEmpresa+=parseFloat(i.value)||0; }));
-
-  let despesasPessoal = 0;
-  Object.values(appData.pessoal.blocks||{}).forEach(b=>(b.items||[]).forEach(i=>{ if(!i.paid) despesasPessoal+=parseFloat(i.value)||0; }));
+  const eOpen = calcGroupTotals(appData.empresa.blocks);
+  const pOpen = calcGroupTotals(appData.pessoal.blocks);
+  const despesasEmpresa = eOpen.despesasAberto;
+  const receitasEmpresa = eOpen.receitasAberto;
+  const despesasPessoal = pOpen.despesasAberto;
+  const receitasPessoal = pOpen.receitasAberto;
 
   let folha = 0;
   (appData.employees.list||[]).forEach(emp => {
@@ -1664,7 +1771,7 @@ function updateCashflow() {
     if (!pd.folhaPaga) folha += calcLiquido(pd);
   });
 
-  const totalContas = despesasEmpresa + despesasPessoal + folha;
+  const totalContas = despesasEmpresa + despesasPessoal + folha - receitasEmpresa - receitasPessoal;
 
   // Lógica:
   // Falta = Total contas - Em conta  (quanto falta para cobrir tudo)
@@ -1678,13 +1785,18 @@ function updateCashflow() {
   }
 
   function buildBlockGroup(blocks, icon) {
-    const lines = [];
-    let subtotal = 0;
+    const despesasLines = [], receitasLines = [];
+    let despesas = 0, receitas = 0;
     Object.values(blocks || {}).forEach(b => {
-      const v = (b.items || []).filter(i => !i.paid).reduce((s, i) => s + (parseFloat(i.value) || 0), 0);
-      if (v > 0) { lines.push(cfLine(`${icon} ${escHtml(b.name)}`, v)); subtotal += v; }
+      let d = 0, r = 0;
+      (b.items || []).filter(i => !i.paid).forEach(i => {
+        const v = parseFloat(i.value) || 0;
+        if (isReceitaItem(i)) r += v; else d += v;
+      });
+      if (d > 0) { despesasLines.push(cfLine(`${icon} ${escHtml(b.name)} (desp.)`, d)); despesas += d; }
+      if (r > 0) { receitasLines.push(cfLine(`${icon} ${escHtml(b.name)} (rec.)`, r, 'cf-line-receita')); receitas += r; }
     });
-    return { lines, subtotal };
+    return { despesasLines, receitasLines, despesas, receitas, net: despesas - receitas };
   }
 
   const empresaGroup = buildBlockGroup(appData.empresa.blocks, '🏢');
@@ -1692,20 +1804,37 @@ function updateCashflow() {
 
   let pendingHtml = '<div class="cf-section-title">Contas em aberto</div>';
 
-  if (empresaGroup.lines.length) {
-    pendingHtml += `<div class="cf-group-label">Empresa</div>${empresaGroup.lines.join('')}`;
-    pendingHtml += cfLine('Subtotal Empresa', empresaGroup.subtotal, 'cf-line-subtotal');
+  if (empresaGroup.despesasLines.length || empresaGroup.receitasLines.length) {
+    pendingHtml += `<div class="cf-group-label">Empresa</div>`;
+    pendingHtml += empresaGroup.despesasLines.join('');
+    pendingHtml += empresaGroup.receitasLines.join('');
+    if (empresaGroup.receitas > 0) {
+      pendingHtml += cfLine('Subtotal despesas Empresa', empresaGroup.despesas, 'cf-line-subtotal');
+      pendingHtml += cfLine('Subtotal receitas Empresa', empresaGroup.receitas, 'cf-line-receita cf-line-subtotal');
+      pendingHtml += cfLine('Saldo Empresa', empresaGroup.net, 'cf-line-subtotal');
+    } else {
+      pendingHtml += cfLine('Subtotal Empresa', empresaGroup.despesas, 'cf-line-subtotal');
+    }
   }
-  if (pessoalGroup.lines.length) {
-    pendingHtml += `<div class="cf-group-label">Pessoal</div>${pessoalGroup.lines.join('')}`;
-    pendingHtml += cfLine('Subtotal Pessoal', pessoalGroup.subtotal, 'cf-line-subtotal');
+  if (pessoalGroup.despesasLines.length || pessoalGroup.receitasLines.length) {
+    pendingHtml += `<div class="cf-group-label">Pessoal</div>`;
+    pendingHtml += pessoalGroup.despesasLines.join('');
+    pendingHtml += pessoalGroup.receitasLines.join('');
+    if (pessoalGroup.receitas > 0) {
+      pendingHtml += cfLine('Subtotal despesas Pessoal', pessoalGroup.despesas, 'cf-line-subtotal');
+      pendingHtml += cfLine('Subtotal receitas Pessoal', pessoalGroup.receitas, 'cf-line-receita cf-line-subtotal');
+      pendingHtml += cfLine('Saldo Pessoal', pessoalGroup.net, 'cf-line-subtotal');
+    } else {
+      pendingHtml += cfLine('Subtotal Pessoal', pessoalGroup.despesas, 'cf-line-subtotal');
+    }
   }
   if (folha > 0) {
     pendingHtml += `<div class="cf-group-label">Funcionários</div>${cfLine('👥 Folha de pagamento', folha)}`;
     pendingHtml += cfLine('Subtotal Funcionários', folha, 'cf-line-subtotal');
   }
 
-  const hasPending = empresaGroup.lines.length || pessoalGroup.lines.length || folha > 0;
+  const hasPending = empresaGroup.despesasLines.length || empresaGroup.receitasLines.length
+    || pessoalGroup.despesasLines.length || pessoalGroup.receitasLines.length || folha > 0;
   const pendingSection = hasPending
     ? `<div class="cf-section">${pendingHtml}<div class="cf-line cf-line-total"><span class="cf-line-name">Total em aberto</span><span class="cf-line-value">${fmtBRL(totalContas)}</span></div></div>`
     : `<div class="cf-section"><div class="cf-section-title">Contas em aberto</div><div class="cf-line cf-line-sub"><span class="cf-line-name">Nenhuma conta pendente</span><span class="cf-line-value">${fmtBRL(0)}</span></div></div>`;
