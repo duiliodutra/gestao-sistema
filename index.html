@@ -429,6 +429,11 @@
     background: #fffbeb; border-color: #fcd34d;
   }
   .copy-banner.new-items .copy-banner-text { color: #92400e; }
+  .copy-banner-opt {
+    display: flex; align-items: center; gap: 6px; margin-top: 8px;
+    font-size: 12px; color: #92400e; cursor: pointer; user-select: none;
+  }
+  .copy-banner-opt input { cursor: pointer; }
 
   /* SHIFT SUMMARY */
   .shift-summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; margin-top: 16px; }
@@ -578,8 +583,14 @@ window.addEventListener('unhandledrejection', function(e) {
 
       <!-- NEW ITEMS FROM PREVIOUS MONTH -->
       <div class="copy-banner new-items" id="copy-new-banner" style="display:none;">
-        <div class="copy-banner-text" id="copy-new-banner-text"></div>
-        <div style="display:flex;gap:8px;">
+        <div style="flex:1;min-width:0;">
+          <div class="copy-banner-text" id="copy-new-banner-text"></div>
+          <label class="copy-banner-opt">
+            <input type="checkbox" id="copy-new-banner-hide">
+            Não mostrar esta mensagem novamente
+          </label>
+        </div>
+        <div style="display:flex;gap:8px;align-items:flex-start;flex-shrink:0;">
           <button class="btn btn-primary btn-sm" onclick="copyNewItemsFromPreviousMonth()">Copiar novos</button>
           <button class="btn btn-ghost btn-sm" onclick="dismissNewItemsBanner()">Ignorar</button>
         </div>
@@ -653,8 +664,8 @@ window.addEventListener('unhandledrejection', function(e) {
     <div class="tab-pane" id="tab-empresa">
       <div class="flex" style="justify-content:space-between;align-items:flex-start;margin-bottom:16px;">
         <div>
-          <div class="section-title">🏢 Contas da Empresa</div>
-          <div class="section-desc">Despesas e receitas da empresa, organizadas por bloco</div>
+          <div class="section-title">🏢 Contas da Empresa <span id="app-version-tag" style="font-size:10px;font-weight:400;color:var(--gray-400);">v2026.06.10</span></div>
+          <div class="section-desc">Despesas e receitas por bloco · lançamentos em ordem de data</div>
         </div>
         <div id="empresa-admin-controls">
           <button class="btn btn-primary" onclick="addBlock('empresa')">+ Novo Bloco</button>
@@ -1066,10 +1077,28 @@ function applyNewItemsToMonth(newItems) {
   });
 }
 
+const NEW_ITEMS_BANNER_HIDE_KEY = 'gestao_hide_new_items_banner';
+
+function isNewItemsBannerHidden() {
+  return localStorage.getItem(NEW_ITEMS_BANNER_HIDE_KEY) === '1';
+}
+
+function setNewItemsBannerHidden(hidden) {
+  if (hidden) localStorage.setItem(NEW_ITEMS_BANNER_HIDE_KEY, '1');
+  else localStorage.removeItem(NEW_ITEMS_BANNER_HIDE_KEY);
+}
+
 async function updateNewItemsBanner() {
   const banner = document.getElementById('copy-new-banner');
   const textEl = document.getElementById('copy-new-banner-text');
+  const hideCheckbox = document.getElementById('copy-new-banner-hide');
   if (!banner || !textEl || !isAdmin) return;
+
+  if (isNewItemsBannerHidden()) {
+    pendingNewItems = [];
+    banner.style.display = 'none';
+    return;
+  }
 
   if (!hasSomeBillData()) {
     pendingNewItems = [];
@@ -1088,10 +1117,13 @@ async function updateNewItemsBanner() {
   const count = items.length;
   const noun = count === 1 ? 'novo boleto cadastrado' : 'novos boletos cadastrados';
   textEl.textContent = `📋 ${count} ${noun} em ${prevLabel} que ainda não estão em ${MONTHS[currentMonth]} ${currentYear}. Copiar para este mês?`;
+  if (hideCheckbox) hideCheckbox.checked = false;
   banner.style.display = 'flex';
 }
 
 function dismissNewItemsBanner() {
+  const hideCheckbox = document.getElementById('copy-new-banner-hide');
+  if (hideCheckbox?.checked) setNewItemsBannerHidden(true);
   const banner = document.getElementById('copy-new-banner');
   if (banner) banner.style.display = 'none';
 }
@@ -1319,6 +1351,8 @@ function renderAll() {
     renderCalendar('ferias');
     return;
   }
+  sortGroupBlocks('empresa');
+  sortGroupBlocks('pessoal');
   renderBlocks('empresa');
   renderBlocks('pessoal');
   renderEmployees();
