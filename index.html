@@ -211,6 +211,7 @@
     padding: 3px 8px; border-radius: 20px; font-size: 11px; font-weight: 600;
   }
   .badge-paid { background: var(--success-light); color: var(--success); }
+  .badge-partial { background: #fef3c7; color: #b45309; }
   .badge-pending { background: var(--warning-light); color: var(--warning); }
   .badge-overdue { background: var(--danger-light); color: var(--danger); }
   .badge-receita { background: #dbeafe; color: #1e40af; }
@@ -372,6 +373,18 @@
   .block-total { font-weight: 700; font-size: 15px; color: var(--primary); }
   .block-actions { display: flex; gap: 6px; align-items: center; }
   .account-block-body { padding: 16px 18px; }
+  .table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .item-cards { display: none; }
+  .item-card {
+    border: 1px solid var(--gray-200); border-radius: var(--radius);
+    padding: 12px; margin-bottom: 10px; background: var(--gray-50);
+  }
+  .item-card-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; margin-bottom: 8px; }
+  .item-card-title { font-weight: 600; font-size: 14px; color: var(--gray-800); }
+  .item-card-meta { font-size: 12px; color: var(--gray-500); margin-top: 4px; }
+  .item-card-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+  .item-progress { font-size: 11px; color: var(--gray-500); margin-top: 4px; }
+  .item-progress strong { color: var(--warning); }
 
   /* EMPLOYEE CARD */
   .employee-card { border: 1px solid var(--gray-200); border-radius: var(--radius-lg); margin-bottom: 16px; overflow: hidden; }
@@ -465,13 +478,80 @@
   .vac-pgto-paid { background: var(--success-light); border-radius: var(--radius); padding: 4px 10px; font-size: 11px; font-weight: 600; color: var(--success); }
 
   /* RESPONSIVE */
+  @media (max-width: 768px) {
+    body { overflow-x: hidden; }
+    .topbar {
+      height: auto; min-height: 52px; flex-wrap: wrap;
+      padding: 8px 12px; gap: 8px;
+    }
+    .topbar-brand { font-size: 15px; }
+    .topbar-right {
+      width: 100%; flex-wrap: wrap; justify-content: space-between; gap: 8px;
+    }
+    .user-badge span:not(.user-avatar) { display: none; }
+    .admin-badge { display: none; }
+    .month-selector { flex: 1; min-width: 0; }
+    .month-selector select { flex: 1; min-width: 0; max-width: none; font-size: 12px; }
+    .month-selector button { padding: 5px 8px; }
+    .btn-logout { padding: 5px 8px; font-size: 12px; }
+    .navtabs { padding: 0 8px; }
+    .navtab { padding: 10px 12px; font-size: 12px; }
+    .content { padding: 10px; }
+    .card { padding: 14px; }
+    .summary-grid { grid-template-columns: 1fr 1fr; gap: 8px; }
+    .stat-box { padding: 10px 12px; }
+    .stat-value { font-size: 16px; }
+    .stat-label { font-size: 10px; }
+    .section-title { font-size: 16px; }
+    .account-block-header {
+      flex-direction: column; align-items: stretch; gap: 10px;
+      padding: 12px 14px;
+    }
+    .block-actions {
+      flex-wrap: wrap; width: 100%;
+    }
+    .block-actions .btn-sm { flex: 1; min-width: calc(50% - 4px); text-align: center; }
+    .block-total { width: 100%; text-align: right; margin-bottom: 4px; }
+    .account-block-body { padding: 12px; }
+    .item-cards { display: block; }
+    .table-wrap { display: none; }
+    .item-card-actions .btn-sm { flex: 1; min-width: calc(50% - 3px); justify-content: center; }
+    .alert-item {
+      flex-direction: column; align-items: stretch; gap: 8px;
+    }
+    .alert-actions {
+      width: 100%; justify-content: space-between; flex-wrap: wrap;
+    }
+    .alert-actions .btn-sm { flex: 1; }
+    .copy-banner {
+      flex-direction: column; align-items: stretch; gap: 10px;
+    }
+    .modal-overlay { padding: 10px; align-items: flex-end; }
+    .modal {
+      max-width: 100%; border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+      max-height: 92vh; padding: 18px;
+    }
+    .modal-footer { flex-direction: column-reverse; }
+    .modal-footer .btn { width: 100%; justify-content: center; }
+    .form-row { grid-template-columns: 1fr; }
+    .cf-line { font-size: 12px; }
+    .employee-header { flex-direction: column; align-items: flex-start; gap: 8px; }
+    .cal-day { min-height: 52px; font-size: 9px; }
+    .flex[style*="justify-content:space-between"] {
+      flex-direction: column; align-items: stretch !important; gap: 10px;
+    }
+    .flex[style*="justify-content:space-between"] > div:last-child {
+      display: flex; flex-wrap: wrap; gap: 8px;
+    }
+    .flex[style*="justify-content:space-between"] .btn { flex: 1; min-width: 120px; }
+  }
+  @media (max-width: 400px) {
+    .summary-grid { grid-template-columns: 1fr; }
+    .auth-card { padding: 32px 20px; }
+  }
   @media (max-width: 600px) {
     .form-row { grid-template-columns: 1fr; }
-    .summary-grid { grid-template-columns: 1fr 1fr; }
-    .topbar { padding: 0 12px; }
-    .content { padding: 12px; }
     .cal-day { min-height: 60px; }
-    .month-selector select { max-width: 100px; }
   }
 
   .hidden { display: none !important; }
@@ -515,7 +595,7 @@ window.addEventListener('unhandledrejection', function(e) {
   <div class="auth-card">
     <div class="auth-logo">📊</div>
     <div class="auth-title">Sistema de Gestão</div>
-    <div class="auth-sub">Empresa &amp; Pessoal — Acesso seguro <span style="opacity:0.45;font-size:10px;">v2026.06.10</span></div>
+    <div class="auth-sub">Empresa &amp; Pessoal — Acesso seguro <span style="opacity:0.45;font-size:10px;">v2026.06.12</span></div>
     <button id="google-signin-btn">
       <svg width="18" height="18" viewBox="0 0 18 18"><path fill="#4285F4" d="M16.51 8H8.98v3h4.3c-.18 1-.74 1.48-1.6 2.04v2.01h2.6a7.8 7.8 0 0 0 2.38-5.88c0-.57-.05-.66-.15-1.18z"/><path fill="#34A853" d="M8.98 17c2.16 0 3.97-.72 5.3-1.94l-2.6-2a4.8 4.8 0 0 1-7.18-2.54H1.83v2.07A8 8 0 0 0 8.98 17z"/><path fill="#FBBC05" d="M4.5 10.52a4.8 4.8 0 0 1 0-3.04V5.41H1.83a8 8 0 0 0 0 7.18l2.67-2.07z"/><path fill="#EA4335" d="M8.98 4.18c1.17 0 2.23.4 3.06 1.2l2.3-2.3A8 8 0 0 0 1.83 5.4L4.5 7.49a4.77 4.77 0 0 1 4.48-3.31z"/></svg>
       Entrar com Google
@@ -664,7 +744,7 @@ window.addEventListener('unhandledrejection', function(e) {
     <div class="tab-pane" id="tab-empresa">
       <div class="flex" style="justify-content:space-between;align-items:flex-start;margin-bottom:16px;">
         <div>
-          <div class="section-title">🏢 Contas da Empresa <span id="app-version-tag" style="font-size:10px;font-weight:400;color:var(--gray-400);">v2026.06.10</span></div>
+          <div class="section-title">🏢 Contas da Empresa <span id="app-version-tag" style="font-size:10px;font-weight:400;color:var(--gray-400);">v2026.06.12</span></div>
           <div class="section-desc">Despesas e receitas por bloco · lançamentos em ordem de data</div>
         </div>
         <div id="empresa-admin-controls">
@@ -1072,7 +1152,8 @@ function applyNewItemsToMonth(newItems) {
       dueDate: advanceDateToCurrentMonth(item.dueDate),
       value: item.value,
       tipo: getItemTipo(item),
-      paid: false
+      paid: false,
+      paidAmount: 0
     });
   });
 }
@@ -1157,6 +1238,7 @@ async function loadMonthData() {
   const pDoc = await db.collection('months').doc(key).collection('pessoal').doc('data').get();
   appData.pessoal = pDoc.exists ? pDoc.data() : { blocks: {} };
   if (!appData.pessoal.blocks) appData.pessoal.blocks = {};
+  normalizeAllBlockItems();
   sortGroupBlocks('empresa');
   sortGroupBlocks('pessoal');
 
@@ -1238,6 +1320,7 @@ async function copyFromPreviousMonth() {
           ...item,
           tipo: getItemTipo(item),
           paid: false,
+          paidAmount: 0,
           dueDate: advanceDateToCurrentMonth(item.dueDate)
         }))
       };
@@ -1394,6 +1477,45 @@ const activeBlockTab = { empresa: null, pessoal: null };
 function getItemTipo(item) { return item?.tipo === 'receita' ? 'receita' : 'despesa'; }
 function isReceitaItem(item) { return getItemTipo(item) === 'receita'; }
 
+function getItemValue(item) { return parseFloat(item?.value) || 0; }
+
+function normalizeBlockItem(item) {
+  if (!item) return item;
+  const value = getItemValue(item);
+  if (item.paidAmount === undefined || item.paidAmount === null) {
+    item.paidAmount = item.paid ? value : 0;
+  } else {
+    item.paidAmount = Math.min(Math.max(0, parseFloat(item.paidAmount) || 0), value);
+  }
+  item.paid = value > 0 ? item.paidAmount >= value - 0.009 : !!item.paid;
+  return item;
+}
+
+function normalizeAllBlockItems() {
+  ['empresa', 'pessoal'].forEach(group => {
+    Object.values(appData[group]?.blocks || {}).forEach(block => {
+      (block.items || []).forEach(normalizeBlockItem);
+    });
+  });
+}
+
+function getItemPaidAmount(item) { normalizeBlockItem(item); return item.paidAmount || 0; }
+function getItemRemaining(item) { return Math.max(0, getItemValue(item) - getItemPaidAmount(item)); }
+function isItemFullyPaid(item) { return getItemRemaining(item) < 0.01; }
+function isItemPartiallyPaid(item) {
+  const paid = getItemPaidAmount(item);
+  return paid > 0.009 && getItemRemaining(item) >= 0.01;
+}
+
+function saveItemPayment(group, bid, idx) {
+  normalizeBlockItem(appData[group].blocks[bid].items[idx]);
+  return (group === 'empresa' ? saveEmpresa() : savePessoal()).then(() => {
+    renderBlocks(group);
+    renderDashboard();
+    updateCashflow();
+  });
+}
+
 function normalizeDateForSort(dateStr) {
   if (!dateStr) return '';
   const s = String(dateStr).trim();
@@ -1428,13 +1550,18 @@ function sortGroupBlocks(group) {
 function calcBlockTotals(items) {
   const t = { despesas: 0, receitas: 0, despesasAberto: 0, receitasAberto: 0, despesasPago: 0, receitasRecebido: 0 };
   (items || []).forEach(i => {
-    const v = parseFloat(i.value) || 0;
+    normalizeBlockItem(i);
+    const v = getItemValue(i);
+    const paidAmt = getItemPaidAmount(i);
+    const rem = Math.max(0, v - paidAmt);
     if (isReceitaItem(i)) {
       t.receitas += v;
-      if (i.paid) t.receitasRecebido += v; else t.receitasAberto += v;
+      t.receitasRecebido += paidAmt;
+      t.receitasAberto += rem;
     } else {
       t.despesas += v;
-      if (i.paid) t.despesasPago += v; else t.despesasAberto += v;
+      t.despesasPago += paidAmt;
+      t.despesasAberto += rem;
     }
   });
   t.net = t.despesas - t.receitas;
@@ -1455,13 +1582,44 @@ function calcGroupTotals(blocks) {
 
 function itemStatusInfo(item) {
   const receita = isReceitaItem(item);
-  if (item.paid) {
-    return { cls: 'badge-paid', text: receita ? 'Recebido' : 'Pago', btn: receita ? 'Reabrir' : 'Reabrir', action: receita ? '✓ Recebido' : '✓ Pago' };
+  const paidAmt = getItemPaidAmount(item);
+  const rem = getItemRemaining(item);
+  if (isItemFullyPaid(item)) {
+    return { cls: 'badge-paid', text: receita ? 'Recebido' : 'Pago' };
+  }
+  if (isItemPartiallyPaid(item)) {
+    return {
+      cls: 'badge-partial',
+      text: receita ? `Parcial · falta ${fmtBRL(rem)}` : `Parcial · falta ${fmtBRL(rem)}`,
+      paidLabel: fmtBRL(paidAmt)
+    };
   }
   if (isOverdue(item.dueDate)) {
-    return { cls: 'badge-overdue', text: receita ? 'Atrasado' : 'Vencido', action: receita ? '✓ Recebido' : '✓ Pago' };
+    return { cls: 'badge-overdue', text: receita ? 'Atrasado' : 'Vencido' };
   }
-  return { cls: 'badge-pending', text: receita ? 'A receber' : 'Em aberto', action: receita ? '✓ Recebido' : '✓ Pago' };
+  return { cls: 'badge-pending', text: receita ? 'A receber' : 'Em aberto' };
+}
+
+function renderItemPaymentButtons(group, bid, idx, item) {
+  if (!canWrite()) return '';
+  const receita = isReceitaItem(item);
+  if (isItemFullyPaid(item)) {
+    return `<button class="btn btn-sm btn-ghost" onclick="resetItemPayment('${group}','${bid}',${idx})">Reabrir</button>`;
+  }
+  return `
+    <button class="btn btn-sm btn-success" onclick="payItemFull('${group}','${bid}',${idx})">${receita ? 'Receber' : 'Pagar'}</button>
+    <button class="btn btn-sm btn-ghost" onclick="openPartialPayment('${group}','${bid}',${idx})">Parcial</button>`;
+}
+
+function renderItemValueHtml(item) {
+  const paid = getItemPaidAmount(item);
+  const rem = getItemRemaining(item);
+  const receita = isReceitaItem(item);
+  let html = `<div class="font-bold ${receita ? 'value-receita' : 'value-despesa'}">${fmtBRL(item.value)}</div>`;
+  if (isItemPartiallyPaid(item)) {
+    html += `<div class="item-progress">Pago <strong>${fmtBRL(paid)}</strong> · Falta <strong>${fmtBRL(rem)}</strong></div>`;
+  }
+  return html;
 }
 
 function renderBlocks(group) {
@@ -1535,24 +1693,48 @@ function switchBlockTab(group, bid) {
 function renderBlockItems(group, bid, items) {
   if (items.length === 0) return '<div class="text-gray text-sm">Nenhum item neste bloco. Use + Despesa ou + Receita.</div>';
   sortItemsByDate(items);
-  return `<table class="data-table"><thead><tr><th>Tipo</th><th>Descrição</th><th>Data</th><th>Valor</th><th>Status</th><th>Ações</th></tr></thead><tbody>
-    ${items.map((item, idx) => {
-      const receita = isReceitaItem(item);
-      const st = itemStatusInfo(item);
-      return `<tr>
-        <td><span class="badge ${receita ? 'badge-receita' : 'badge-despesa'}">${receita ? 'Receita' : 'Despesa'}</span></td>
-        <td>${escHtml(item.desc)}</td>
-        <td>${fmtDate(item.dueDate)}</td>
-        <td class="font-bold ${receita ? 'value-receita' : 'value-despesa'}">${fmtBRL(item.value)}</td>
-        <td><span class="badge ${st.cls}">${st.text}</span></td>
-        <td style="display:flex;gap:4px;">
-          <button class="btn btn-sm ${item.paid?'btn-ghost':'btn-success'}" onclick="togglePaid('${group}','${bid}',${idx})">${item.paid?'Reabrir':st.action}</button>
-          <button class="btn btn-sm btn-ghost" onclick="editItem('${group}','${bid}',${idx})">✏️</button>
-          <button class="btn btn-sm btn-danger" onclick="deleteItem('${group}','${bid}',${idx})">🗑️</button>
-        </td>
-      </tr>`;
-    }).join('')}
-  </tbody></table>`;
+
+  const tableRows = items.map((item, idx) => {
+    const receita = isReceitaItem(item);
+    const st = itemStatusInfo(item);
+    return `<tr>
+      <td><span class="badge ${receita ? 'badge-receita' : 'badge-despesa'}">${receita ? 'Receita' : 'Despesa'}</span></td>
+      <td>${escHtml(item.desc)}</td>
+      <td>${fmtDate(item.dueDate)}</td>
+      <td>${renderItemValueHtml(item)}</td>
+      <td><span class="badge ${st.cls}">${st.text}</span></td>
+      <td style="display:flex;gap:4px;flex-wrap:wrap;">
+        ${renderItemPaymentButtons(group, bid, idx, item)}
+        <button class="btn btn-sm btn-ghost" onclick="editItem('${group}','${bid}',${idx})">✏️</button>
+        <button class="btn btn-sm btn-danger" onclick="deleteItem('${group}','${bid}',${idx})">🗑️</button>
+      </td>
+    </tr>`;
+  }).join('');
+
+  const cards = items.map((item, idx) => {
+    const receita = isReceitaItem(item);
+    const st = itemStatusInfo(item);
+    return `<div class="item-card">
+      <div class="item-card-head">
+        <div>
+          <div class="item-card-title">${escHtml(item.desc)}</div>
+          <div class="item-card-meta">${fmtDate(item.dueDate)} · <span class="badge ${receita ? 'badge-receita' : 'badge-despesa'}">${receita ? 'Receita' : 'Despesa'}</span></div>
+        </div>
+        <span class="badge ${st.cls}">${st.text}</span>
+      </div>
+      ${renderItemValueHtml(item)}
+      <div class="item-card-actions">
+        ${renderItemPaymentButtons(group, bid, idx, item)}
+        <button class="btn btn-sm btn-ghost" onclick="editItem('${group}','${bid}',${idx})">✏️</button>
+        <button class="btn btn-sm btn-danger" onclick="deleteItem('${group}','${bid}',${idx})">🗑️</button>
+      </div>
+    </div>`;
+  }).join('');
+
+  return `<div class="table-wrap">
+    <table class="data-table"><thead><tr><th>Tipo</th><th>Descrição</th><th>Data</th><th>Valor</th><th>Status</th><th>Ações</th></tr></thead><tbody>${tableRows}</tbody></table>
+  </div>
+  <div class="item-cards">${cards}</div>`;
 }
 
 function itemTipoSelectHtml(selected) {
@@ -1643,7 +1825,7 @@ function confirmAddItem(group, bid) {
   const tipo = document.getElementById('m-item-tipo')?.value === 'receita' ? 'receita' : 'despesa';
   if (!desc) return alert('Informe a descrição.');
   if (!appData[group].blocks[bid].items) appData[group].blocks[bid].items = [];
-  appData[group].blocks[bid].items.push({ desc, dueDate, value, tipo, paid: false });
+  appData[group].blocks[bid].items.push({ desc, dueDate, value, tipo, paid: false, paidAmount: 0 });
   (group === 'empresa' ? saveEmpresa() : savePessoal()).then(() => { renderBlocks(group); renderDashboard(); updateCashflow(); closeModal(); });
 }
 
@@ -1676,7 +1858,10 @@ function confirmEditItem(group, bid, idx) {
   const value = parseFloat(document.getElementById('m-item-value').value) || 0;
   const tipo = document.getElementById('m-item-tipo')?.value === 'receita' ? 'receita' : 'despesa';
   if (!desc) return;
-  appData[group].blocks[bid].items[idx] = { ...appData[group].blocks[bid].items[idx], desc, dueDate, value, tipo };
+  const prev = appData[group].blocks[bid].items[idx];
+  const updated = { ...prev, desc, dueDate, value, tipo };
+  normalizeBlockItem(updated);
+  appData[group].blocks[bid].items[idx] = updated;
   (group === 'empresa' ? saveEmpresa() : savePessoal()).then(() => { renderBlocks(group); renderDashboard(); updateCashflow(); closeModal(); });
 }
 
@@ -1686,10 +1871,65 @@ function deleteItem(group, bid, idx) {
   (group === 'empresa' ? saveEmpresa() : savePessoal()).then(() => { renderBlocks(group); renderDashboard(); updateCashflow(); });
 }
 
-function togglePaid(group, bid, idx) {
+let partialPaymentCtx = null;
+
+function payItemFull(group, bid, idx) {
   if (!canWrite()) return;
-  appData[group].blocks[bid].items[idx].paid = !appData[group].blocks[bid].items[idx].paid;
-  (group === 'empresa' ? saveEmpresa() : savePessoal()).then(() => { renderBlocks(group); renderDashboard(); updateCashflow(); });
+  const item = appData[group].blocks[bid].items[idx];
+  item.paidAmount = getItemValue(item);
+  item.paid = true;
+  saveItemPayment(group, bid, idx);
+}
+
+function openPartialPayment(group, bid, idx) {
+  if (!canWrite()) return;
+  partialPaymentCtx = { group, bid, idx };
+  const item = appData[group].blocks[bid].items[idx];
+  normalizeBlockItem(item);
+  const receita = isReceitaItem(item);
+  const rem = getItemRemaining(item);
+  const paid = getItemPaidAmount(item);
+  openModal(`
+    <div class="modal-title">${receita ? 'Recebimento parcial' : 'Pagamento parcial'}</div>
+    <div class="text-sm text-gray" style="margin-bottom:16px;line-height:1.5;">
+      <strong>${escHtml(item.desc)}</strong><br>
+      Valor total: ${fmtBRL(item.value)} · Já ${receita ? 'recebido' : 'pago'}: ${fmtBRL(paid)} · Falta: <strong>${fmtBRL(rem)}</strong>
+    </div>
+    <div class="form-group">
+      <div class="form-label">Valor deste ${receita ? 'recebimento' : 'pagamento'} (R$)</div>
+      <input type="number" step="0.01" min="0.01" max="${rem}" class="form-control" id="m-partial-value" placeholder="0,00">
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal()">Cancelar</button>
+      <button class="btn btn-primary" onclick="confirmPartialPayment()">Registrar</button>
+    </div>`);
+  setTimeout(() => {
+    const inp = document.getElementById('m-partial-value');
+    if (inp) { inp.value = rem.toFixed(2); inp.focus(); inp.select(); }
+  }, 50);
+}
+
+function confirmPartialPayment() {
+  if (!partialPaymentCtx || !canWrite()) return;
+  const { group, bid, idx } = partialPaymentCtx;
+  const item = appData[group].blocks[bid].items[idx];
+  const add = parseFloat(document.getElementById('m-partial-value')?.value) || 0;
+  const rem = getItemRemaining(item);
+  if (add <= 0) return alert('Informe um valor maior que zero.');
+  if (add > rem + 0.009) return alert(`O valor não pode ser maior que ${fmtBRL(rem)}.`);
+  item.paidAmount = getItemPaidAmount(item) + add;
+  normalizeBlockItem(item);
+  partialPaymentCtx = null;
+  closeModal();
+  saveItemPayment(group, bid, idx);
+}
+
+function resetItemPayment(group, bid, idx) {
+  if (!canWrite()) return;
+  const item = appData[group].blocks[bid].items[idx];
+  item.paidAmount = 0;
+  item.paid = false;
+  saveItemPayment(group, bid, idx);
 }
 
 // =============================================
@@ -1730,11 +1970,12 @@ function renderAlerts() {
   function collectItems(group, label) {
     Object.entries(appData[group].blocks||{}).forEach(([bid,block])=>{
       (block.items||[]).forEach((item,idx)=>{
-        if (item.paid) return;
+        normalizeBlockItem(item);
+        if (isItemFullyPaid(item)) return;
         const due = item.dueDate ? new Date(item.dueDate+'T00:00:00') : null;
         if (!due) return;
         const diff = Math.ceil((due-today)/(1000*60*60*24));
-        if (diff <= 7) alerts.push({...item, diff, group, bid, idx, label, blockName: block.name});
+        if (diff <= 7) alerts.push({...item, diff, group, bid, idx, label, blockName: block.name, remaining: getItemRemaining(item)});
       });
     });
   }
@@ -1760,15 +2001,26 @@ function renderAlerts() {
       ? (a.diff < 0 ? `Atrasado há ${Math.abs(a.diff)} dias` : (a.diff === 0 ? 'Previsto hoje' : `Previsto em ${a.diff} dias`))
       : (a.diff < 0 ? `Venceu há ${Math.abs(a.diff)} dias` : (a.diff === 0 ? 'Vence hoje' : `Vence em ${a.diff} dias`));
     const tipoBadge = receita ? '<span class="badge badge-receita" style="margin-right:6px;">Receita</span>' : '';
+    const rem = a.remaining ?? getItemRemaining(a);
+    const partial = isItemPartiallyPaid(a);
+    const valueHtml = partial
+      ? `<div>${fmtBRL(rem)} <span style="font-size:10px;color:var(--gray-400);">de ${fmtBRL(a.value)}</span></div>`
+      : fmtBRL(a.value);
+    const payBtns = canWrite()
+      ? (isItemFullyPaid(a)
+        ? ''
+        : `<button class="btn btn-sm btn-success" onclick="payItemFull('${a.group}','${a.bid}',${a.idx})">${receita ? 'Receber' : 'Pagar'}</button>
+           <button class="btn btn-sm btn-ghost" onclick="openPartialPayment('${a.group}','${a.bid}',${a.idx})">Parcial</button>`)
+      : '';
     return `<div class="alert-item ${cls}">
       <span class="alert-type-icon" title="${a.label}">${icon}</span>
       <div class="alert-info">
-        <div class="alert-name">${tipoBadge}${escHtml(a.desc)}</div>
+        <div class="alert-name">${tipoBadge}${escHtml(a.desc)}${partial ? ` <span class="badge badge-partial" style="margin-left:4px;">Parcial</span>` : ''}</div>
         <div class="alert-meta">${escHtml(a.blockName)} · ${fmtDate(a.dueDate)} · <span class="alert-due ${cls}">${diffText}</span></div>
       </div>
       <div class="alert-actions">
-        <div class="alert-value ${receita ? 'value-receita' : ''}">${fmtBRL(a.value)}</div>
-        <button class="btn btn-sm btn-success" onclick="togglePaid('${a.group}','${a.bid}',${a.idx})">${receita ? '✓ Recebido' : '✓ Pago'}</button>
+        <div class="alert-value ${receita ? 'value-receita' : ''}">${valueHtml}</div>
+        ${payBtns}
       </div>
     </div>`;
   }
@@ -1777,8 +2029,8 @@ function renderAlerts() {
     if (!items.length) return '';
     let despesas = 0, receitas = 0;
     items.forEach(a => {
-      const v = parseFloat(a.value) || 0;
-      if (isReceitaItem(a)) receitas += v; else despesas += v;
+      const rem = a.remaining ?? getItemRemaining(a);
+      if (isReceitaItem(a)) receitas += rem; else despesas += rem;
     });
     const subtotalLine = receitas > 0
       ? `<div class="alert-group-subtotal"><span>Despesas</span><span>${fmtBRL(despesas)}</span></div>
@@ -1838,8 +2090,10 @@ function updateCashflow() {
     let despesas = 0, receitas = 0;
     Object.values(blocks || {}).forEach(b => {
       let d = 0, r = 0;
-      (b.items || []).filter(i => !i.paid).forEach(i => {
-        const v = parseFloat(i.value) || 0;
+      (b.items || []).forEach(i => {
+        normalizeBlockItem(i);
+        if (isItemFullyPaid(i)) return;
+        const v = getItemRemaining(i);
         if (isReceitaItem(i)) r += v; else d += v;
       });
       if (d > 0) { despesasLines.push(cfLine(`${icon} ${escHtml(b.name)} (desp.)`, d)); despesas += d; }
@@ -2787,6 +3041,7 @@ function openModal(html) {
   document.getElementById('modal-overlay').classList.remove('hidden');
 }
 function closeModal() {
+  partialPaymentCtx = null;
   document.getElementById('modal-overlay').classList.add('hidden');
 }
 function closeModalOnOverlay(e) {
