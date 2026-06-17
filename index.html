@@ -130,6 +130,44 @@
     background: white; cursor: pointer; font-size: 13px; color: var(--gray-700);
   }
   .month-selector button { background: var(--primary); color: white; border-color: var(--primary); font-weight: 500; }
+  .month-actions-wrap { position: relative; }
+  .btn-month-menu {
+    padding: 5px 12px; border: 1px solid var(--gray-200); border-radius: var(--radius);
+    background: white; cursor: pointer; font-size: 13px; color: var(--gray-700);
+    display: flex; align-items: center; gap: 6px; white-space: nowrap;
+  }
+  .btn-month-menu:hover { background: var(--gray-50); border-color: var(--gray-300); }
+  .month-menu-badge {
+    background: var(--warning); color: white; font-size: 10px; font-weight: 700;
+    min-width: 16px; height: 16px; border-radius: 8px; display: inline-flex;
+    align-items: center; justify-content: center; padding: 0 4px;
+  }
+  .month-menu-dropdown {
+    position: absolute; top: calc(100% + 6px); right: 0; min-width: 240px;
+    background: white; border: 1px solid var(--gray-200); border-radius: var(--radius);
+    box-shadow: 0 8px 24px rgba(0,0,0,0.12); z-index: 200; padding: 6px;
+  }
+  .month-menu-dropdown.hidden { display: none; }
+  .month-menu-item {
+    display: block; width: 100%; text-align: left; padding: 10px 12px;
+    border: none; background: none; cursor: pointer; font-size: 13px;
+    color: var(--gray-700); border-radius: 6px;
+  }
+  .month-menu-item:hover { background: var(--gray-50); }
+  .month-menu-item.danger { color: var(--danger); }
+  .month-menu-item.danger:hover { background: var(--danger-light); }
+  .month-menu-divider { height: 1px; background: var(--gray-200); margin: 6px 0; }
+  .bulk-toolbar {
+    display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
+    padding: 10px 12px; margin-bottom: 12px; background: var(--primary-light);
+    border: 1px solid #bfdbfe; border-radius: var(--radius);
+  }
+  .bulk-toolbar.hidden { display: none; }
+  .bulk-toolbar-count { font-size: 13px; font-weight: 600; color: var(--primary); flex: 1; min-width: 120px; }
+  .item-select-cell { width: 36px; text-align: center; }
+  .item-select-cell input, .item-card-select input { width: 16px; height: 16px; cursor: pointer; }
+  .item-card.selected { border-color: var(--primary); background: var(--primary-light); }
+  .item-card-select { margin-right: 8px; flex-shrink: 0; }
   .btn-logout { padding: 5px 12px; border: 1px solid var(--gray-200); border-radius: var(--radius); background: white; cursor: pointer; color: var(--gray-600); font-size: 13px; }
   .btn-logout:hover { background: var(--danger-light); color: var(--danger); border-color: var(--danger); }
 
@@ -488,6 +526,7 @@
     .topbar-right {
       width: 100%; flex-wrap: wrap; justify-content: space-between; gap: 8px;
     }
+    .month-actions-wrap { order: 3; }
     .user-badge span:not(.user-avatar) { display: none; }
     .admin-badge { display: none; }
     .month-selector { flex: 1; min-width: 0; }
@@ -595,7 +634,7 @@ window.addEventListener('unhandledrejection', function(e) {
   <div class="auth-card">
     <div class="auth-logo">📊</div>
     <div class="auth-title">Sistema de Gestão</div>
-    <div class="auth-sub">Empresa &amp; Pessoal — Acesso seguro <span style="opacity:0.45;font-size:10px;">v2026.06.12</span></div>
+    <div class="auth-sub">Empresa &amp; Pessoal — Acesso seguro <span style="opacity:0.45;font-size:10px;">v2026.06.13</span></div>
     <button id="google-signin-btn">
       <svg width="18" height="18" viewBox="0 0 18 18"><path fill="#4285F4" d="M16.51 8H8.98v3h4.3c-.18 1-.74 1.48-1.6 2.04v2.01h2.6a7.8 7.8 0 0 0 2.38-5.88c0-.57-.05-.66-.15-1.18z"/><path fill="#34A853" d="M8.98 17c2.16 0 3.97-.72 5.3-1.94l-2.6-2a4.8 4.8 0 0 1-7.18-2.54H1.83v2.07A8 8 0 0 0 8.98 17z"/><path fill="#FBBC05" d="M4.5 10.52a4.8 4.8 0 0 1 0-3.04V5.41H1.83a8 8 0 0 0 0 7.18l2.67-2.07z"/><path fill="#EA4335" d="M8.98 4.18c1.17 0 2.23.4 3.06 1.2l2.3-2.3A8 8 0 0 0 1.83 5.4L4.5 7.49a4.77 4.77 0 0 1 4.48-3.31z"/></svg>
       Entrar com Google
@@ -617,6 +656,17 @@ window.addEventListener('unhandledrejection', function(e) {
         <select id="month-select" onchange="applyMonthYear()"></select>
         <select id="year-select" onchange="applyMonthYear()"></select>
         <button onclick="applyMonthYear()" title="Carregar mês">▶</button>
+      </div>
+      <div class="month-actions-wrap hidden" id="month-actions-wrap">
+        <button class="btn-month-menu" id="month-menu-btn" onclick="toggleMonthMenu(event)" type="button">
+          📋 Mês <span id="month-menu-badge" class="month-menu-badge hidden"></span> ▾
+        </button>
+        <div class="month-menu-dropdown hidden" id="month-menu-dropdown">
+          <button class="month-menu-item" type="button" onclick="openCopyMonthModal()">Copiar do mês anterior</button>
+          <button class="month-menu-item" type="button" id="month-menu-copy-new" style="display:none;" onclick="openCopyNewItemsModal()">Copiar novos boletos (<span id="month-menu-new-count">0</span>)</button>
+          <div class="month-menu-divider"></div>
+          <button class="month-menu-item danger" type="button" onclick="openResetMonthModal()">Zerar dados deste mês</button>
+        </div>
       </div>
       <div class="user-badge">
         <div class="user-avatar" id="user-initial">?</div>
@@ -652,28 +702,11 @@ window.addEventListener('unhandledrejection', function(e) {
       <div class="section-title">Painel Principal</div>
       <div class="section-desc" id="dashboard-period-label">Carregando...</div>
 
-      <!-- COPY BANNER -->
-      <div class="copy-banner" id="copy-banner" style="display:none;">
-        <div class="copy-banner-text">📋 Nenhum dado neste mês. Copiar contas, folha dos funcionários e escala do mês anterior?</div>
-        <div style="display:flex;gap:8px;">
-          <button class="btn btn-primary btn-sm" onclick="copyFromPreviousMonth()">Copiar</button>
-          <button class="btn btn-ghost btn-sm" onclick="document.getElementById('copy-banner').style.display='none'">Ignorar</button>
-        </div>
-      </div>
-
-      <!-- NEW ITEMS FROM PREVIOUS MONTH -->
-      <div class="copy-banner new-items" id="copy-new-banner" style="display:none;">
-        <div style="flex:1;min-width:0;">
-          <div class="copy-banner-text" id="copy-new-banner-text"></div>
-          <label class="copy-banner-opt">
-            <input type="checkbox" id="copy-new-banner-hide">
-            Não mostrar esta mensagem novamente
-          </label>
-        </div>
-        <div style="display:flex;gap:8px;align-items:flex-start;flex-shrink:0;">
-          <button class="btn btn-primary btn-sm" onclick="copyNewItemsFromPreviousMonth()">Copiar novos</button>
-          <button class="btn btn-ghost btn-sm" onclick="dismissNewItemsBanner()">Ignorar</button>
-        </div>
+      <!-- COPY BANNERS (substituídos pelo menu Mês na topbar) -->
+      <div class="copy-banner" id="copy-banner" style="display:none !important;"></div>
+      <div class="copy-banner new-items" id="copy-new-banner" style="display:none !important;">
+        <div class="copy-banner-text" id="copy-new-banner-text"></div>
+        <input type="checkbox" id="copy-new-banner-hide" style="display:none;">
       </div>
 
       <!-- SUMMARY CARDS -->
@@ -744,7 +777,7 @@ window.addEventListener('unhandledrejection', function(e) {
     <div class="tab-pane" id="tab-empresa">
       <div class="flex" style="justify-content:space-between;align-items:flex-start;margin-bottom:16px;">
         <div>
-          <div class="section-title">🏢 Contas da Empresa <span id="app-version-tag" style="font-size:10px;font-weight:400;color:var(--gray-400);">v2026.06.12</span></div>
+          <div class="section-title">🏢 Contas da Empresa <span id="app-version-tag" style="font-size:10px;font-weight:400;color:var(--gray-400);">v2026.06.13</span></div>
           <div class="section-desc">Despesas e receitas por bloco · lançamentos em ordem de data</div>
         </div>
         <div id="empresa-admin-controls">
@@ -888,12 +921,17 @@ let appData = {
   cashflow: {}
 };
 let pendingNewItems = [];
+const blockItemSelection = {};
 
 // =============================================
 // INIT
 // =============================================
 function init() {
   populateMonthYear();
+  document.addEventListener('click', e => {
+    const wrap = document.getElementById('month-actions-wrap');
+    if (wrap && !wrap.contains(e.target)) closeMonthMenu();
+  });
   const authTimeout = setTimeout(showAuthScreen, 8000);
   auth.onAuthStateChanged(async user => {
     clearTimeout(authTimeout);
@@ -967,6 +1005,8 @@ function updateUserUI() {
   nameLabel.classList.remove('hidden');
   document.getElementById('admin-badge-el').classList.toggle('hidden', !isAdmin);
   document.getElementById('employee-badge-el').classList.toggle('hidden', !isEmployeeView());
+  const monthActions = document.getElementById('month-actions-wrap');
+  if (monthActions) monthActions.classList.toggle('hidden', !isAdmin);
 }
 
 function updateEmployeeTabLabels() {
@@ -1074,18 +1114,155 @@ function getMissingCopySections() {
 }
 
 function updateCopyBanner() {
-  const copyBanner = document.getElementById('copy-banner');
-  if (!copyBanner || !isAdmin) return;
+  updateMonthMenuState();
+}
+
+function closeMonthMenu() {
+  const dropdown = document.getElementById('month-menu-dropdown');
+  if (dropdown) dropdown.classList.add('hidden');
+}
+
+function toggleMonthMenu(event) {
+  event.stopPropagation();
+  const dropdown = document.getElementById('month-menu-dropdown');
+  if (!dropdown) return;
+  dropdown.classList.toggle('hidden');
+}
+
+function updateMonthMenuState() {
+  if (!isAdmin) return;
   const missing = getMissingCopySections();
-  if (missing.length === 0) {
-    copyBanner.style.display = 'none';
-    return;
+  const badge = document.getElementById('month-menu-badge');
+  const copyNewBtn = document.getElementById('month-menu-copy-new');
+  const newCountEl = document.getElementById('month-menu-new-count');
+  const newCount = pendingNewItems.length;
+  let badgeText = '';
+
+  if (missing.length > 0) badgeText = '!';
+  else if (newCount > 0) badgeText = String(newCount);
+
+  if (badge) {
+    if (badgeText) {
+      badge.textContent = badgeText;
+      badge.classList.remove('hidden');
+    } else {
+      badge.classList.add('hidden');
+    }
   }
-  const textEl = copyBanner.querySelector('.copy-banner-text');
-  if (textEl) {
-    textEl.textContent = `📋 Faltam dados neste mês: ${missing.join(', ')}. Copiar do mês anterior?`;
-  }
-  copyBanner.style.display = 'flex';
+  if (copyNewBtn) copyNewBtn.style.display = newCount > 0 ? 'block' : 'none';
+  if (newCountEl) newCountEl.textContent = String(newCount);
+}
+
+function openCopyMonthModal() {
+  closeMonthMenu();
+  const { label } = getPreviousMonthKey();
+  const missing = getMissingCopySections();
+  const period = `${MONTHS[currentMonth]} ${currentYear}`;
+  const body = missing.length
+    ? `<p style="font-size:13px;color:var(--gray-600);line-height:1.5;margin-bottom:16px;">
+        Copiar de <strong>${label}</strong> para <strong>${period}</strong> apenas o que ainda está vazio:<br>
+        <strong>${missing.join(', ')}</strong>.
+      </p>
+      <p style="font-size:12px;color:var(--gray-400);">Se já copiou e editou boletos, use <strong>Zerar dados deste mês</strong> antes de copiar novamente.</p>`
+    : `<p style="font-size:13px;color:var(--gray-600);line-height:1.5;margin-bottom:16px;">
+        Este mês já possui todos os dados. Nada será copiado de <strong>${label}</strong>.
+      </p>
+      <p style="font-size:12px;color:var(--gray-400);">Para recopiar tudo, primeiro use <strong>Zerar dados deste mês</strong>.</p>`;
+  openModal(`
+    <div class="modal-title">Copiar do mês anterior</div>
+    ${body}
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal()">Cancelar</button>
+      <button class="btn btn-primary" ${missing.length ? '' : 'disabled'} onclick="confirmCopyMonth()">Copiar</button>
+    </div>`);
+}
+
+function confirmCopyMonth() {
+  closeModal();
+  copyFromPreviousMonth();
+}
+
+function openCopyNewItemsModal() {
+  closeMonthMenu();
+  if (pendingNewItems.length === 0) return;
+  const { prevLabel } = getPreviousMonthKey();
+  const count = pendingNewItems.length;
+  const noun = count === 1 ? 'boleto' : 'boletos';
+  openModal(`
+    <div class="modal-title">Copiar novos boletos</div>
+    <p style="font-size:13px;color:var(--gray-600);line-height:1.5;margin-bottom:12px;">
+      ${count} ${noun} de <strong>${prevLabel}</strong> ainda não estão em <strong>${MONTHS[currentMonth]} ${currentYear}</strong>.
+    </p>
+    <label class="copy-banner-opt" style="margin-bottom:16px;">
+      <input type="checkbox" id="modal-copy-new-hide">
+      Não sugerir novos boletos automaticamente
+    </label>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal()">Cancelar</button>
+      <button class="btn btn-primary" onclick="confirmCopyNewItems()">Copiar ${count} ${noun}</button>
+    </div>`);
+}
+
+function confirmCopyNewItems() {
+  const hideCheckbox = document.getElementById('modal-copy-new-hide');
+  if (hideCheckbox?.checked) setNewItemsBannerHidden(true);
+  closeModal();
+  copyNewItemsFromPreviousMonth();
+}
+
+function openResetMonthModal() {
+  closeMonthMenu();
+  const period = `${MONTHS[currentMonth]} ${currentYear}`;
+  openModal(`
+    <div class="modal-title">Zerar dados deste mês</div>
+    <p style="font-size:13px;color:var(--gray-600);line-height:1.5;margin-bottom:12px;">
+      Isso apaga <strong>todos</strong> os dados de <strong>${period}</strong>:
+    </p>
+    <ul style="font-size:13px;color:var(--gray-600);margin:0 0 16px 18px;line-height:1.6;">
+      <li>Contas da Empresa e Pessoal</li>
+      <li>Folha dos funcionários</li>
+      <li>Escala e caixa</li>
+    </ul>
+    <p style="font-size:12px;color:var(--danger);font-weight:600;">Esta ação não pode ser desfeita.</p>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal()">Cancelar</button>
+      <button class="btn btn-danger" onclick="confirmResetMonth()">Zerar ${period}</button>
+    </div>`);
+}
+
+async function confirmResetMonth() {
+  closeModal();
+  await resetMonthData();
+}
+
+async function resetMonthData() {
+  if (!canWrite()) return;
+  appData.empresa = { blocks: {} };
+  appData.pessoal = { blocks: {} };
+  appData.employeePayments = {};
+  appData.escala = { events: {} };
+  appData.cashflow = {};
+  Object.keys(blockItemSelection).forEach(k => delete blockItemSelection[k]);
+  pendingNewItems = [];
+
+  const cfEmConta = document.getElementById('cf-em-conta');
+  const cfRecebido = document.getElementById('cf-recebido');
+  const cfPrevisao = document.getElementById('cf-previsao');
+  if (cfEmConta) cfEmConta.value = '';
+  if (cfRecebido) cfRecebido.value = '';
+  if (cfPrevisao) cfPrevisao.value = '';
+
+  await Promise.all([
+    saveEmpresa(),
+    savePessoal(),
+    saveEmployeePayments(),
+    saveEscala(),
+    saveCashflow()
+  ]);
+
+  updateMonthMenuState();
+  await updateNewItemsBanner();
+  renderAll();
 }
 
 function getPreviousMonthKey() {
@@ -1170,43 +1347,17 @@ function setNewItemsBannerHidden(hidden) {
 }
 
 async function updateNewItemsBanner() {
-  const banner = document.getElementById('copy-new-banner');
-  const textEl = document.getElementById('copy-new-banner-text');
-  const hideCheckbox = document.getElementById('copy-new-banner-hide');
-  if (!banner || !textEl || !isAdmin) return;
+  if (!isAdmin) return;
 
-  if (isNewItemsBannerHidden()) {
+  if (isNewItemsBannerHidden() || !hasSomeBillData()) {
     pendingNewItems = [];
-    banner.style.display = 'none';
+    updateMonthMenuState();
     return;
   }
 
-  if (!hasSomeBillData()) {
-    pendingNewItems = [];
-    banner.style.display = 'none';
-    return;
-  }
-
-  const { prevLabel, items } = await detectNewItemsFromPreviousMonth();
+  const { items } = await detectNewItemsFromPreviousMonth();
   pendingNewItems = items;
-
-  if (items.length === 0) {
-    banner.style.display = 'none';
-    return;
-  }
-
-  const count = items.length;
-  const noun = count === 1 ? 'novo boleto cadastrado' : 'novos boletos cadastrados';
-  textEl.textContent = `📋 ${count} ${noun} em ${prevLabel} que ainda não estão em ${MONTHS[currentMonth]} ${currentYear}. Copiar para este mês?`;
-  if (hideCheckbox) hideCheckbox.checked = false;
-  banner.style.display = 'flex';
-}
-
-function dismissNewItemsBanner() {
-  const hideCheckbox = document.getElementById('copy-new-banner-hide');
-  if (hideCheckbox?.checked) setNewItemsBannerHidden(true);
-  const banner = document.getElementById('copy-new-banner');
-  if (banner) banner.style.display = 'none';
+  updateMonthMenuState();
 }
 
 async function copyNewItemsFromPreviousMonth() {
@@ -1218,7 +1369,6 @@ async function copyNewItemsFromPreviousMonth() {
     items.some(i => i.group === 'pessoal') ? savePessoal() : Promise.resolve()
   ]);
   pendingNewItems = [];
-  dismissNewItemsBanner();
   await updateNewItemsBanner();
   updateCopyBanner();
   renderAll();
@@ -1262,7 +1412,9 @@ async function loadMonthData() {
   appData.escala = esDoc.exists ? esDoc.data() : { events: {} };
   if (!appData.escala.events) appData.escala.events = {};
 
-  updateCopyBanner();
+  Object.keys(blockItemSelection).forEach(k => delete blockItemSelection[k]);
+  closeMonthMenu();
+  updateMonthMenuState();
   await updateNewItemsBanner();
   renderAll();
 }
@@ -1419,7 +1571,7 @@ async function copyFromPreviousMonth() {
     cashflowChanged ? saveCashflow() : Promise.resolve()
   ]);
 
-  updateCopyBanner();
+  updateMonthMenuState();
   await updateNewItemsBanner();
   renderAll();
 }
@@ -1622,6 +1774,168 @@ function renderItemValueHtml(item) {
   return html;
 }
 
+function itemSelectionKey(group, bid) { return `${group}:${bid}`; }
+
+function getItemSelectionSet(group, bid) {
+  const key = itemSelectionKey(group, bid);
+  if (!blockItemSelection[key]) blockItemSelection[key] = new Set();
+  return blockItemSelection[key];
+}
+
+function isItemSelected(group, bid, idx) {
+  return getItemSelectionSet(group, bid).has(idx);
+}
+
+function getSelectedItemCount(group, bid) {
+  return getItemSelectionSet(group, bid).size;
+}
+
+function toggleItemSelect(group, bid, idx, checked) {
+  const sel = getItemSelectionSet(group, bid);
+  if (checked) sel.add(idx); else sel.delete(idx);
+  refreshBulkToolbar(group, bid);
+}
+
+function toggleSelectAllItems(group, bid, checked, total) {
+  const sel = getItemSelectionSet(group, bid);
+  sel.clear();
+  if (checked) {
+    for (let i = 0; i < total; i++) sel.add(i);
+  }
+  renderBlocks(group);
+}
+
+function clearItemSelection(group, bid) {
+  delete blockItemSelection[itemSelectionKey(group, bid)];
+  renderBlocks(group);
+}
+
+function adjustSelectionAfterDelete(group, bid, removedIdx) {
+  const key = itemSelectionKey(group, bid);
+  const sel = blockItemSelection[key];
+  if (!sel) return;
+  const next = new Set();
+  sel.forEach(i => {
+    if (i < removedIdx) next.add(i);
+    else if (i > removedIdx) next.add(i - 1);
+  });
+  if (next.size) blockItemSelection[key] = next;
+  else delete blockItemSelection[key];
+}
+
+function getSelectedIndices(group, bid) {
+  return [...getItemSelectionSet(group, bid)].sort((a, b) => a - b);
+}
+
+function refreshBulkToolbar(group, bid) {
+  const el = document.getElementById(`bulk-toolbar-${group}-${bid}`);
+  if (!el) return;
+  const count = getSelectedItemCount(group, bid);
+  el.classList.toggle('hidden', count === 0);
+  const countEl = el.querySelector('.bulk-toolbar-count');
+  if (countEl) {
+    countEl.textContent = count === 1 ? '1 boleto selecionado' : `${count} boletos selecionados`;
+  }
+  document.querySelectorAll(`.item-card[data-sel="${group}-${bid}"]`).forEach(card => {
+    const idx = parseInt(card.dataset.idx, 10);
+    card.classList.toggle('selected', isItemSelected(group, bid, idx));
+  });
+}
+
+function renderBulkToolbar(group, bid, itemCount) {
+  if (!canWrite() || itemCount === 0) return '';
+  const count = getSelectedItemCount(group, bid);
+  return `<div class="bulk-toolbar ${count ? '' : 'hidden'}" id="bulk-toolbar-${group}-${bid}">
+    <span class="bulk-toolbar-count">${count === 1 ? '1 boleto selecionado' : `${count} boletos selecionados`}</span>
+    <button class="btn btn-sm btn-primary" onclick="openBulkEditItems('${group}','${bid}')">Editar selecionados</button>
+    <button class="btn btn-sm btn-danger" onclick="deleteSelectedItems('${group}','${bid}')">Excluir selecionados</button>
+    <button class="btn btn-sm btn-ghost" onclick="clearItemSelection('${group}','${bid}')">Limpar</button>
+  </div>`;
+}
+
+function deleteSelectedItems(group, bid) {
+  if (!canWrite()) return;
+  const indices = getSelectedIndices(group, bid);
+  if (!indices.length) return;
+  const noun = indices.length === 1 ? '1 boleto' : `${indices.length} boletos`;
+  if (!confirm(`Excluir ${noun} selecionado(s)?`)) return;
+  const items = appData[group].blocks[bid].items;
+  indices.sort((a, b) => b - a).forEach(i => items.splice(i, 1));
+  clearItemSelection(group, bid);
+  (group === 'empresa' ? saveEmpresa() : savePessoal()).then(() => {
+    renderBlocks(group);
+    renderDashboard();
+    updateCashflow();
+  });
+}
+
+function openBulkEditItems(group, bid) {
+  if (!canWrite()) return;
+  const indices = getSelectedIndices(group, bid);
+  if (!indices.length) return;
+  const noun = indices.length === 1 ? '1 boleto' : `${indices.length} boletos`;
+  openModal(`
+    <div class="modal-title">Editar ${noun}</div>
+    <p style="font-size:12px;color:var(--gray-500);margin-bottom:16px;">Marque os campos que deseja alterar em todos os selecionados.</p>
+    <label class="copy-banner-opt" style="margin-bottom:10px;">
+      <input type="checkbox" id="bulk-apply-tipo" onchange="document.getElementById('bulk-field-tipo').style.display=this.checked?'block':'none'">
+      Alterar tipo
+    </label>
+    <div id="bulk-field-tipo" style="display:none;margin:0 0 12px 24px;">
+      <select class="form-control" id="bulk-tipo">
+        <option value="despesa">Despesa</option>
+        <option value="receita">Receita</option>
+      </select>
+    </div>
+    <label class="copy-banner-opt" style="margin-bottom:10px;">
+      <input type="checkbox" id="bulk-apply-date" onchange="document.getElementById('bulk-field-date').style.display=this.checked?'block':'none'">
+      Alterar data
+    </label>
+    <div id="bulk-field-date" style="display:none;margin:0 0 12px 24px;">
+      <input type="date" class="form-control" id="bulk-date">
+    </div>
+    <label class="copy-banner-opt" style="margin-bottom:10px;">
+      <input type="checkbox" id="bulk-apply-value" onchange="document.getElementById('bulk-field-value').style.display=this.checked?'block':'none'">
+      Alterar valor
+    </label>
+    <div id="bulk-field-value" style="display:none;margin:0 0 12px 24px;">
+      <input type="number" step="0.01" class="form-control" id="bulk-value" placeholder="0,00">
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal()">Cancelar</button>
+      <button class="btn btn-primary" onclick="confirmBulkEditItems('${group}','${bid}')">Aplicar</button>
+    </div>`);
+}
+
+function confirmBulkEditItems(group, bid) {
+  if (!canWrite()) return;
+  const indices = getSelectedIndices(group, bid);
+  if (!indices.length) return;
+  const applyTipo = document.getElementById('bulk-apply-tipo')?.checked;
+  const applyDate = document.getElementById('bulk-apply-date')?.checked;
+  const applyValue = document.getElementById('bulk-apply-value')?.checked;
+  if (!applyTipo && !applyDate && !applyValue) return alert('Marque pelo menos um campo para alterar.');
+  const tipo = document.getElementById('bulk-tipo')?.value;
+  const dueDate = document.getElementById('bulk-date')?.value;
+  const value = parseFloat(document.getElementById('bulk-value')?.value);
+  if (applyDate && !dueDate) return alert('Informe a data.');
+  if (applyValue && (isNaN(value) || value < 0)) return alert('Informe um valor válido.');
+  indices.forEach(idx => {
+    const item = appData[group].blocks[bid].items[idx];
+    if (applyTipo) item.tipo = tipo === 'receita' ? 'receita' : 'despesa';
+    if (applyDate) item.dueDate = dueDate;
+    if (applyValue) item.value = value;
+    normalizeBlockItem(item);
+  });
+  closeModal();
+  clearItemSelection(group, bid);
+  (group === 'empresa' ? saveEmpresa() : savePessoal()).then(() => {
+    renderBlocks(group);
+    renderDashboard();
+    updateCashflow();
+  });
+}
+
 function renderBlocks(group) {
   sortGroupBlocks(group);
   const subtabs = document.getElementById(`${group}-subtabs`);
@@ -1680,6 +1994,7 @@ function renderBlocks(group) {
       </div>
     </div>
     <div class="account-block-body">
+      ${renderBulkToolbar(group, bid, (block.items || []).length)}
       ${renderBlockItems(group, bid, block.items || [])}
     </div>`;
   container.appendChild(div);
@@ -1693,11 +2008,18 @@ function switchBlockTab(group, bid) {
 function renderBlockItems(group, bid, items) {
   if (items.length === 0) return '<div class="text-gray text-sm">Nenhum item neste bloco. Use + Despesa ou + Receita.</div>';
   sortItemsByDate(items);
+  const showSelect = canWrite();
+  const allSelected = showSelect && items.length > 0 && getSelectedItemCount(group, bid) === items.length;
 
   const tableRows = items.map((item, idx) => {
     const receita = isReceitaItem(item);
     const st = itemStatusInfo(item);
+    const checked = isItemSelected(group, bid, idx);
+    const selectCell = showSelect
+      ? `<td class="item-select-cell"><input type="checkbox" ${checked ? 'checked' : ''} onchange="toggleItemSelect('${group}','${bid}',${idx}, this.checked)"></td>`
+      : '';
     return `<tr>
+      ${selectCell}
       <td><span class="badge ${receita ? 'badge-receita' : 'badge-despesa'}">${receita ? 'Receita' : 'Despesa'}</span></td>
       <td>${escHtml(item.desc)}</td>
       <td>${fmtDate(item.dueDate)}</td>
@@ -1714,11 +2036,18 @@ function renderBlockItems(group, bid, items) {
   const cards = items.map((item, idx) => {
     const receita = isReceitaItem(item);
     const st = itemStatusInfo(item);
-    return `<div class="item-card">
+    const checked = isItemSelected(group, bid, idx);
+    const selectBox = showSelect
+      ? `<label class="item-card-select"><input type="checkbox" ${checked ? 'checked' : ''} onchange="toggleItemSelect('${group}','${bid}',${idx}, this.checked)"></label>`
+      : '';
+    return `<div class="item-card ${checked ? 'selected' : ''}" data-sel="${group}-${bid}" data-idx="${idx}">
       <div class="item-card-head">
-        <div>
-          <div class="item-card-title">${escHtml(item.desc)}</div>
-          <div class="item-card-meta">${fmtDate(item.dueDate)} · <span class="badge ${receita ? 'badge-receita' : 'badge-despesa'}">${receita ? 'Receita' : 'Despesa'}</span></div>
+        <div style="display:flex;align-items:flex-start;gap:0;flex:1;min-width:0;">
+          ${selectBox}
+          <div style="min-width:0;">
+            <div class="item-card-title">${escHtml(item.desc)}</div>
+            <div class="item-card-meta">${fmtDate(item.dueDate)} · <span class="badge ${receita ? 'badge-receita' : 'badge-despesa'}">${receita ? 'Receita' : 'Despesa'}</span></div>
+          </div>
         </div>
         <span class="badge ${st.cls}">${st.text}</span>
       </div>
@@ -1731,8 +2060,12 @@ function renderBlockItems(group, bid, items) {
     </div>`;
   }).join('');
 
+  const selectHeader = showSelect
+    ? `<th class="item-select-cell"><input type="checkbox" ${allSelected ? 'checked' : ''} onchange="toggleSelectAllItems('${group}','${bid}', this.checked, ${items.length})" title="Selecionar todos"></th>`
+    : '';
+
   return `<div class="table-wrap">
-    <table class="data-table"><thead><tr><th>Tipo</th><th>Descrição</th><th>Data</th><th>Valor</th><th>Status</th><th>Ações</th></tr></thead><tbody>${tableRows}</tbody></table>
+    <table class="data-table"><thead><tr>${selectHeader}<th>Tipo</th><th>Descrição</th><th>Data</th><th>Valor</th><th>Status</th><th>Ações</th></tr></thead><tbody>${tableRows}</tbody></table>
   </div>
   <div class="item-cards">${cards}</div>`;
 }
@@ -1868,6 +2201,7 @@ function confirmEditItem(group, bid, idx) {
 function deleteItem(group, bid, idx) {
   if (!confirm('Remover este item?')) return;
   appData[group].blocks[bid].items.splice(idx, 1);
+  adjustSelectionAfterDelete(group, bid, idx);
   (group === 'empresa' ? saveEmpresa() : savePessoal()).then(() => { renderBlocks(group); renderDashboard(); updateCashflow(); });
 }
 
