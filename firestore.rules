@@ -1,0 +1,23 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return isSignedIn() && request.auth.token.email == 'duiliodudu@gmail.com';
+    }
+
+    match /global/employees {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
+    match /months/{monthId}/{collection}/{docId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+  }
+}

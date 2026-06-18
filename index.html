@@ -1,0 +1,3493 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
+<title>Gestão — Sistema</title>
+<style>
+  :root {
+    --primary: #1a56db;
+    --primary-light: #e8f0fe;
+    --success: #0e9f6e;
+    --success-light: #d1fae5;
+    --danger: #e02424;
+    --danger-light: #fde8e8;
+    --warning: #d97706;
+    --warning-light: #fef3c7;
+    --gray-50: #f9fafb;
+    --gray-100: #f3f4f6;
+    --gray-200: #e5e7eb;
+    --gray-300: #d1d5db;
+    --gray-400: #9ca3af;
+    --gray-500: #6b7280;
+    --gray-600: #4b5563;
+    --gray-700: #374151;
+    --gray-800: #1f2937;
+    --gray-900: #111827;
+    --radius: 8px;
+    --radius-lg: 12px;
+    --shadow: 0 1px 3px rgba(0,0,0,0.08);
+    --shadow-md: 0 4px 12px rgba(0,0,0,0.1);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: var(--gray-50);
+    color: var(--gray-800);
+    min-height: 100vh;
+    font-size: 14px;
+  }
+
+  /* AUTH SCREEN */
+  #auth-screen {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, #1a56db 0%, #0e9f6e 100%);
+  }
+  .auth-card {
+    background: white;
+    border-radius: 16px;
+    padding: 48px 40px;
+    text-align: center;
+    max-width: 400px;
+    width: 90%;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.15);
+  }
+  .auth-logo { font-size: 48px; margin-bottom: 8px; }
+  .auth-title { font-size: 22px; font-weight: 700; color: var(--gray-900); margin-bottom: 4px; }
+  .auth-sub { color: var(--gray-500); margin-bottom: 32px; font-size: 14px; }
+  .auth-access-note {
+    background: var(--gray-50);
+    border: 1px solid var(--gray-200);
+    border-radius: var(--radius);
+    padding: 12px;
+    font-size: 12px;
+    color: var(--gray-500);
+    margin-top: 16px;
+    text-align: left;
+  }
+  #google-signin-btn {
+    width: 100%;
+    padding: 12px 20px;
+    background: white;
+    border: 2px solid var(--gray-200);
+    border-radius: var(--radius);
+    font-size: 15px;
+    font-weight: 500;
+    color: var(--gray-700);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    transition: all 0.2s;
+  }
+  #google-signin-btn:hover { border-color: var(--primary); color: var(--primary); background: var(--primary-light); }
+  #auth-error { color: var(--danger); font-size: 13px; margin-top: 12px; }
+
+  /* TOP BAR */
+  #app { display: none; min-height: 100vh; flex-direction: column; }
+  .topbar {
+    background: white;
+    border-bottom: 1px solid var(--gray-200);
+    padding: 0 20px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 52px;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+  .topbar-brand { font-weight: 700; font-size: 16px; color: var(--gray-900); display: flex; align-items: center; gap: 8px; }
+  .topbar-brand span { color: var(--primary); }
+  .topbar-right { display: flex; align-items: center; gap: 12px; }
+  .user-badge {
+    display: flex; align-items: center; gap: 8px;
+    font-size: 13px; color: var(--gray-600);
+  }
+  .user-avatar {
+    width: 30px; height: 30px; border-radius: 50%;
+    background: var(--primary-light); display: flex; align-items: center; justify-content: center;
+    font-size: 12px; font-weight: 600; color: var(--primary);
+  }
+  .admin-badge {
+    background: var(--primary-light); color: var(--primary);
+    padding: 2px 8px; border-radius: 20px; font-size: 11px; font-weight: 600;
+  }
+  .month-selector {
+    display: flex; align-items: center; gap: 8px;
+  }
+  .month-selector select, .month-selector button {
+    padding: 5px 10px; border: 1px solid var(--gray-200); border-radius: var(--radius);
+    background: white; cursor: pointer; font-size: 13px; color: var(--gray-700);
+  }
+  .month-selector button { background: var(--primary); color: white; border-color: var(--primary); font-weight: 500; }
+  .month-actions-wrap { position: relative; }
+  .btn-month-menu {
+    padding: 5px 12px; border: 1px solid var(--gray-200); border-radius: var(--radius);
+    background: white; cursor: pointer; font-size: 13px; color: var(--gray-700);
+    display: flex; align-items: center; gap: 6px; white-space: nowrap;
+  }
+  .btn-month-menu:hover { background: var(--gray-50); border-color: var(--gray-300); }
+  .month-menu-badge {
+    background: var(--warning); color: white; font-size: 10px; font-weight: 700;
+    min-width: 16px; height: 16px; border-radius: 8px; display: inline-flex;
+    align-items: center; justify-content: center; padding: 0 4px;
+  }
+  .month-menu-dropdown {
+    position: absolute; top: calc(100% + 6px); right: 0; min-width: 240px;
+    background: white; border: 1px solid var(--gray-200); border-radius: var(--radius);
+    box-shadow: 0 8px 24px rgba(0,0,0,0.12); z-index: 200; padding: 6px;
+  }
+  .month-menu-dropdown.hidden { display: none; }
+  .month-menu-item {
+    display: block; width: 100%; text-align: left; padding: 10px 12px;
+    border: none; background: none; cursor: pointer; font-size: 13px;
+    color: var(--gray-700); border-radius: 6px;
+  }
+  .month-menu-item:hover { background: var(--gray-50); }
+  .month-menu-item.danger { color: var(--danger); }
+  .month-menu-item.danger:hover { background: var(--danger-light); }
+  .month-menu-divider { height: 1px; background: var(--gray-200); margin: 6px 0; }
+  .bulk-toolbar {
+    display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
+    padding: 10px 12px; margin-bottom: 12px; background: var(--primary-light);
+    border: 1px solid #bfdbfe; border-radius: var(--radius);
+  }
+  .bulk-toolbar.hidden { display: none; }
+  .bulk-toolbar-count { font-size: 13px; font-weight: 600; color: var(--primary); flex: 1; min-width: 120px; }
+  .item-select-cell { width: 36px; text-align: center; }
+  .item-select-cell input, .item-card-select input { width: 16px; height: 16px; cursor: pointer; }
+  .item-card.selected { border-color: var(--primary); background: var(--primary-light); }
+  .item-card-select { margin-right: 8px; flex-shrink: 0; }
+  .btn-logout { padding: 5px 12px; border: 1px solid var(--gray-200); border-radius: var(--radius); background: white; cursor: pointer; color: var(--gray-600); font-size: 13px; }
+  .btn-logout:hover { background: var(--danger-light); color: var(--danger); border-color: var(--danger); }
+
+  /* NAV TABS */
+  .navtabs {
+    background: white;
+    border-bottom: 1px solid var(--gray-200);
+    display: flex;
+    overflow-x: auto;
+    padding: 0 16px;
+    gap: 4px;
+  }
+  .navtabs::-webkit-scrollbar { height: 3px; }
+  .navtab {
+    padding: 12px 16px;
+    border: none;
+    background: none;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--gray-500);
+    white-space: nowrap;
+    border-bottom: 2px solid transparent;
+    transition: all 0.2s;
+  }
+  .navtab.active { color: var(--primary); border-bottom-color: var(--primary); }
+  .navtab:hover:not(.active) { color: var(--gray-700); }
+
+  /* MAIN CONTENT */
+  .content { flex: 1; padding: 20px; max-width: 1200px; margin: 0 auto; width: 100%; }
+  .tab-pane { display: none; }
+  .tab-pane.active { display: block; }
+
+  /* CARDS & BLOCKS */
+  .card {
+    background: white;
+    border: 1px solid var(--gray-200);
+    border-radius: var(--radius-lg);
+    padding: 20px;
+    margin-bottom: 16px;
+    box-shadow: var(--shadow);
+  }
+  .card-header {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 16px; padding-bottom: 12px; border-bottom: 1px solid var(--gray-100);
+  }
+  .card-title { font-size: 15px; font-weight: 600; color: var(--gray-800); }
+  .card-subtitle { font-size: 12px; color: var(--gray-400); margin-top: 2px; }
+
+  /* SUMMARY GRID */
+  .summary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; margin-bottom: 16px; }
+  .stat-box {
+    background: var(--gray-50);
+    border: 1px solid var(--gray-200);
+    border-radius: var(--radius);
+    padding: 14px 16px;
+  }
+  .stat-label { font-size: 11px; color: var(--gray-500); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; }
+  .stat-value { font-size: 20px; font-weight: 700; color: var(--gray-900); }
+  .stat-value.green { color: var(--success); }
+  .stat-value.red { color: var(--danger); }
+  .stat-value.blue { color: var(--primary); }
+  .stat-value.orange { color: var(--warning); }
+
+  /* TABLE */
+  .data-table { width: 100%; border-collapse: collapse; }
+  .data-table th {
+    text-align: left; padding: 8px 12px; font-size: 11px; font-weight: 600;
+    color: var(--gray-500); text-transform: uppercase; letter-spacing: 0.5px;
+    border-bottom: 1px solid var(--gray-200); background: var(--gray-50);
+  }
+  .data-table td { padding: 10px 12px; border-bottom: 1px solid var(--gray-100); vertical-align: middle; }
+  .data-table tr:last-child td { border-bottom: none; }
+  .data-table tr:hover td { background: var(--gray-50); }
+
+  /* STATUS BADGES */
+  .badge {
+    display: inline-flex; align-items: center; gap: 4px;
+    padding: 3px 8px; border-radius: 20px; font-size: 11px; font-weight: 600;
+  }
+  .badge-paid { background: var(--success-light); color: var(--success); }
+  .badge-partial { background: #fef3c7; color: #b45309; }
+  .badge-pending { background: var(--warning-light); color: var(--warning); }
+  .badge-overdue { background: var(--danger-light); color: var(--danger); }
+  .badge-receita { background: #dbeafe; color: #1e40af; }
+  .badge-despesa { background: #fee2e2; color: #991b1b; }
+  .badge-empresa { background: #dbeafe; color: #1e40af; }
+  .badge-pessoal { background: #ede9fe; color: #5b21b6; }
+  .value-receita { color: var(--success) !important; }
+  .value-despesa { color: var(--gray-800); }
+
+  /* BUTTONS */
+  .btn {
+    padding: 7px 14px; border-radius: var(--radius); border: none; cursor: pointer;
+    font-size: 13px; font-weight: 500; display: inline-flex; align-items: center; gap: 6px;
+    transition: all 0.15s;
+  }
+  .btn-primary { background: var(--primary); color: white; }
+  .btn-primary:hover { background: #1648c2; }
+  .btn-success { background: var(--success); color: white; }
+  .btn-success:hover { background: #0c8a60; }
+  .btn-danger { background: var(--danger); color: white; }
+  .btn-danger:hover { background: #c51f1f; }
+  .btn-ghost { background: white; color: var(--gray-600); border: 1px solid var(--gray-200); }
+  .btn-ghost:hover { background: var(--gray-50); }
+  .btn-sm { padding: 4px 10px; font-size: 12px; }
+  .btn-icon { padding: 5px 8px; min-width: auto; }
+
+  /* MODAL */
+  .modal-overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 1000;
+    display: flex; align-items: center; justify-content: center; padding: 20px;
+  }
+  .modal {
+    background: white; border-radius: var(--radius-lg); padding: 24px;
+    max-width: 520px; width: 100%; max-height: 90vh; overflow-y: auto;
+    box-shadow: var(--shadow-md);
+  }
+  .modal-title { font-size: 17px; font-weight: 700; margin-bottom: 20px; }
+  .modal-footer { display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--gray-200); }
+
+  /* FORM */
+  .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px; }
+  .form-row.full { grid-template-columns: 1fr; }
+  .form-group { display: flex; flex-direction: column; gap: 5px; }
+  .form-label { font-size: 12px; font-weight: 600; color: var(--gray-600); }
+  .form-control {
+    padding: 8px 12px; border: 1px solid var(--gray-200); border-radius: var(--radius);
+    font-size: 14px; color: var(--gray-800); background: white; outline: none; width: 100%;
+  }
+  .form-control:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(26,86,219,0.1); }
+  textarea.form-control { resize: vertical; min-height: 80px; }
+
+  /* ALERT ITEMS */
+  .alerts-panel {
+    border: 1px solid var(--gray-200); border-radius: var(--radius-lg);
+    background: white; overflow: hidden;
+  }
+  .alert-group { padding: 10px 14px 6px; border-bottom: 1px solid var(--gray-100); }
+  .alert-group:last-child { border-bottom: none; }
+  .alert-group-label {
+    font-size: 11px; font-weight: 700; color: var(--gray-500);
+    text-transform: uppercase; letter-spacing: 0.6px; margin-bottom: 6px;
+  }
+  .alert-group-subtotal {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 8px 0 4px; margin-top: 4px; border-top: 1px dashed var(--gray-200);
+    font-size: 12px; font-weight: 600; color: var(--gray-600);
+  }
+  .alert-group-subtotal span:last-child { color: var(--primary); font-weight: 700; }
+  .alert-item {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 8px 10px; border-radius: var(--radius);
+    background: var(--gray-50); border: 1px solid var(--gray-100);
+    margin-bottom: 6px; gap: 10px;
+  }
+  .alert-item.danger { border-left: 3px solid var(--danger); }
+  .alert-item.warning { border-left: 3px solid var(--warning); }
+  .alert-item.ok { border-left: 3px solid var(--success); }
+  .alert-type-icon { font-size: 15px; flex-shrink: 0; line-height: 1; }
+  .alert-info { flex: 1; min-width: 0; }
+  .alert-name { font-weight: 600; font-size: 13px; color: var(--gray-800); }
+  .alert-meta { font-size: 11px; color: var(--gray-500); margin-top: 2px; }
+  .alert-due.danger { color: var(--danger); font-weight: 600; }
+  .alert-due.warning { color: var(--warning); font-weight: 600; }
+  .alert-due.ok { color: var(--success); font-weight: 500; }
+  .alert-value { font-weight: 700; font-size: 13px; color: var(--gray-800); white-space: nowrap; }
+  .alert-actions { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+
+  /* CASH FLOW */
+  .cashflow-inputs { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin-bottom: 16px; }
+  .cashflow-row { display: flex; align-items: center; gap: 10px; }
+  .cashflow-label { font-size: 13px; color: var(--gray-600); min-width: 140px; }
+  .cashflow-input { flex: 1; padding: 7px 10px; border: 1px solid var(--gray-200); border-radius: var(--radius); font-size: 14px; }
+  .cashflow-total {
+    background: var(--primary-light); border: 1px solid #bfdbfe;
+    border-radius: var(--radius); padding: 14px 16px; text-align: center;
+    font-size: 22px; font-weight: 700; color: var(--primary); margin-top: 12px;
+  }
+  .cashflow-total.positive { background: var(--success-light); border-color: #6ee7b7; color: var(--success); }
+  .cashflow-total.negative { background: var(--danger-light); border-color: #fca5a5; color: var(--danger); }
+
+  .cf-panel {
+    border: 1px solid var(--gray-200); border-radius: var(--radius-lg);
+    background: white; overflow: hidden; margin-top: 8px;
+  }
+  .cf-section { padding: 12px 16px; border-bottom: 1px solid var(--gray-100); }
+  .cf-section:last-child { border-bottom: none; }
+  .cf-section-title {
+    font-size: 11px; font-weight: 600; color: var(--gray-400);
+    text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px;
+  }
+  .cf-group-label {
+    font-size: 11px; font-weight: 700; color: var(--gray-500);
+    text-transform: uppercase; letter-spacing: 0.6px;
+    margin: 10px 0 4px; padding-top: 8px; border-top: 1px solid var(--gray-100);
+  }
+  .cf-group-label:first-of-type { margin-top: 0; padding-top: 0; border-top: none; }
+  .cf-line-subtotal { font-weight: 600; color: var(--gray-800); }
+  .cf-line-subtotal .cf-line-value { color: var(--primary); }
+  .cf-line-receita .cf-line-name { color: var(--success); }
+  .cf-line-receita .cf-line-value { color: var(--success); }
+  .cf-line {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 6px 0; font-size: 13px; color: var(--gray-700); gap: 12px;
+  }
+  .cf-line + .cf-line { border-top: 1px solid var(--gray-50); }
+  .cf-line-name { flex: 1; min-width: 0; }
+  .cf-line-value { font-weight: 600; color: var(--gray-800); white-space: nowrap; }
+  .cf-line-total {
+    margin-top: 4px; padding-top: 10px; border-top: 1px dashed var(--gray-200);
+    font-weight: 700; color: var(--gray-900);
+  }
+  .cf-line-total .cf-line-value { color: var(--danger); }
+  .cf-line-sub { font-size: 12px; color: var(--gray-500); }
+  .cf-line-sub .cf-line-value { font-weight: 500; }
+  .cf-badge {
+    display: inline-block; background: var(--primary-light); color: var(--primary);
+    padding: 1px 8px; border-radius: 10px; font-size: 11px; font-weight: 600; margin-left: 6px;
+  }
+  .cf-result {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 14px 16px; border-radius: var(--radius);
+    font-size: 14px; font-weight: 700;
+  }
+  .cf-result.positive { background: var(--success-light); color: var(--success); }
+  .cf-result.negative { background: var(--danger-light); color: var(--danger); }
+  .cf-result-value { font-size: 18px; }
+
+  /* ACCOUNT BLOCKS */
+  .account-block {
+    background: white; border: 1px solid var(--gray-200); border-radius: var(--radius-lg);
+    margin-bottom: 16px; overflow: hidden;
+  }
+  .account-block-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 14px 18px; background: var(--gray-50); border-bottom: 1px solid var(--gray-200);
+    cursor: pointer;
+  }
+  .block-name { font-weight: 600; font-size: 14px; color: var(--gray-800); }
+  .block-total { font-weight: 700; font-size: 15px; color: var(--primary); }
+  .block-actions { display: flex; gap: 6px; align-items: center; }
+  .account-block-body { padding: 16px 18px; }
+  .table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .item-cards { display: none; }
+  .item-card {
+    border: 1px solid var(--gray-200); border-radius: var(--radius);
+    padding: 12px; margin-bottom: 10px; background: var(--gray-50);
+  }
+  .item-card-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; margin-bottom: 8px; }
+  .item-card-title { font-weight: 600; font-size: 14px; color: var(--gray-800); }
+  .item-card-meta { font-size: 12px; color: var(--gray-500); margin-top: 4px; }
+  .item-card-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+  .item-progress { font-size: 11px; color: var(--gray-500); margin-top: 4px; }
+  .item-progress strong { color: var(--warning); }
+
+  /* EMPLOYEE CARD */
+  .employee-card { border: 1px solid var(--gray-200); border-radius: var(--radius-lg); margin-bottom: 16px; overflow: hidden; }
+  .employee-header { background: var(--gray-50); padding: 14px 18px; border-bottom: 1px solid var(--gray-200); display: flex; justify-content: space-between; align-items: center; }
+  .employee-name { font-weight: 700; font-size: 15px; }
+  .employee-body { padding: 16px 18px; }
+  .emp-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  @media (max-width: 640px) { .emp-grid { grid-template-columns: 1fr; } }
+
+  /* CALENDAR */
+  .calendar-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+  .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; }
+  .cal-header-day { text-align: center; font-size: 11px; font-weight: 600; color: var(--gray-400); padding: 6px 0; text-transform: uppercase; }
+  .cal-day {
+    min-height: 80px; padding: 4px; border: 1px solid var(--gray-100);
+    border-radius: 4px; font-size: 11px; cursor: pointer; background: white;
+    transition: background 0.15s;
+  }
+  .cal-day:hover { background: var(--primary-light); }
+  .cal-day.other-month { background: var(--gray-50); color: var(--gray-300); }
+  .cal-day.today { border-color: var(--primary); background: var(--primary-light); }
+  .cal-day-num { font-weight: 600; font-size: 12px; color: var(--gray-700); margin-bottom: 3px; }
+  .cal-day.other-month .cal-day-num { color: var(--gray-300); }
+  .cal-event {
+    font-size: 9px; padding: 1px 4px; border-radius: 3px; margin-bottom: 1px;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 500;
+  }
+  .cal-event.remunerado { background: #dc2626; color: white; font-weight: 600; }
+  .cal-event.nao-remunerado { background: #6b7280; color: white; }
+  .cal-event.hora-extra { background: #2563eb; color: white; font-weight: 600; }
+  .cal-event.meio-plantao { background: #ea580c; color: white; font-weight: 600; }
+  .cal-event.dobra { background: #7c3aed; color: white; font-weight: 600; }
+  .cal-event.ferias { background: #16a34a; color: white; font-weight: 600; }
+
+  /* LEGEND */
+  .legend { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
+  .legend-item { display: flex; align-items: center; gap: 6px; font-size: 12px; }
+  .legend-dot { width: 12px; height: 12px; border-radius: 3px; }
+
+  /* SECTION TITLE */
+  .section-title { font-size: 18px; font-weight: 700; color: var(--gray-900); margin-bottom: 4px; }
+  .section-desc { font-size: 13px; color: var(--gray-400); margin-bottom: 20px; }
+
+  /* LOADING OVERLAY */
+  #loading { position: fixed; inset: 0; background: white; display: flex; align-items: center; justify-content: center; z-index: 9999; }
+  .spinner { width: 36px; height: 36px; border: 3px solid var(--gray-200); border-top-color: var(--primary); border-radius: 50%; animation: spin 0.7s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* COPY MONTH BANNER */
+  .copy-banner {
+    background: #eff6ff; border: 1px solid #bfdbfe; border-radius: var(--radius); padding: 12px 16px;
+    display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; gap: 12px;
+  }
+  .copy-banner-text { font-size: 13px; color: #1e40af; }
+  .copy-banner.new-items {
+    background: #fffbeb; border-color: #fcd34d;
+  }
+  .copy-banner.new-items .copy-banner-text { color: #92400e; }
+  .copy-banner-opt {
+    display: flex; align-items: center; gap: 6px; margin-top: 8px;
+    font-size: 12px; color: #92400e; cursor: pointer; user-select: none;
+  }
+  .copy-banner-opt input { cursor: pointer; }
+
+  /* SHIFT SUMMARY */
+  .shift-summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; margin-top: 16px; }
+  .shift-box { background: var(--gray-50); border: 1px solid var(--gray-200); border-radius: var(--radius); padding: 10px 12px; }
+  .shift-box-name { font-size: 11px; color: var(--gray-500); margin-bottom: 4px; }
+  .shift-box-count { font-size: 18px; font-weight: 700; color: var(--primary); }
+
+  /* VACATION PERIOD */
+  .period-row { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; flex-wrap: wrap; }
+  .period-row input, .period-row select { flex: 1; min-width: 100px; padding: 6px 10px; border: 1px solid var(--gray-200); border-radius: var(--radius); font-size: 13px; }
+  .vac-aq-block {
+    border: 1px solid var(--gray-200); border-radius: var(--radius-lg);
+    margin-bottom: 12px; overflow: hidden; background: var(--gray-50);
+  }
+  .vac-aq-header {
+    display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: space-between;
+    padding: 12px 14px; background: white; border-bottom: 1px solid var(--gray-200);
+  }
+  .vac-aq-body { padding: 12px 14px; }
+  .vac-gozo-card {
+    background: white; border: 1px solid var(--gray-200); border-radius: var(--radius);
+    padding: 12px; margin-bottom: 10px;
+  }
+  .vac-gozo-title { font-size: 12px; font-weight: 600; color: var(--gray-600); margin-bottom: 8px; }
+  .vac-pgto-row {
+    display: flex; gap: 6px; align-items: center; margin-bottom: 6px; flex-wrap: wrap;
+  }
+  .vac-pgto-row input { flex: 1; min-width: 80px; padding: 6px 10px; border: 1px solid var(--gray-200); border-radius: var(--radius); font-size: 12px; }
+  .vac-pgto-paid { background: var(--success-light); border-radius: var(--radius); padding: 4px 10px; font-size: 11px; font-weight: 600; color: var(--success); }
+
+  /* RESPONSIVE */
+  @media (max-width: 768px) {
+    body { overflow-x: hidden; }
+    .topbar {
+      height: auto; min-height: 52px; flex-wrap: wrap;
+      padding: 8px 12px; gap: 8px;
+    }
+    .topbar-brand { font-size: 15px; }
+    .topbar-right {
+      width: 100%; flex-wrap: wrap; justify-content: space-between; gap: 8px;
+    }
+    .month-actions-wrap { order: 3; }
+    .user-badge span:not(.user-avatar) { display: none; }
+    .admin-badge { display: none; }
+    .month-selector { flex: 1; min-width: 0; }
+    .month-selector select { flex: 1; min-width: 0; max-width: none; font-size: 12px; }
+    .month-selector button { padding: 5px 8px; }
+    .btn-logout { padding: 5px 8px; font-size: 12px; }
+    .navtabs { padding: 0 8px; }
+    .navtab { padding: 10px 12px; font-size: 12px; }
+    .content { padding: 10px; }
+    .card { padding: 14px; }
+    .summary-grid { grid-template-columns: 1fr 1fr; gap: 8px; }
+    .stat-box { padding: 10px 12px; }
+    .stat-value { font-size: 16px; }
+    .stat-label { font-size: 10px; }
+    .section-title { font-size: 16px; }
+    .account-block-header {
+      flex-direction: column; align-items: stretch; gap: 10px;
+      padding: 12px 14px;
+    }
+    .block-actions {
+      flex-wrap: wrap; width: 100%;
+    }
+    .block-actions .btn-sm { flex: 1; min-width: calc(50% - 4px); text-align: center; }
+    .block-total { width: 100%; text-align: right; margin-bottom: 4px; }
+    .account-block-body { padding: 12px; }
+    .item-cards { display: block; }
+    .table-wrap { display: none; }
+    .item-card-actions .btn-sm { flex: 1; min-width: calc(50% - 3px); justify-content: center; }
+    .alert-item {
+      flex-direction: column; align-items: stretch; gap: 8px;
+    }
+    .alert-actions {
+      width: 100%; justify-content: space-between; flex-wrap: wrap;
+    }
+    .alert-actions .btn-sm { flex: 1; }
+    .copy-banner {
+      flex-direction: column; align-items: stretch; gap: 10px;
+    }
+    .modal-overlay { padding: 10px; align-items: flex-end; }
+    .modal {
+      max-width: 100%; border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+      max-height: 92vh; padding: 18px;
+    }
+    .modal-footer { flex-direction: column-reverse; }
+    .modal-footer .btn { width: 100%; justify-content: center; }
+    .form-row { grid-template-columns: 1fr; }
+    .cf-line { font-size: 12px; }
+    .employee-header { flex-direction: column; align-items: flex-start; gap: 8px; }
+    .cal-day { min-height: 52px; font-size: 9px; }
+    .flex[style*="justify-content:space-between"] {
+      flex-direction: column; align-items: stretch !important; gap: 10px;
+    }
+    .flex[style*="justify-content:space-between"] > div:last-child {
+      display: flex; flex-wrap: wrap; gap: 8px;
+    }
+    .flex[style*="justify-content:space-between"] .btn { flex: 1; min-width: 120px; }
+  }
+  @media (max-width: 400px) {
+    .summary-grid { grid-template-columns: 1fr; }
+    .auth-card { padding: 32px 20px; }
+  }
+  @media (max-width: 600px) {
+    .form-row { grid-template-columns: 1fr; }
+    .cal-day { min-height: 60px; }
+  }
+
+  .hidden { display: none !important; }
+  .flex { display: flex; }
+  .gap-2 { gap: 8px; }
+  .gap-1 { gap: 4px; }
+  .text-right { text-align: right; }
+  .font-bold { font-weight: 700; }
+  .text-sm { font-size: 13px; }
+  .text-xs { font-size: 11px; }
+  .text-gray { color: var(--gray-500); }
+  .mt-1 { margin-top: 8px; }
+  .mt-2 { margin-top: 16px; }
+  .mb-1 { margin-bottom: 8px; }
+  .w-full { width: 100%; }
+
+  /* viewer mode info */
+  .viewer-notice { background: #eff6ff; border: 1px solid #bfdbfe; padding: 10px 14px; border-radius: var(--radius); font-size: 12px; color: #1e40af; margin-bottom: 16px; }
+</style>
+</head>
+<body>
+
+<!-- LOADING -->
+<div id="loading"><div class="spinner"></div></div>
+<div id="debug-bar" style="display:none;position:fixed;bottom:0;left:0;right:0;background:#dc2626;color:white;padding:10px;font-size:12px;z-index:9999;word-break:break-all;"></div>
+<div id="global-error" style="display:none;position:fixed;top:0;left:0;right:0;background:#dc2626;color:white;padding:12px 16px;font-size:13px;z-index:99999;word-break:break-all;"></div>
+
+<script>
+window.onerror = function(msg, src, line, col, err) {
+  var el = document.getElementById('global-error');
+  if (el) { el.style.display='block'; el.textContent = 'Erro: ' + msg + ' (linha ' + line + ')'; }
+};
+window.addEventListener('unhandledrejection', function(e) {
+  var el = document.getElementById('global-error');
+  if (el) { el.style.display='block'; el.textContent = 'Erro: ' + (e.reason && e.reason.message ? e.reason.message : e.reason); }
+});
+</script>
+
+<!-- AUTH SCREEN -->
+<div id="auth-screen" style="display:none;">
+  <div class="auth-card">
+    <div class="auth-logo">📊</div>
+    <div class="auth-title">Sistema de Gestão</div>
+    <div class="auth-sub">Empresa &amp; Pessoal — Acesso seguro <span style="opacity:0.45;font-size:10px;">v2026.06.13</span></div>
+    <button id="google-signin-btn">
+      <svg width="18" height="18" viewBox="0 0 18 18"><path fill="#4285F4" d="M16.51 8H8.98v3h4.3c-.18 1-.74 1.48-1.6 2.04v2.01h2.6a7.8 7.8 0 0 0 2.38-5.88c0-.57-.05-.66-.15-1.18z"/><path fill="#34A853" d="M8.98 17c2.16 0 3.97-.72 5.3-1.94l-2.6-2a4.8 4.8 0 0 1-7.18-2.54H1.83v2.07A8 8 0 0 0 8.98 17z"/><path fill="#FBBC05" d="M4.5 10.52a4.8 4.8 0 0 1 0-3.04V5.41H1.83a8 8 0 0 0 0 7.18l2.67-2.07z"/><path fill="#EA4335" d="M8.98 4.18c1.17 0 2.23.4 3.06 1.2l2.3-2.3A8 8 0 0 0 1.83 5.4L4.5 7.49a4.77 4.77 0 0 1 4.48-3.31z"/></svg>
+      Entrar com Google
+    </button>
+    <div id="auth-error"></div>
+    <div class="auth-access-note">
+      ℹ️ Administrador: duiliodudu@gmail.com<br>
+      Funcionários têm acesso limitado (somente visualização).
+    </div>
+  </div>
+</div>
+
+<!-- MAIN APP -->
+<div id="app" style="display:none;">
+  <div class="topbar">
+    <div class="topbar-brand">📊 <span>Gestão</span></div>
+    <div class="topbar-right">
+      <div class="month-selector">
+        <select id="month-select" onchange="applyMonthYear()"></select>
+        <select id="year-select" onchange="applyMonthYear()"></select>
+        <button onclick="applyMonthYear()" title="Carregar mês">▶</button>
+      </div>
+      <div class="month-actions-wrap hidden" id="month-actions-wrap">
+        <button class="btn-month-menu" id="month-menu-btn" onclick="toggleMonthMenu(event)" type="button">
+          📋 Mês <span id="month-menu-badge" class="month-menu-badge hidden"></span> ▾
+        </button>
+        <div class="month-menu-dropdown hidden" id="month-menu-dropdown">
+          <button class="month-menu-item" type="button" onclick="openCopyMonthModal()">Copiar do mês anterior</button>
+          <button class="month-menu-item" type="button" id="month-menu-copy-new" style="display:none;" onclick="openCopyNewItemsModal()">Copiar novos boletos (<span id="month-menu-new-count">0</span>)</button>
+          <div class="month-menu-divider"></div>
+          <button class="month-menu-item danger" type="button" onclick="openResetMonthModal()">Zerar dados deste mês</button>
+        </div>
+      </div>
+      <div class="user-badge">
+        <div class="user-avatar" id="user-initial">?</div>
+        <span id="user-name-label" class="hidden" style="font-size:12px;"></span>
+        <span id="admin-badge-el" class="admin-badge hidden">Admin</span>
+        <span id="employee-badge-el" class="admin-badge hidden" style="background:var(--success-light);color:var(--success);">Funcionário</span>
+      </div>
+      <button class="btn-logout" onclick="signOut()">Sair</button>
+    </div>
+  </div>
+
+  <div class="navtabs" id="navtabs-container">
+    <button class="navtab active" id="tab-dashboard-btn" onclick="showTab('dashboard', this)">🏠 Painel</button>
+    <button class="navtab" id="tab-minha-area-btn" style="display:none;" onclick="showTab('minha-area', this)">👤 Minha Área</button>
+    <button class="navtab" id="tab-empresa-btn" onclick="showTab('empresa', this)">🏢 Empresa</button>
+    <button class="navtab" id="tab-pessoal-btn" onclick="showTab('pessoal', this)">👤 Pessoal</button>
+    <button class="navtab" id="tab-funcionarios-btn" onclick="showTab('funcionarios', this)">👥 Funcionários</button>
+    <button class="navtab" id="tab-escala-btn" onclick="showTab('escala', this)">📅 Escala</button>
+    <button class="navtab" id="tab-ferias-btn" onclick="showTab('ferias', this)">🌴 Férias</button>
+  </div>
+
+  <div class="content">
+    <!-- ===== MINHA ÁREA (FUNCIONÁRIO) ===== -->
+    <div class="tab-pane" id="tab-minha-area">
+      <div class="viewer-notice">ℹ️ Modo somente leitura — aqui você vê apenas a sua folha, receitas, descontos e férias. Use as abas <strong>Escala</strong> e <strong>Férias</strong> para consultar a agenda de toda a equipe.</div>
+      <div class="section-title" id="employee-portal-title">Minha Área</div>
+      <div class="section-desc" id="employee-portal-period">Carregando...</div>
+      <div id="employee-portal-salary"></div>
+    </div>
+
+    <!-- ===== DASHBOARD ===== -->
+    <div class="tab-pane active" id="tab-dashboard">
+      <div class="section-title">Painel Principal</div>
+      <div class="section-desc" id="dashboard-period-label">Carregando...</div>
+
+      <!-- COPY BANNERS (substituídos pelo menu Mês na topbar) -->
+      <div class="copy-banner" id="copy-banner" style="display:none !important;"></div>
+      <div class="copy-banner new-items" id="copy-new-banner" style="display:none !important;">
+        <div class="copy-banner-text" id="copy-new-banner-text"></div>
+        <input type="checkbox" id="copy-new-banner-hide" style="display:none;">
+      </div>
+
+      <!-- SUMMARY CARDS -->
+      <div class="card">
+        <div class="card-header">
+          <div>
+            <div class="card-title">Resumo Financeiro</div>
+            <div class="card-subtitle">Empresa + Pessoal + Funcionários</div>
+          </div>
+        </div>
+        <div class="summary-grid">
+          <div class="stat-box">
+            <div class="stat-label">🏢 Saldo Empresa</div>
+            <div class="stat-value blue" id="dash-empresa-total">R$ 0,00</div>
+          </div>
+          <div class="stat-box">
+            <div class="stat-label">👤 Saldo Pessoal</div>
+            <div class="stat-value blue" id="dash-pessoal-total">R$ 0,00</div>
+          </div>
+          <div class="stat-box">
+            <div class="stat-label">👥 Folha Funcionários</div>
+            <div class="stat-value orange" id="dash-func-total">R$ 0,00</div>
+          </div>
+          <div class="stat-box">
+            <div class="stat-label">📊 Total Geral</div>
+            <div class="stat-value red" id="dash-total-geral">R$ 0,00</div>
+          </div>
+          <div class="stat-box">
+            <div class="stat-label">✅ Quitado / Recebido</div>
+            <div class="stat-value green" id="dash-paid">R$ 0,00</div>
+          </div>
+          <div class="stat-box">
+            <div class="stat-label">⏳ Saldo em Aberto</div>
+            <div class="stat-value red" id="dash-pending">R$ 0,00</div>
+          </div>
+          <div class="stat-box" id="dash-prev-fechamento-box">
+            <div class="stat-label">📊 Prev. de Fechamento</div>
+            <div class="stat-value" id="dash-prev-fechamento">—</div>
+          </div>
+        </div>
+
+        <!-- CASHFLOW -->
+        <div class="card-title" style="margin-bottom:12px;">Previsão de Caixa</div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;margin-bottom:12px;">
+          <div>
+            <div class="form-label">💰 Dinheiro em Conta</div>
+            <input type="number" class="form-control cashflow-input" id="cf-em-conta" placeholder="R$ 0,00" oninput="updateCashflow()">
+          </div>
+          <div>
+            <div class="form-label">📈 Previsão de Recebimento</div>
+            <input type="number" class="form-control cashflow-input" id="cf-previsao" placeholder="R$ 0,00" oninput="updateCashflow()">
+          </div>
+          <div>
+            <div class="form-label">✅ Já Recebido</div>
+            <input type="number" class="form-control cashflow-input" id="cf-recebido" placeholder="R$ 0,00" oninput="updateCashflow()">
+          </div>
+        </div>
+        <div id="cashflow-result"></div>
+      </div>
+
+      <!-- ALERTS -->
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">⚠️ Alertas de Vencimento</div>
+        </div>
+        <div id="alerts-container"><p class="text-gray text-sm">Nenhum alerta para exibir.</p></div>
+      </div>
+
+    </div>
+
+    <!-- ===== EMPRESA ===== -->
+    <div class="tab-pane" id="tab-empresa">
+      <div class="flex" style="justify-content:space-between;align-items:flex-start;margin-bottom:16px;">
+        <div>
+          <div class="section-title">🏢 Contas da Empresa <span id="app-version-tag" style="font-size:10px;font-weight:400;color:var(--gray-400);">v2026.06.13</span></div>
+          <div class="section-desc">Despesas e receitas por bloco · lançamentos em ordem de data</div>
+        </div>
+        <div id="empresa-admin-controls">
+          <button class="btn btn-primary" onclick="addBlock('empresa')">+ Novo Bloco</button>
+        </div>
+      </div>
+      <div id="empresa-subtabs" style="display:flex;flex-wrap:wrap;gap:4px;border-bottom:2px solid var(--gray-200);margin-bottom:20px;padding-bottom:0;"></div>
+      <div id="empresa-blocks"></div>
+    </div>
+
+    <!-- ===== PESSOAL ===== -->
+    <div class="tab-pane" id="tab-pessoal">
+      <div class="flex" style="justify-content:space-between;align-items:flex-start;margin-bottom:16px;">
+        <div>
+          <div class="section-title">👤 Contas Pessoais</div>
+          <div class="section-desc">Despesas, recebimentos e compromissos pessoais</div>
+        </div>
+        <div id="pessoal-admin-controls">
+          <button class="btn btn-primary" onclick="addBlock('pessoal')">+ Novo Bloco</button>
+        </div>
+      </div>
+      <div id="pessoal-subtabs" style="display:flex;flex-wrap:wrap;gap:4px;border-bottom:2px solid var(--gray-200);margin-bottom:20px;padding-bottom:0;"></div>
+      <div id="pessoal-blocks"></div>
+    </div>
+
+    <!-- ===== FUNCIONÁRIOS ===== -->
+    <div class="tab-pane" id="tab-funcionarios">
+      <div class="flex" style="justify-content:space-between;align-items:flex-start;margin-bottom:16px;">
+        <div>
+          <div class="section-title">👥 Funcionários</div>
+          <div class="section-desc">Controle de pagamentos, férias e 13º</div>
+        </div>
+        <div id="func-admin-controls">
+          <button class="btn btn-primary" onclick="addEmployee()">+ Novo Funcionário</button>
+        </div>
+      </div>
+      <div id="emp-subtabs" style="display:flex;flex-wrap:wrap;gap:4px;border-bottom:2px solid var(--gray-200);margin-bottom:20px;padding-bottom:0;"></div>
+      <div id="employees-container"></div>
+    </div>
+
+    <!-- ===== ESCALA ===== -->
+    <div class="tab-pane" id="tab-escala">
+      <div class="section-title">📅 Escala de Plantões</div>
+      <div class="section-desc" id="escala-desc">Gerencie a escala de trabalho dos funcionários</div>
+      <div class="legend">
+        <div class="legend-item"><div class="legend-dot" style="background:#dc2626;"></div>Plantão Remunerado</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#6b7280;"></div>Não Remunerado</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#2563eb;"></div>Hora Extra</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#ea580c;"></div>Meio Plantão</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#7c3aed;"></div>Dobra</div>
+      </div>
+      <div class="card">
+        <div class="calendar-header">
+          <button class="btn btn-ghost btn-sm" onclick="prevCalMonth('escala')">← Anterior</button>
+          <span id="cal-escala-title" style="font-weight:600;"></span>
+          <button class="btn btn-ghost btn-sm" onclick="nextCalMonth('escala')">Próximo →</button>
+        </div>
+        <div id="cal-escala-grid"></div>
+      </div>
+      <div class="card">
+        <div class="card-title" style="margin-bottom:12px;">Resumo de Plantões Remunerados</div>
+        <div class="shift-summary" id="shift-summary"></div>
+      </div>
+    </div>
+
+    <!-- ===== FÉRIAS ===== -->
+    <div class="tab-pane" id="tab-ferias">
+      <div class="section-title">🌴 Calendário de Férias</div>
+      <div class="section-desc" id="ferias-desc">Visualize os períodos de férias dos funcionários</div>
+      <div class="legend" id="ferias-legend"></div>
+      <div class="card">
+        <div class="calendar-header">
+          <button class="btn btn-ghost btn-sm" onclick="prevCalMonth('ferias')">← Anterior</button>
+          <span id="cal-ferias-title" style="font-weight:600;"></span>
+          <button class="btn btn-ghost btn-sm" onclick="nextCalMonth('ferias')">Próximo →</button>
+        </div>
+        <div id="cal-ferias-grid"></div>
+      </div>
+    </div>
+  </div><!-- /content -->
+</div><!-- /app -->
+
+<!-- MODAL CONTAINER -->
+<div id="modal-overlay" class="modal-overlay hidden" onclick="closeModalOnOverlay(event)">
+  <div class="modal" id="modal-box"></div>
+</div>
+
+
+<!-- Firebase SDKs -->
+<script src="https://cdn.jsdelivr.net/npm/firebase@10.12.0/firebase-app-compat.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/firebase@10.12.0/firebase-auth-compat.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/firebase@10.12.0/firebase-firestore-compat.min.js"></script>
+
+<script>
+// Global error catcher for debugging
+window.onerror = function(msg, src, line, col, err) {
+  const bar = document.getElementById('debug-bar');
+  if (bar) { bar.style.display='block'; bar.textContent = 'ERRO: ' + msg + ' (linha ' + line + ')'; }
+  return false;
+};
+window.addEventListener('unhandledrejection', function(e) {
+  const bar = document.getElementById('debug-bar');
+  if (bar) { bar.style.display='block'; bar.textContent = 'ERRO: ' + (e.reason?.message || e.reason); }
+});
+
+// =============================================
+// FIREBASE CONFIG
+// =============================================
+const firebaseConfig = {
+  apiKey: "AIzaSyBoHHtjo2xIukzls8COqQVO6cpjIQuM-Wg",
+  authDomain: "gestao-sistema-af7b2.firebaseapp.com",
+  projectId: "gestao-sistema-af7b2",
+  storageBucket: "gestao-sistema-af7b2.firebasestorage.app",
+  messagingSenderId: "482592013694",
+  appId: "1:482592013694:web:6e2624385a937fd39f872f"
+};
+
+firebase.initializeApp(firebaseConfig);
+const auth = firebase.auth();
+const db = firebase.firestore();
+
+// =============================================
+// STATE
+// =============================================
+const ADMIN_EMAIL = "duiliodudu@gmail.com";
+let currentUser = null;
+let isAdmin = false;
+let isEmployee = false;
+let employeeOwnId = null;
+let currentMonth = new Date().getMonth();
+let currentYear = new Date().getFullYear();
+let calEscalaMonth = currentMonth;
+let calEscalaYear = currentYear;
+let calFeriasMonth = currentMonth;
+let calFeriasYear = currentYear;
+
+let appData = {
+  empresa: { blocks: {} },
+  pessoal: { blocks: {} },
+  employees: {},
+  escala: {},
+  cashflow: {}
+};
+let pendingNewItems = [];
+const blockItemSelection = {};
+
+// =============================================
+// INIT
+// =============================================
+function init() {
+  populateMonthYear();
+  document.addEventListener('click', e => {
+    const wrap = document.getElementById('month-actions-wrap');
+    if (wrap && !wrap.contains(e.target)) closeMonthMenu();
+  });
+  const authTimeout = setTimeout(showAuthScreen, 8000);
+  auth.onAuthStateChanged(async user => {
+    clearTimeout(authTimeout);
+    if (user) {
+      currentUser = user;
+      await checkUserRole();
+      loadApp();
+    } else {
+      showAuthScreen();
+    }
+  });
+}
+
+async function checkUserRole() {
+  isAdmin = currentUser.email.toLowerCase() === ADMIN_EMAIL.toLowerCase();
+  isEmployee = false;
+  employeeOwnId = null;
+  if (!isAdmin) {
+    const snap = await db.collection('global').doc('employees').get();
+    if (snap.exists) {
+      const emps = snap.data().list || [];
+      const found = emps.find(e => e.email && e.email.toLowerCase() === currentUser.email.toLowerCase());
+      if (found) { isEmployee = true; employeeOwnId = found.id; }
+    }
+  }
+}
+
+function canWrite() { return isAdmin; }
+
+function isEmployeeView() { return isEmployee && !isAdmin; }
+
+function showAuthScreen() {
+  document.getElementById('loading').style.display = 'none';
+  document.getElementById('auth-screen').style.display = 'flex';
+  document.getElementById('app').style.display = 'none';
+}
+
+function loadApp() {
+  if (!isAdmin && !isEmployee) {
+    showAccessDenied();
+    return;
+  }
+  document.getElementById('auth-screen').style.display = 'none';
+  document.getElementById('app').style.display = 'flex';
+  document.getElementById('loading').style.display = 'none';
+  updateUserUI();
+  applyRoleVisibility();
+  loadMonthData();
+}
+
+function showAccessDenied() {
+  document.getElementById('auth-screen').style.display = 'none';
+  document.getElementById('app').style.display = 'flex';
+  document.getElementById('loading').style.display = 'none';
+  document.getElementById('navtabs-container').style.display = 'none';
+  document.querySelector('.topbar .month-selector').style.display = 'none';
+  document.querySelector('.content').innerHTML = `
+    <div class="card" style="text-align:center;padding:48px 24px;max-width:480px;margin:40px auto;">
+      <div style="font-size:40px;margin-bottom:12px;">🔒</div>
+      <div class="section-title">Acesso não autorizado</div>
+      <p class="section-desc" style="margin-bottom:24px;">O e-mail <strong>${escHtml(currentUser.email)}</strong> não está cadastrado como administrador nem como funcionário.</p>
+      <button class="btn btn-primary" onclick="signOut()">Sair e tentar outra conta</button>
+    </div>`;
+}
+
+function updateUserUI() {
+  const name = currentUser.displayName || currentUser.email;
+  document.getElementById('user-initial').textContent = name.charAt(0).toUpperCase();
+  const nameLabel = document.getElementById('user-name-label');
+  nameLabel.textContent = name.split(' ')[0];
+  nameLabel.classList.remove('hidden');
+  document.getElementById('admin-badge-el').classList.toggle('hidden', !isAdmin);
+  document.getElementById('employee-badge-el').classList.toggle('hidden', !isEmployeeView());
+  const monthActions = document.getElementById('month-actions-wrap');
+  if (monthActions) monthActions.classList.toggle('hidden', !isAdmin);
+}
+
+function updateEmployeeTabLabels() {
+  const escalaDesc = document.getElementById('escala-desc');
+  const feriasDesc = document.getElementById('ferias-desc');
+  if (isEmployeeView()) {
+    if (escalaDesc) escalaDesc.textContent = 'Visualize a escala de todos os colegas (somente leitura)';
+    if (feriasDesc) feriasDesc.textContent = 'Visualize as férias de todos os colegas (somente leitura)';
+  } else {
+    if (escalaDesc) escalaDesc.textContent = 'Gerencie a escala de trabalho dos funcionários';
+    if (feriasDesc) feriasDesc.textContent = 'Visualize os períodos de férias dos funcionários';
+  }
+}
+
+function applyRoleVisibility() {
+  const hiddenForEmployee = ['tab-dashboard-btn','tab-empresa-btn','tab-pessoal-btn','tab-funcionarios-btn'];
+  const minhaAreaBtn = document.getElementById('tab-minha-area-btn');
+
+  if (isEmployeeView()) {
+    hiddenForEmployee.forEach(id => { const el = document.getElementById(id); if (el) el.style.display = 'none'; });
+    ['tab-escala-btn','tab-ferias-btn'].forEach(id => { const el = document.getElementById(id); if (el) el.style.display = ''; });
+    if (minhaAreaBtn) minhaAreaBtn.style.display = '';
+    document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+    document.querySelectorAll('.navtab').forEach(b => b.classList.remove('active'));
+    document.getElementById('tab-minha-area').classList.add('active');
+    if (minhaAreaBtn) minhaAreaBtn.classList.add('active');
+    updateEmployeeTabLabels();
+    return;
+  }
+
+  if (minhaAreaBtn) minhaAreaBtn.style.display = 'none';
+  updateEmployeeTabLabels();
+  if (!isAdmin) {
+    ['empresa-admin-controls','pessoal-admin-controls','func-admin-controls'].forEach(id => {
+      const el = document.getElementById(id); if (el) el.style.display = 'none';
+    });
+    ['tab-empresa-btn','tab-pessoal-btn','tab-funcionarios-btn'].forEach(id => {
+      const el = document.getElementById(id); if (el) el.style.display = 'none';
+    });
+  }
+}
+
+function signOut() { auth.signOut(); }
+
+// =============================================
+// MONTH/YEAR SELECTORS
+// =============================================
+const MONTHS = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+
+function populateMonthYear() {
+  const ms = document.getElementById('month-select');
+  const ys = document.getElementById('year-select');
+  ms.innerHTML = MONTHS.map((m,i) => `<option value="${i}" ${i===currentMonth?'selected':''}>${m}</option>`).join('');
+  for (let y = 2023; y <= 2030; y++) {
+    ys.innerHTML += `<option value="${y}" ${y===currentYear?'selected':''}>${y}</option>`;
+  }
+}
+
+function syncCalendarToCurrentMonth() {
+  calEscalaMonth = currentMonth;
+  calEscalaYear = currentYear;
+  calFeriasMonth = currentMonth;
+  calFeriasYear = currentYear;
+}
+
+function applyMonthYear() {
+  currentMonth = parseInt(document.getElementById('month-select').value);
+  currentYear = parseInt(document.getElementById('year-select').value);
+  syncCalendarToCurrentMonth();
+  loadMonthData();
+}
+
+function getMonthKey() { return `${currentYear}-${String(currentMonth+1).padStart(2,'0')}`; }
+
+function advanceDateToCurrentMonth(dateStr) {
+  if (!dateStr) return dateStr;
+  const parts = dateStr.split('-');
+  if (parts.length !== 3) return dateStr;
+  const day = parseInt(parts[2], 10);
+  const maxDay = new Date(currentYear, currentMonth + 1, 0).getDate();
+  const newDay = String(Math.min(day, maxDay)).padStart(2, '0');
+  return `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-${newDay}`;
+}
+
+function isEmptyPayment(pd) {
+  if (!pd) return true;
+  const hasReceitas = (pd.receitas || []).some(r => (r.nome && r.nome.trim()) || parseFloat(r.valor) > 0);
+  const hasDescontos = (pd.descontos_list || []).some(d => (d.nome && d.nome.trim()) || parseFloat(d.valor) > 0);
+  return !hasReceitas && !hasDescontos;
+}
+
+function needsEmployeePayments() {
+  const list = appData.employees.list || [];
+  if (list.length === 0) return false;
+  return list.some(emp => isEmptyPayment((appData.employeePayments || {})[emp.id]));
+}
+
+function getMissingCopySections() {
+  const missing = [];
+  if (Object.keys(appData.empresa.blocks || {}).length === 0) missing.push('contas empresa');
+  if (Object.keys(appData.pessoal.blocks || {}).length === 0) missing.push('contas pessoais');
+  if (needsEmployeePayments()) missing.push('folha dos funcionários');
+  if (Object.keys(appData.escala.events || {}).length === 0) missing.push('escala');
+  return missing;
+}
+
+function updateCopyBanner() {
+  updateMonthMenuState();
+}
+
+function closeMonthMenu() {
+  const dropdown = document.getElementById('month-menu-dropdown');
+  if (dropdown) dropdown.classList.add('hidden');
+}
+
+function toggleMonthMenu(event) {
+  event.stopPropagation();
+  const dropdown = document.getElementById('month-menu-dropdown');
+  if (!dropdown) return;
+  dropdown.classList.toggle('hidden');
+}
+
+function updateMonthMenuState() {
+  if (!isAdmin) return;
+  const missing = getMissingCopySections();
+  const badge = document.getElementById('month-menu-badge');
+  const copyNewBtn = document.getElementById('month-menu-copy-new');
+  const newCountEl = document.getElementById('month-menu-new-count');
+  const newCount = pendingNewItems.length;
+  let badgeText = '';
+
+  if (missing.length > 0) badgeText = '!';
+  else if (newCount > 0) badgeText = String(newCount);
+
+  if (badge) {
+    if (badgeText) {
+      badge.textContent = badgeText;
+      badge.classList.remove('hidden');
+    } else {
+      badge.classList.add('hidden');
+    }
+  }
+  if (copyNewBtn) copyNewBtn.style.display = newCount > 0 ? 'block' : 'none';
+  if (newCountEl) newCountEl.textContent = String(newCount);
+}
+
+function openCopyMonthModal() {
+  closeMonthMenu();
+  const { label } = getPreviousMonthKey();
+  const missing = getMissingCopySections();
+  const period = `${MONTHS[currentMonth]} ${currentYear}`;
+  const body = missing.length
+    ? `<p style="font-size:13px;color:var(--gray-600);line-height:1.5;margin-bottom:16px;">
+        Copiar de <strong>${label}</strong> para <strong>${period}</strong> apenas o que ainda está vazio:<br>
+        <strong>${missing.join(', ')}</strong>.
+      </p>
+      <p style="font-size:12px;color:var(--gray-400);">Se já copiou e editou boletos, use <strong>Zerar dados deste mês</strong> antes de copiar novamente.</p>`
+    : `<p style="font-size:13px;color:var(--gray-600);line-height:1.5;margin-bottom:16px;">
+        Este mês já possui todos os dados. Nada será copiado de <strong>${label}</strong>.
+      </p>
+      <p style="font-size:12px;color:var(--gray-400);">Para recopiar tudo, primeiro use <strong>Zerar dados deste mês</strong>.</p>`;
+  openModal(`
+    <div class="modal-title">Copiar do mês anterior</div>
+    ${body}
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal()">Cancelar</button>
+      <button class="btn btn-primary" ${missing.length ? '' : 'disabled'} onclick="confirmCopyMonth()">Copiar</button>
+    </div>`);
+}
+
+function confirmCopyMonth() {
+  closeModal();
+  copyFromPreviousMonth();
+}
+
+function openCopyNewItemsModal() {
+  closeMonthMenu();
+  if (pendingNewItems.length === 0) return;
+  const { prevLabel } = getPreviousMonthKey();
+  const count = pendingNewItems.length;
+  const noun = count === 1 ? 'boleto' : 'boletos';
+  openModal(`
+    <div class="modal-title">Copiar novos boletos</div>
+    <p style="font-size:13px;color:var(--gray-600);line-height:1.5;margin-bottom:12px;">
+      ${count} ${noun} de <strong>${prevLabel}</strong> ainda não estão em <strong>${MONTHS[currentMonth]} ${currentYear}</strong>.
+    </p>
+    <label class="copy-banner-opt" style="margin-bottom:16px;">
+      <input type="checkbox" id="modal-copy-new-hide">
+      Não sugerir novos boletos automaticamente
+    </label>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal()">Cancelar</button>
+      <button class="btn btn-primary" onclick="confirmCopyNewItems()">Copiar ${count} ${noun}</button>
+    </div>`);
+}
+
+function confirmCopyNewItems() {
+  const hideCheckbox = document.getElementById('modal-copy-new-hide');
+  if (hideCheckbox?.checked) setNewItemsBannerHidden(true);
+  closeModal();
+  copyNewItemsFromPreviousMonth();
+}
+
+function openResetMonthModal() {
+  closeMonthMenu();
+  const period = `${MONTHS[currentMonth]} ${currentYear}`;
+  openModal(`
+    <div class="modal-title">Zerar dados deste mês</div>
+    <p style="font-size:13px;color:var(--gray-600);line-height:1.5;margin-bottom:12px;">
+      Isso apaga <strong>todos</strong> os dados de <strong>${period}</strong>:
+    </p>
+    <ul style="font-size:13px;color:var(--gray-600);margin:0 0 16px 18px;line-height:1.6;">
+      <li>Contas da Empresa e Pessoal</li>
+      <li>Folha dos funcionários</li>
+      <li>Escala e caixa</li>
+    </ul>
+    <p style="font-size:12px;color:var(--danger);font-weight:600;">Esta ação não pode ser desfeita.</p>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal()">Cancelar</button>
+      <button class="btn btn-danger" onclick="confirmResetMonth()">Zerar ${period}</button>
+    </div>`);
+}
+
+async function confirmResetMonth() {
+  closeModal();
+  await resetMonthData();
+}
+
+async function resetMonthData() {
+  if (!canWrite()) return;
+  appData.empresa = { blocks: {} };
+  appData.pessoal = { blocks: {} };
+  appData.employeePayments = {};
+  appData.escala = { events: {} };
+  appData.cashflow = {};
+  Object.keys(blockItemSelection).forEach(k => delete blockItemSelection[k]);
+  pendingNewItems = [];
+
+  const cfEmConta = document.getElementById('cf-em-conta');
+  const cfRecebido = document.getElementById('cf-recebido');
+  const cfPrevisao = document.getElementById('cf-previsao');
+  if (cfEmConta) cfEmConta.value = '';
+  if (cfRecebido) cfRecebido.value = '';
+  if (cfPrevisao) cfPrevisao.value = '';
+
+  await Promise.all([
+    saveEmpresa(),
+    savePessoal(),
+    saveEmployeePayments(),
+    saveEscala(),
+    saveCashflow()
+  ]);
+
+  updateMonthMenuState();
+  await updateNewItemsBanner();
+  renderAll();
+}
+
+function getPreviousMonthKey() {
+  let pm = currentMonth - 1, py = currentYear;
+  if (pm < 0) { pm = 11; py--; }
+  return { key: `${py}-${String(pm + 1).padStart(2, '0')}`, label: `${MONTHS[pm]} ${py}` };
+}
+
+function hasSomeBillData() {
+  return Object.keys(appData.empresa.blocks || {}).length > 0 ||
+         Object.keys(appData.pessoal.blocks || {}).length > 0;
+}
+
+function itemExistsInBlocks(blocks, blockName, item) {
+  const block = Object.values(blocks || {}).find(b => b.name === blockName);
+  if (!block) return false;
+  return (block.items || []).some(ci =>
+    ci.desc === item.desc &&
+    getItemTipo(ci) === getItemTipo(item) &&
+    Math.abs((parseFloat(ci.value) || 0) - (parseFloat(item.value) || 0)) < 0.01
+  );
+}
+
+function findNewItemsFromPrev(prevEmpresa, prevPessoal) {
+  const found = [];
+  function scan(group, prevData) {
+    const curData = appData[group];
+    Object.values(prevData.blocks || {}).forEach(prevBlock => {
+      (prevBlock.items || []).forEach(item => {
+        if (!item.desc) return;
+        if (!itemExistsInBlocks(curData.blocks, prevBlock.name, item)) {
+          found.push({ group, blockName: prevBlock.name, item });
+        }
+      });
+    });
+  }
+  scan('empresa', prevEmpresa);
+  scan('pessoal', prevPessoal);
+  return found;
+}
+
+async function detectNewItemsFromPreviousMonth() {
+  const { key, label } = getPreviousMonthKey();
+  const [eDoc, pDoc] = await Promise.all([
+    db.collection('months').doc(key).collection('empresa').doc('data').get(),
+    db.collection('months').doc(key).collection('pessoal').doc('data').get()
+  ]);
+  const prevEmpresa = eDoc.exists ? eDoc.data() : { blocks: {} };
+  const prevPessoal = pDoc.exists ? pDoc.data() : { blocks: {} };
+  return { prevLabel: label, items: findNewItemsFromPrev(prevEmpresa, prevPessoal) };
+}
+
+function applyNewItemsToMonth(newItems) {
+  newItems.forEach(({ group, blockName, item }, idx) => {
+    if (!appData[group].blocks) appData[group].blocks = {};
+    let blockId = Object.entries(appData[group].blocks).find(([, b]) => b.name === blockName)?.[0];
+    if (!blockId) {
+      blockId = 'b' + Date.now() + idx;
+      appData[group].blocks[blockId] = { name: blockName, items: [] };
+    }
+    if (!appData[group].blocks[blockId].items) appData[group].blocks[blockId].items = [];
+    appData[group].blocks[blockId].items.push({
+      desc: item.desc,
+      dueDate: advanceDateToCurrentMonth(item.dueDate),
+      value: item.value,
+      tipo: getItemTipo(item),
+      paid: false,
+      paidAmount: 0
+    });
+  });
+}
+
+const NEW_ITEMS_BANNER_HIDE_KEY = 'gestao_hide_new_items_banner';
+
+function isNewItemsBannerHidden() {
+  return localStorage.getItem(NEW_ITEMS_BANNER_HIDE_KEY) === '1';
+}
+
+function setNewItemsBannerHidden(hidden) {
+  if (hidden) localStorage.setItem(NEW_ITEMS_BANNER_HIDE_KEY, '1');
+  else localStorage.removeItem(NEW_ITEMS_BANNER_HIDE_KEY);
+}
+
+async function updateNewItemsBanner() {
+  if (!isAdmin) return;
+
+  if (isNewItemsBannerHidden() || !hasSomeBillData()) {
+    pendingNewItems = [];
+    updateMonthMenuState();
+    return;
+  }
+
+  const { items } = await detectNewItemsFromPreviousMonth();
+  pendingNewItems = items;
+  updateMonthMenuState();
+}
+
+async function copyNewItemsFromPreviousMonth() {
+  if (!canWrite() || pendingNewItems.length === 0) return;
+  const items = [...pendingNewItems];
+  applyNewItemsToMonth(items);
+  await Promise.all([
+    items.some(i => i.group === 'empresa') ? saveEmpresa() : Promise.resolve(),
+    items.some(i => i.group === 'pessoal') ? savePessoal() : Promise.resolve()
+  ]);
+  pendingNewItems = [];
+  await updateNewItemsBanner();
+  updateCopyBanner();
+  renderAll();
+}
+
+// =============================================
+// DATA LOAD
+// =============================================
+async function loadMonthData() {
+  const key = getMonthKey();
+  document.getElementById('dashboard-period-label').textContent = `${MONTHS[currentMonth]} ${currentYear}`;
+
+  const eDoc = await db.collection('months').doc(key).collection('empresa').doc('data').get();
+  appData.empresa = eDoc.exists ? eDoc.data() : { blocks: {} };
+  if (!appData.empresa.blocks) appData.empresa.blocks = {};
+
+  const pDoc = await db.collection('months').doc(key).collection('pessoal').doc('data').get();
+  appData.pessoal = pDoc.exists ? pDoc.data() : { blocks: {} };
+  if (!appData.pessoal.blocks) appData.pessoal.blocks = {};
+  normalizeAllBlockItems();
+  sortGroupBlocks('empresa');
+  sortGroupBlocks('pessoal');
+
+  const cfDoc = await db.collection('months').doc(key).collection('cashflow').doc('data').get();
+  appData.cashflow = cfDoc.exists ? cfDoc.data() : {};
+  const cfEmConta = document.getElementById('cf-em-conta');
+  const cfRecebido = document.getElementById('cf-recebido');
+  const cfPrevisao = document.getElementById('cf-previsao');
+  if (cfEmConta) cfEmConta.value = appData.cashflow.emConta ?? '';
+  if (cfRecebido) cfRecebido.value = appData.cashflow.recebido ?? '';
+  if (cfPrevisao) cfPrevisao.value = appData.cashflow.previsao ?? '';
+
+  const empDoc = await db.collection('global').doc('employees').get();
+  appData.employees = empDoc.exists ? empDoc.data() : { list: [] };
+  if (!appData.employees.list) appData.employees.list = [];
+
+  const epDoc = await db.collection('months').doc(key).collection('employees').doc('payments').get();
+  appData.employeePayments = epDoc.exists ? epDoc.data() : {};
+
+  const esDoc = await db.collection('months').doc(key).collection('escala').doc('data').get();
+  appData.escala = esDoc.exists ? esDoc.data() : { events: {} };
+  if (!appData.escala.events) appData.escala.events = {};
+
+  let pm = currentMonth - 1, py = currentYear;
+  if (pm < 0) { pm = 11; py--; }
+  const prevKey = `${py}-${String(pm + 1).padStart(2, '0')}`;
+  const prevEsDoc = await db.collection('months').doc(prevKey).collection('escala').doc('data').get();
+  appData.prevEscala = prevEsDoc.exists ? prevEsDoc.data() : { events: {} };
+  if (!appData.prevEscala.events) appData.prevEscala.events = {};
+
+  Object.keys(blockItemSelection).forEach(k => delete blockItemSelection[k]);
+  closeMonthMenu();
+  updateMonthMenuState();
+  await updateNewItemsBanner();
+  renderAll();
+}
+
+async function saveEmpresa() {
+  if (!canWrite()) return;
+  sortGroupBlocks('empresa');
+  await db.collection('months').doc(getMonthKey()).collection('empresa').doc('data').set(appData.empresa);
+}
+async function savePessoal() {
+  if (!canWrite()) return;
+  sortGroupBlocks('pessoal');
+  await db.collection('months').doc(getMonthKey()).collection('pessoal').doc('data').set(appData.pessoal);
+}
+async function saveEmployees() {
+  if (!canWrite()) return;
+  await db.collection('global').doc('employees').set(appData.employees);
+}
+async function saveEmployeePayments() {
+  if (!canWrite()) return;
+  await db.collection('months').doc(getMonthKey()).collection('employees').doc('payments').set(appData.employeePayments);
+}
+async function saveEscala() {
+  if (!canWrite()) return;
+  await db.collection('months').doc(getMonthKey()).collection('escala').doc('data').set(appData.escala);
+}
+async function saveCashflow() {
+  if (!canWrite()) return;
+  await db.collection('months').doc(getMonthKey()).collection('cashflow').doc('data').set(appData.cashflow);
+}
+
+// =============================================
+// COPY FROM PREVIOUS MONTH
+// =============================================
+async function copyFromPreviousMonth() {
+  if (!canWrite()) return;
+  let pm = currentMonth - 1, py = currentYear;
+  if (pm < 0) { pm = 11; py--; }
+  const prevKey = `${py}-${String(pm+1).padStart(2,'0')}`;
+
+  const [eDoc, pDoc, epDoc, esDoc, cfDoc] = await Promise.all([
+    db.collection('months').doc(prevKey).collection('empresa').doc('data').get(),
+    db.collection('months').doc(prevKey).collection('pessoal').doc('data').get(),
+    db.collection('months').doc(prevKey).collection('employees').doc('payments').get(),
+    db.collection('months').doc(prevKey).collection('escala').doc('data').get(),
+    db.collection('months').doc(prevKey).collection('cashflow').doc('data').get()
+  ]);
+
+  function copyBlocks(src) {
+    const newBlocks = {};
+    Object.entries(src.blocks || {}).forEach(([bid, block]) => {
+      newBlocks[bid] = {
+        ...block,
+        items: (block.items || []).map(item => ({
+          ...item,
+          tipo: getItemTipo(item),
+          paid: false,
+          paidAmount: 0,
+          dueDate: advanceDateToCurrentMonth(item.dueDate)
+        }))
+      };
+    });
+    return { blocks: newBlocks };
+  }
+
+  function copyEmployeePayments(src, current = {}) {
+    const result = JSON.parse(JSON.stringify(current));
+    Object.entries(src || {}).forEach(([eid, pd]) => {
+      if (isEmptyPayment(result[eid])) {
+        result[eid] = JSON.parse(JSON.stringify(pd));
+        result[eid].folhaPaga = false;
+      }
+    });
+    return result;
+  }
+
+  function seedEmployeePaymentsFromSalario() {
+    const result = {};
+    (appData.employees.list || []).forEach(emp => {
+      if (isEmptyPayment((appData.employeePayments || {})[emp.id]) && parseFloat(emp.salarioBase) > 0) {
+        result[emp.id] = {
+          receitas: [{ nome: 'Salário', valor: emp.salarioBase }],
+          descontos_list: [],
+          folhaPaga: false
+        };
+      }
+    });
+    return result;
+  }
+
+  function copyEscala(src) {
+    const newEvents = {};
+    Object.entries(src.events || {}).forEach(([dateStr, events]) => {
+      const newDate = advanceDateToCurrentMonth(dateStr);
+      if (!newEvents[newDate]) newEvents[newDate] = [];
+      newEvents[newDate].push(...events.map(ev => ({ ...ev })));
+    });
+    return { events: newEvents };
+  }
+
+  let empresaChanged = false;
+  let pessoalChanged = false;
+  let paymentsChanged = false;
+  let escalaChanged = false;
+  let cashflowChanged = false;
+
+  if (eDoc.exists && Object.keys(appData.empresa.blocks || {}).length === 0) {
+    appData.empresa = copyBlocks(eDoc.data());
+    empresaChanged = true;
+  }
+  if (pDoc.exists && Object.keys(appData.pessoal.blocks || {}).length === 0) {
+    appData.pessoal = copyBlocks(pDoc.data());
+    pessoalChanged = true;
+  }
+
+  if (needsEmployeePayments()) {
+    const before = JSON.stringify(appData.employeePayments || {});
+    if (epDoc.exists) {
+      appData.employeePayments = copyEmployeePayments(epDoc.data(), appData.employeePayments);
+    }
+    const seeded = seedEmployeePaymentsFromSalario();
+    if (Object.keys(seeded).length > 0) {
+      appData.employeePayments = copyEmployeePayments(seeded, appData.employeePayments);
+    }
+    if (JSON.stringify(appData.employeePayments || {}) !== before) {
+      paymentsChanged = true;
+    }
+  }
+
+  if (esDoc.exists && Object.keys(appData.escala.events || {}).length === 0) {
+    appData.escala = copyEscala(esDoc.data());
+    escalaChanged = true;
+  }
+
+  const cashflowEmpty = !appData.cashflow || (
+    !appData.cashflow.emConta && !appData.cashflow.previsao && !appData.cashflow.recebido
+  );
+  if (cfDoc.exists && cashflowEmpty) {
+    appData.cashflow = { ...cfDoc.data(), recebido: 0 };
+    const cfEmConta = document.getElementById('cf-em-conta');
+    const cfRecebido = document.getElementById('cf-recebido');
+    const cfPrevisao = document.getElementById('cf-previsao');
+    if (cfEmConta) cfEmConta.value = appData.cashflow.emConta ?? '';
+    if (cfRecebido) cfRecebido.value = '';
+    if (cfPrevisao) cfPrevisao.value = appData.cashflow.previsao ?? '';
+    cashflowChanged = true;
+  }
+
+  await Promise.all([
+    empresaChanged ? saveEmpresa() : Promise.resolve(),
+    pessoalChanged ? savePessoal() : Promise.resolve(),
+    paymentsChanged ? saveEmployeePayments() : Promise.resolve(),
+    escalaChanged ? saveEscala() : Promise.resolve(),
+    cashflowChanged ? saveCashflow() : Promise.resolve()
+  ]);
+
+  updateMonthMenuState();
+  await updateNewItemsBanner();
+  renderAll();
+}
+
+// =============================================
+// RENDER ALL
+// =============================================
+function renderAll() {
+  if (isEmployeeView()) {
+    renderEmployeePortal();
+    renderCalendar('escala');
+    renderCalendar('ferias');
+    return;
+  }
+  sortGroupBlocks('empresa');
+  sortGroupBlocks('pessoal');
+  renderBlocks('empresa');
+  renderBlocks('pessoal');
+  renderEmployees();
+  renderDashboard();
+  renderCalendar('escala');
+  renderCalendar('ferias');
+  updateCashflow();
+}
+
+function renderEmployeePortal() {
+  const emp = (appData.employees.list || []).find(e => e.id === employeeOwnId);
+  const periodEl = document.getElementById('employee-portal-period');
+  const titleEl = document.getElementById('employee-portal-title');
+  const salaryEl = document.getElementById('employee-portal-salary');
+
+  if (periodEl) periodEl.textContent = `${MONTHS[currentMonth]} ${currentYear}`;
+  if (!emp) {
+    if (titleEl) titleEl.textContent = 'Minha Área';
+    if (salaryEl) salaryEl.innerHTML = '<div class="card"><p class="text-gray text-sm">Cadastro não encontrado. Contate o administrador.</p></div>';
+    return;
+  }
+
+  if (titleEl) titleEl.textContent = `Minha Área — ${emp.name}`;
+  const pd = (appData.employeePayments || {})[emp.id] || {};
+  if (salaryEl) {
+    salaryEl.innerHTML = '';
+    const div = document.createElement('div');
+    div.className = 'employee-card';
+    div.innerHTML = buildEmployeeCard(emp, pd, true);
+    salaryEl.appendChild(div);
+  }
+}
+
+// =============================================
+// BLOCKS
+// =============================================
+const activeBlockTab = { empresa: null, pessoal: null };
+
+function getItemTipo(item) { return item?.tipo === 'receita' ? 'receita' : 'despesa'; }
+function isReceitaItem(item) { return getItemTipo(item) === 'receita'; }
+
+function getItemValue(item) { return parseFloat(item?.value) || 0; }
+
+function normalizeBlockItem(item) {
+  if (!item) return item;
+  const value = getItemValue(item);
+  if (item.paidAmount === undefined || item.paidAmount === null) {
+    item.paidAmount = item.paid ? value : 0;
+  } else {
+    item.paidAmount = Math.min(Math.max(0, parseFloat(item.paidAmount) || 0), value);
+  }
+  item.paid = value > 0 ? item.paidAmount >= value - 0.009 : !!item.paid;
+  return item;
+}
+
+function normalizeAllBlockItems() {
+  ['empresa', 'pessoal'].forEach(group => {
+    Object.values(appData[group]?.blocks || {}).forEach(block => {
+      (block.items || []).forEach(normalizeBlockItem);
+    });
+  });
+}
+
+function getItemPaidAmount(item) { normalizeBlockItem(item); return item.paidAmount || 0; }
+function getItemRemaining(item) { return Math.max(0, getItemValue(item) - getItemPaidAmount(item)); }
+function isItemFullyPaid(item) { return getItemRemaining(item) < 0.01; }
+function isItemPartiallyPaid(item) {
+  const paid = getItemPaidAmount(item);
+  return paid > 0.009 && getItemRemaining(item) >= 0.01;
+}
+
+function saveItemPayment(group, bid, idx) {
+  normalizeBlockItem(appData[group].blocks[bid].items[idx]);
+  return (group === 'empresa' ? saveEmpresa() : savePessoal()).then(() => {
+    renderBlocks(group);
+    renderDashboard();
+    updateCashflow();
+  });
+}
+
+function normalizeDateForSort(dateStr) {
+  if (!dateStr) return '';
+  const s = String(dateStr).trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+  const br = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (br) return `${br[3]}-${br[2].padStart(2, '0')}-${br[1].padStart(2, '0')}`;
+  const iso = s.match(/^(\d{4})\/(\d{2})\/(\d{2})$/);
+  if (iso) return `${iso[1]}-${iso[2]}-${iso[3]}`;
+  return s;
+}
+
+function sortItemsByDate(items) {
+  if (!items || items.length < 2) return items;
+  items.sort((a, b) => {
+    const da = normalizeDateForSort(a.dueDate);
+    const db = normalizeDateForSort(b.dueDate);
+    if (!da && !db) return (a.desc || '').localeCompare(b.desc || '', 'pt-BR');
+    if (!da) return 1;
+    if (!db) return -1;
+    const cmp = da.localeCompare(db);
+    return cmp !== 0 ? cmp : (a.desc || '').localeCompare(b.desc || '', 'pt-BR');
+  });
+  return items;
+}
+
+function sortGroupBlocks(group) {
+  Object.values(appData[group]?.blocks || {}).forEach(block => {
+    if (block.items?.length) sortItemsByDate(block.items);
+  });
+}
+
+function calcBlockTotals(items) {
+  const t = { despesas: 0, receitas: 0, despesasAberto: 0, receitasAberto: 0, despesasPago: 0, receitasRecebido: 0 };
+  (items || []).forEach(i => {
+    normalizeBlockItem(i);
+    const v = getItemValue(i);
+    const paidAmt = getItemPaidAmount(i);
+    const rem = Math.max(0, v - paidAmt);
+    if (isReceitaItem(i)) {
+      t.receitas += v;
+      t.receitasRecebido += paidAmt;
+      t.receitasAberto += rem;
+    } else {
+      t.despesas += v;
+      t.despesasPago += paidAmt;
+      t.despesasAberto += rem;
+    }
+  });
+  t.net = t.despesas - t.receitas;
+  t.netAberto = t.despesasAberto - t.receitasAberto;
+  return t;
+}
+
+function calcGroupTotals(blocks) {
+  const t = { despesas: 0, receitas: 0, despesasAberto: 0, receitasAberto: 0, despesasPago: 0, receitasRecebido: 0 };
+  Object.values(blocks || {}).forEach(b => {
+    const bt = calcBlockTotals(b.items);
+    Object.keys(t).forEach(k => { if (k !== 'net' && k !== 'netAberto' && bt[k] !== undefined) t[k] += bt[k]; });
+  });
+  t.net = t.despesas - t.receitas;
+  t.netAberto = t.despesasAberto - t.receitasAberto;
+  return t;
+}
+
+function itemStatusInfo(item) {
+  const receita = isReceitaItem(item);
+  const paidAmt = getItemPaidAmount(item);
+  const rem = getItemRemaining(item);
+  if (isItemFullyPaid(item)) {
+    return { cls: 'badge-paid', text: receita ? 'Recebido' : 'Pago' };
+  }
+  if (isItemPartiallyPaid(item)) {
+    return {
+      cls: 'badge-partial',
+      text: receita ? `Parcial · falta ${fmtBRL(rem)}` : `Parcial · falta ${fmtBRL(rem)}`,
+      paidLabel: fmtBRL(paidAmt)
+    };
+  }
+  if (isOverdue(item.dueDate)) {
+    return { cls: 'badge-overdue', text: receita ? 'Atrasado' : 'Vencido' };
+  }
+  return { cls: 'badge-pending', text: receita ? 'A receber' : 'Em aberto' };
+}
+
+function renderItemPaymentButtons(group, bid, idx, item) {
+  if (!canWrite()) return '';
+  const receita = isReceitaItem(item);
+  if (isItemFullyPaid(item)) {
+    return `<button class="btn btn-sm btn-ghost" onclick="resetItemPayment('${group}','${bid}',${idx})">Reabrir</button>`;
+  }
+  return `
+    <button class="btn btn-sm btn-success" onclick="payItemFull('${group}','${bid}',${idx})">${receita ? 'Receber' : 'Pagar'}</button>
+    <button class="btn btn-sm btn-ghost" onclick="openPartialPayment('${group}','${bid}',${idx})">Parcial</button>`;
+}
+
+function renderItemValueHtml(item) {
+  const paid = getItemPaidAmount(item);
+  const rem = getItemRemaining(item);
+  const receita = isReceitaItem(item);
+  let html = `<div class="font-bold ${receita ? 'value-receita' : 'value-despesa'}">${fmtBRL(item.value)}</div>`;
+  if (isItemPartiallyPaid(item)) {
+    html += `<div class="item-progress">Pago <strong>${fmtBRL(paid)}</strong> · Falta <strong>${fmtBRL(rem)}</strong></div>`;
+  }
+  return html;
+}
+
+function itemSelectionKey(group, bid) { return `${group}:${bid}`; }
+
+function getItemSelectionSet(group, bid) {
+  const key = itemSelectionKey(group, bid);
+  if (!blockItemSelection[key]) blockItemSelection[key] = new Set();
+  return blockItemSelection[key];
+}
+
+function isItemSelected(group, bid, idx) {
+  return getItemSelectionSet(group, bid).has(idx);
+}
+
+function getSelectedItemCount(group, bid) {
+  return getItemSelectionSet(group, bid).size;
+}
+
+function toggleItemSelect(group, bid, idx, checked) {
+  const sel = getItemSelectionSet(group, bid);
+  if (checked) sel.add(idx); else sel.delete(idx);
+  refreshBulkToolbar(group, bid);
+}
+
+function toggleSelectAllItems(group, bid, checked, total) {
+  const sel = getItemSelectionSet(group, bid);
+  sel.clear();
+  if (checked) {
+    for (let i = 0; i < total; i++) sel.add(i);
+  }
+  renderBlocks(group);
+}
+
+function clearItemSelection(group, bid) {
+  delete blockItemSelection[itemSelectionKey(group, bid)];
+  renderBlocks(group);
+}
+
+function adjustSelectionAfterDelete(group, bid, removedIdx) {
+  const key = itemSelectionKey(group, bid);
+  const sel = blockItemSelection[key];
+  if (!sel) return;
+  const next = new Set();
+  sel.forEach(i => {
+    if (i < removedIdx) next.add(i);
+    else if (i > removedIdx) next.add(i - 1);
+  });
+  if (next.size) blockItemSelection[key] = next;
+  else delete blockItemSelection[key];
+}
+
+function getSelectedIndices(group, bid) {
+  return [...getItemSelectionSet(group, bid)].sort((a, b) => a - b);
+}
+
+function refreshBulkToolbar(group, bid) {
+  const el = document.getElementById(`bulk-toolbar-${group}-${bid}`);
+  if (!el) return;
+  const count = getSelectedItemCount(group, bid);
+  el.classList.toggle('hidden', count === 0);
+  const countEl = el.querySelector('.bulk-toolbar-count');
+  if (countEl) {
+    countEl.textContent = count === 1 ? '1 boleto selecionado' : `${count} boletos selecionados`;
+  }
+  document.querySelectorAll(`.item-card[data-sel="${group}-${bid}"]`).forEach(card => {
+    const idx = parseInt(card.dataset.idx, 10);
+    card.classList.toggle('selected', isItemSelected(group, bid, idx));
+  });
+}
+
+function renderBulkToolbar(group, bid, itemCount) {
+  if (!canWrite() || itemCount === 0) return '';
+  const count = getSelectedItemCount(group, bid);
+  return `<div class="bulk-toolbar ${count ? '' : 'hidden'}" id="bulk-toolbar-${group}-${bid}">
+    <span class="bulk-toolbar-count">${count === 1 ? '1 boleto selecionado' : `${count} boletos selecionados`}</span>
+    <button class="btn btn-sm btn-primary" onclick="openBulkEditItems('${group}','${bid}')">Editar selecionados</button>
+    <button class="btn btn-sm btn-danger" onclick="deleteSelectedItems('${group}','${bid}')">Excluir selecionados</button>
+    <button class="btn btn-sm btn-ghost" onclick="clearItemSelection('${group}','${bid}')">Limpar</button>
+  </div>`;
+}
+
+function deleteSelectedItems(group, bid) {
+  if (!canWrite()) return;
+  const indices = getSelectedIndices(group, bid);
+  if (!indices.length) return;
+  const noun = indices.length === 1 ? '1 boleto' : `${indices.length} boletos`;
+  if (!confirm(`Excluir ${noun} selecionado(s)?`)) return;
+  const items = appData[group].blocks[bid].items;
+  indices.sort((a, b) => b - a).forEach(i => items.splice(i, 1));
+  clearItemSelection(group, bid);
+  (group === 'empresa' ? saveEmpresa() : savePessoal()).then(() => {
+    renderBlocks(group);
+    renderDashboard();
+    updateCashflow();
+  });
+}
+
+function openBulkEditItems(group, bid) {
+  if (!canWrite()) return;
+  const indices = getSelectedIndices(group, bid);
+  if (!indices.length) return;
+  const noun = indices.length === 1 ? '1 boleto' : `${indices.length} boletos`;
+  openModal(`
+    <div class="modal-title">Editar ${noun}</div>
+    <p style="font-size:12px;color:var(--gray-500);margin-bottom:16px;">Marque os campos que deseja alterar em todos os selecionados.</p>
+    <label class="copy-banner-opt" style="margin-bottom:10px;">
+      <input type="checkbox" id="bulk-apply-tipo" onchange="document.getElementById('bulk-field-tipo').style.display=this.checked?'block':'none'">
+      Alterar tipo
+    </label>
+    <div id="bulk-field-tipo" style="display:none;margin:0 0 12px 24px;">
+      <select class="form-control" id="bulk-tipo">
+        <option value="despesa">Despesa</option>
+        <option value="receita">Receita</option>
+      </select>
+    </div>
+    <label class="copy-banner-opt" style="margin-bottom:10px;">
+      <input type="checkbox" id="bulk-apply-date" onchange="document.getElementById('bulk-field-date').style.display=this.checked?'block':'none'">
+      Alterar data
+    </label>
+    <div id="bulk-field-date" style="display:none;margin:0 0 12px 24px;">
+      <input type="date" class="form-control" id="bulk-date">
+    </div>
+    <label class="copy-banner-opt" style="margin-bottom:10px;">
+      <input type="checkbox" id="bulk-apply-value" onchange="document.getElementById('bulk-field-value').style.display=this.checked?'block':'none'">
+      Alterar valor
+    </label>
+    <div id="bulk-field-value" style="display:none;margin:0 0 12px 24px;">
+      <input type="number" step="0.01" class="form-control" id="bulk-value" placeholder="0,00">
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal()">Cancelar</button>
+      <button class="btn btn-primary" onclick="confirmBulkEditItems('${group}','${bid}')">Aplicar</button>
+    </div>`);
+}
+
+function confirmBulkEditItems(group, bid) {
+  if (!canWrite()) return;
+  const indices = getSelectedIndices(group, bid);
+  if (!indices.length) return;
+  const applyTipo = document.getElementById('bulk-apply-tipo')?.checked;
+  const applyDate = document.getElementById('bulk-apply-date')?.checked;
+  const applyValue = document.getElementById('bulk-apply-value')?.checked;
+  if (!applyTipo && !applyDate && !applyValue) return alert('Marque pelo menos um campo para alterar.');
+  const tipo = document.getElementById('bulk-tipo')?.value;
+  const dueDate = document.getElementById('bulk-date')?.value;
+  const value = parseFloat(document.getElementById('bulk-value')?.value);
+  if (applyDate && !dueDate) return alert('Informe a data.');
+  if (applyValue && (isNaN(value) || value < 0)) return alert('Informe um valor válido.');
+  indices.forEach(idx => {
+    const item = appData[group].blocks[bid].items[idx];
+    if (applyTipo) item.tipo = tipo === 'receita' ? 'receita' : 'despesa';
+    if (applyDate) item.dueDate = dueDate;
+    if (applyValue) item.value = value;
+    normalizeBlockItem(item);
+  });
+  closeModal();
+  clearItemSelection(group, bid);
+  (group === 'empresa' ? saveEmpresa() : savePessoal()).then(() => {
+    renderBlocks(group);
+    renderDashboard();
+    updateCashflow();
+  });
+}
+
+function renderBlocks(group) {
+  sortGroupBlocks(group);
+  const subtabs = document.getElementById(`${group}-subtabs`);
+  const container = document.getElementById(`${group}-blocks`);
+  const data = appData[group].blocks;
+  const entries = Object.entries(data);
+
+  if (entries.length === 0) {
+    if (subtabs) subtabs.innerHTML = '';
+    container.innerHTML = `<div class="text-gray text-sm" style="padding:20px;text-align:center;">Nenhum bloco cadastrado. Clique em "+ Novo Bloco" para adicionar.</div>`;
+    return;
+  }
+
+  // Keep active tab valid
+  if (!activeBlockTab[group] || !data[activeBlockTab[group]]) {
+    activeBlockTab[group] = entries[0][0];
+  }
+
+  // Render sub-tab buttons
+  if (subtabs) {
+    subtabs.innerHTML = entries.map(([bid, block]) => {
+      const isActive = bid === activeBlockTab[group];
+      const bt = calcBlockTotals(block.items);
+      const pending = bt.netAberto;
+      return `<button onclick="switchBlockTab('${group}','${bid}')" style="
+        padding:9px 16px;border:none;background:none;cursor:pointer;font-size:13px;font-weight:500;
+        color:${isActive ? 'var(--primary)' : 'var(--gray-500)'};
+        border-bottom:${isActive ? '2px solid var(--primary)' : '2px solid transparent'};
+        margin-bottom:-2px;transition:all 0.15s;white-space:nowrap;display:flex;flex-direction:column;align-items:flex-start;gap:2px;
+      "><span>${escHtml(block.name)}</span><span style="font-size:10px;font-weight:400;color:${pending>0?'var(--warning)':(pending<0?'var(--success)':'var(--gray-400)')};">${fmtBRL(bt.net)}</span></button>`;
+    }).join('');
+  }
+
+  // Render active block only
+  const [bid, block] = entries.find(([b]) => b === activeBlockTab[group]);
+  const bt = calcBlockTotals(block.items);
+
+  container.innerHTML = '';
+  const div = document.createElement('div');
+  div.className = 'account-block';
+  div.innerHTML = `
+    <div class="account-block-header">
+      <div>
+        <div class="block-name">${escHtml(block.name)}</div>
+        <div style="font-size:11px;color:var(--gray-400);">
+          Desp. pago ${fmtBRL(bt.despesasPago)} · em aberto ${fmtBRL(bt.despesasAberto)}
+          ${bt.receitas > 0 ? ` · Rec. recebido ${fmtBRL(bt.receitasRecebido)} · a receber ${fmtBRL(bt.receitasAberto)}` : ''}
+        </div>
+      </div>
+      <div class="block-actions">
+        <div class="block-total" title="Despesas menos receitas">${fmtBRL(bt.net)}</div>
+        <button class="btn btn-sm btn-ghost" onclick="addItemToBlock('${group}','${bid}','despesa')">+ Despesa</button>
+        <button class="btn btn-sm btn-ghost" onclick="addItemToBlock('${group}','${bid}','receita')">+ Receita</button>
+        <button class="btn btn-sm btn-ghost" onclick="editBlockName('${group}','${bid}')">✏️</button>
+        <button class="btn btn-sm btn-danger" onclick="deleteBlock('${group}','${bid}')">🗑️</button>
+      </div>
+    </div>
+    <div class="account-block-body">
+      ${renderBulkToolbar(group, bid, (block.items || []).length)}
+      ${renderBlockItems(group, bid, block.items || [])}
+    </div>`;
+  container.appendChild(div);
+}
+
+function switchBlockTab(group, bid) {
+  activeBlockTab[group] = bid;
+  renderBlocks(group);
+}
+
+function renderBlockItems(group, bid, items) {
+  if (items.length === 0) return '<div class="text-gray text-sm">Nenhum item neste bloco. Use + Despesa ou + Receita.</div>';
+  sortItemsByDate(items);
+  const showSelect = canWrite();
+  const allSelected = showSelect && items.length > 0 && getSelectedItemCount(group, bid) === items.length;
+
+  const tableRows = items.map((item, idx) => {
+    const receita = isReceitaItem(item);
+    const st = itemStatusInfo(item);
+    const checked = isItemSelected(group, bid, idx);
+    const selectCell = showSelect
+      ? `<td class="item-select-cell"><input type="checkbox" ${checked ? 'checked' : ''} onchange="toggleItemSelect('${group}','${bid}',${idx}, this.checked)"></td>`
+      : '';
+    return `<tr>
+      ${selectCell}
+      <td><span class="badge ${receita ? 'badge-receita' : 'badge-despesa'}">${receita ? 'Receita' : 'Despesa'}</span></td>
+      <td>${escHtml(item.desc)}</td>
+      <td>${fmtDate(item.dueDate)}</td>
+      <td>${renderItemValueHtml(item)}</td>
+      <td><span class="badge ${st.cls}">${st.text}</span></td>
+      <td style="display:flex;gap:4px;flex-wrap:wrap;">
+        ${renderItemPaymentButtons(group, bid, idx, item)}
+        <button class="btn btn-sm btn-ghost" onclick="editItem('${group}','${bid}',${idx})">✏️</button>
+        <button class="btn btn-sm btn-danger" onclick="deleteItem('${group}','${bid}',${idx})">🗑️</button>
+      </td>
+    </tr>`;
+  }).join('');
+
+  const cards = items.map((item, idx) => {
+    const receita = isReceitaItem(item);
+    const st = itemStatusInfo(item);
+    const checked = isItemSelected(group, bid, idx);
+    const selectBox = showSelect
+      ? `<label class="item-card-select"><input type="checkbox" ${checked ? 'checked' : ''} onchange="toggleItemSelect('${group}','${bid}',${idx}, this.checked)"></label>`
+      : '';
+    return `<div class="item-card ${checked ? 'selected' : ''}" data-sel="${group}-${bid}" data-idx="${idx}">
+      <div class="item-card-head">
+        <div style="display:flex;align-items:flex-start;gap:0;flex:1;min-width:0;">
+          ${selectBox}
+          <div style="min-width:0;">
+            <div class="item-card-title">${escHtml(item.desc)}</div>
+            <div class="item-card-meta">${fmtDate(item.dueDate)} · <span class="badge ${receita ? 'badge-receita' : 'badge-despesa'}">${receita ? 'Receita' : 'Despesa'}</span></div>
+          </div>
+        </div>
+        <span class="badge ${st.cls}">${st.text}</span>
+      </div>
+      ${renderItemValueHtml(item)}
+      <div class="item-card-actions">
+        ${renderItemPaymentButtons(group, bid, idx, item)}
+        <button class="btn btn-sm btn-ghost" onclick="editItem('${group}','${bid}',${idx})">✏️</button>
+        <button class="btn btn-sm btn-danger" onclick="deleteItem('${group}','${bid}',${idx})">🗑️</button>
+      </div>
+    </div>`;
+  }).join('');
+
+  const selectHeader = showSelect
+    ? `<th class="item-select-cell"><input type="checkbox" ${allSelected ? 'checked' : ''} onchange="toggleSelectAllItems('${group}','${bid}', this.checked, ${items.length})" title="Selecionar todos"></th>`
+    : '';
+
+  return `<div class="table-wrap">
+    <table class="data-table"><thead><tr>${selectHeader}<th>Tipo</th><th>Descrição</th><th>Data</th><th>Valor</th><th>Status</th><th>Ações</th></tr></thead><tbody>${tableRows}</tbody></table>
+  </div>
+  <div class="item-cards">${cards}</div>`;
+}
+
+function itemTipoSelectHtml(selected) {
+  return `<div class="form-group"><div class="form-label">Tipo</div>
+    <select class="form-control" id="m-item-tipo" onchange="updateItemDateLabel()">
+      <option value="despesa" ${selected === 'despesa' ? 'selected' : ''}>Despesa (conta a pagar)</option>
+      <option value="receita" ${selected === 'receita' ? 'selected' : ''}>Receita (valor a receber)</option>
+    </select></div>`;
+}
+
+function updateItemDateLabel() {
+  const tipo = document.getElementById('m-item-tipo')?.value || 'despesa';
+  const lbl = document.getElementById('m-item-date-label');
+  if (lbl) lbl.textContent = tipo === 'receita' ? 'Data prevista' : 'Vencimento';
+}
+
+function addBlock(group) {
+  openModal(`
+    <div class="modal-title">Novo Bloco — ${group === 'empresa' ? 'Empresa' : 'Pessoal'}</div>
+    <div class="form-group"><div class="form-label">Nome do Bloco</div>
+    <input type="text" class="form-control" id="m-block-name" placeholder="Ex: Aluguel, Energia, Crédito..."></div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal()">Cancelar</button>
+      <button class="btn btn-primary" onclick="confirmAddBlock('${group}')">Criar Bloco</button>
+    </div>`);
+  setTimeout(()=>document.getElementById('m-block-name').focus(),50);
+}
+
+function confirmAddBlock(group) {
+  const name = document.getElementById('m-block-name').value.trim();
+  if (!name) return alert('Digite um nome para o bloco.');
+  const bid = 'b' + Date.now();
+  appData[group].blocks[bid] = { name, items: [] };
+  activeBlockTab[group] = bid;
+  (group === 'empresa' ? saveEmpresa() : savePessoal()).then(() => { renderBlocks(group); renderDashboard(); updateCashflow(); closeModal(); });
+}
+
+function editBlockName(group, bid) {
+  const block = appData[group].blocks[bid];
+  openModal(`
+    <div class="modal-title">Renomear Bloco</div>
+    <div class="form-group"><div class="form-label">Nome</div>
+    <input type="text" class="form-control" id="m-block-name" value="${escHtml(block.name)}"></div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal()">Cancelar</button>
+      <button class="btn btn-primary" onclick="confirmEditBlockName('${group}','${bid}')">Salvar</button>
+    </div>`);
+}
+
+function confirmEditBlockName(group, bid) {
+  const name = document.getElementById('m-block-name').value.trim();
+  if (!name) return;
+  appData[group].blocks[bid].name = name;
+  (group === 'empresa' ? saveEmpresa() : savePessoal()).then(() => { renderBlocks(group); closeModal(); });
+}
+
+function deleteBlock(group, bid) {
+  if (!confirm('Excluir este bloco e todos os itens?')) return;
+  delete appData[group].blocks[bid];
+  (group === 'empresa' ? saveEmpresa() : savePessoal()).then(() => { renderBlocks(group); renderDashboard(); updateCashflow(); });
+}
+
+function addItemToBlock(group, bid, tipo = 'despesa') {
+  openModal(`
+    <div class="modal-title">Novo ${tipo === 'receita' ? 'Receita' : 'Despesa'}</div>
+    ${itemTipoSelectHtml(tipo)}
+    <div class="form-row"><div class="form-group">
+      <div class="form-label">Descrição</div>
+      <input type="text" class="form-control" id="m-item-desc" placeholder="${tipo === 'receita' ? 'Ex: Aluguel recebido, cliente X...' : 'Nome da conta'}">
+    </div><div class="form-group">
+      <div class="form-label" id="m-item-date-label">${tipo === 'receita' ? 'Data prevista' : 'Vencimento'}</div>
+      <input type="date" class="form-control" id="m-item-date">
+    </div></div>
+    <div class="form-row"><div class="form-group">
+      <div class="form-label">Valor (R$)</div>
+      <input type="number" step="0.01" class="form-control" id="m-item-value" placeholder="0,00">
+    </div></div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal()">Cancelar</button>
+      <button class="btn btn-primary" onclick="confirmAddItem('${group}','${bid}')">Adicionar</button>
+    </div>`);
+}
+
+function confirmAddItem(group, bid) {
+  const desc = document.getElementById('m-item-desc').value.trim();
+  const dueDate = document.getElementById('m-item-date').value;
+  const value = parseFloat(document.getElementById('m-item-value').value) || 0;
+  const tipo = document.getElementById('m-item-tipo')?.value === 'receita' ? 'receita' : 'despesa';
+  if (!desc) return alert('Informe a descrição.');
+  if (!appData[group].blocks[bid].items) appData[group].blocks[bid].items = [];
+  appData[group].blocks[bid].items.push({ desc, dueDate, value, tipo, paid: false, paidAmount: 0 });
+  (group === 'empresa' ? saveEmpresa() : savePessoal()).then(() => { renderBlocks(group); renderDashboard(); updateCashflow(); closeModal(); });
+}
+
+function editItem(group, bid, idx) {
+  const item = appData[group].blocks[bid].items[idx];
+  const tipo = getItemTipo(item);
+  openModal(`
+    <div class="modal-title">Editar Item</div>
+    ${itemTipoSelectHtml(tipo)}
+    <div class="form-row"><div class="form-group">
+      <div class="form-label">Descrição</div>
+      <input type="text" class="form-control" id="m-item-desc" value="${escHtml(item.desc)}">
+    </div><div class="form-group">
+      <div class="form-label" id="m-item-date-label">${tipo === 'receita' ? 'Data prevista' : 'Vencimento'}</div>
+      <input type="date" class="form-control" id="m-item-date" value="${item.dueDate||''}">
+    </div></div>
+    <div class="form-row"><div class="form-group">
+      <div class="form-label">Valor (R$)</div>
+      <input type="number" step="0.01" class="form-control" id="m-item-value" value="${item.value||0}">
+    </div></div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal()">Cancelar</button>
+      <button class="btn btn-primary" onclick="confirmEditItem('${group}','${bid}',${idx})">Salvar</button>
+    </div>`);
+}
+
+function confirmEditItem(group, bid, idx) {
+  const desc = document.getElementById('m-item-desc').value.trim();
+  const dueDate = document.getElementById('m-item-date').value;
+  const value = parseFloat(document.getElementById('m-item-value').value) || 0;
+  const tipo = document.getElementById('m-item-tipo')?.value === 'receita' ? 'receita' : 'despesa';
+  if (!desc) return;
+  const prev = appData[group].blocks[bid].items[idx];
+  const updated = { ...prev, desc, dueDate, value, tipo };
+  normalizeBlockItem(updated);
+  appData[group].blocks[bid].items[idx] = updated;
+  (group === 'empresa' ? saveEmpresa() : savePessoal()).then(() => { renderBlocks(group); renderDashboard(); updateCashflow(); closeModal(); });
+}
+
+function deleteItem(group, bid, idx) {
+  if (!confirm('Remover este item?')) return;
+  appData[group].blocks[bid].items.splice(idx, 1);
+  adjustSelectionAfterDelete(group, bid, idx);
+  (group === 'empresa' ? saveEmpresa() : savePessoal()).then(() => { renderBlocks(group); renderDashboard(); updateCashflow(); });
+}
+
+let partialPaymentCtx = null;
+
+function payItemFull(group, bid, idx) {
+  if (!canWrite()) return;
+  const item = appData[group].blocks[bid].items[idx];
+  item.paidAmount = getItemValue(item);
+  item.paid = true;
+  saveItemPayment(group, bid, idx);
+}
+
+function openPartialPayment(group, bid, idx) {
+  if (!canWrite()) return;
+  partialPaymentCtx = { group, bid, idx };
+  const item = appData[group].blocks[bid].items[idx];
+  normalizeBlockItem(item);
+  const receita = isReceitaItem(item);
+  const rem = getItemRemaining(item);
+  const paid = getItemPaidAmount(item);
+  openModal(`
+    <div class="modal-title">${receita ? 'Recebimento parcial' : 'Pagamento parcial'}</div>
+    <div class="text-sm text-gray" style="margin-bottom:16px;line-height:1.5;">
+      <strong>${escHtml(item.desc)}</strong><br>
+      Valor total: ${fmtBRL(item.value)} · Já ${receita ? 'recebido' : 'pago'}: ${fmtBRL(paid)} · Falta: <strong>${fmtBRL(rem)}</strong>
+    </div>
+    <div class="form-group">
+      <div class="form-label">Valor deste ${receita ? 'recebimento' : 'pagamento'} (R$)</div>
+      <input type="number" step="0.01" min="0.01" max="${rem}" class="form-control" id="m-partial-value" placeholder="0,00">
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal()">Cancelar</button>
+      <button class="btn btn-primary" onclick="confirmPartialPayment()">Registrar</button>
+    </div>`);
+  setTimeout(() => {
+    const inp = document.getElementById('m-partial-value');
+    if (inp) { inp.value = rem.toFixed(2); inp.focus(); inp.select(); }
+  }, 50);
+}
+
+function confirmPartialPayment() {
+  if (!partialPaymentCtx || !canWrite()) return;
+  const { group, bid, idx } = partialPaymentCtx;
+  const item = appData[group].blocks[bid].items[idx];
+  const add = parseFloat(document.getElementById('m-partial-value')?.value) || 0;
+  const rem = getItemRemaining(item);
+  if (add <= 0) return alert('Informe um valor maior que zero.');
+  if (add > rem + 0.009) return alert(`O valor não pode ser maior que ${fmtBRL(rem)}.`);
+  item.paidAmount = getItemPaidAmount(item) + add;
+  normalizeBlockItem(item);
+  partialPaymentCtx = null;
+  closeModal();
+  saveItemPayment(group, bid, idx);
+}
+
+function resetItemPayment(group, bid, idx) {
+  if (!canWrite()) return;
+  const item = appData[group].blocks[bid].items[idx];
+  item.paidAmount = 0;
+  item.paid = false;
+  saveItemPayment(group, bid, idx);
+}
+
+// =============================================
+// DASHBOARD
+// =============================================
+function renderDashboard() {
+  const eT = calcGroupTotals(appData.empresa.blocks);
+  const pT = calcGroupTotals(appData.pessoal.blocks);
+  let funcTotal = 0, folhaPago = 0, folhaAberto = 0;
+
+  (appData.employees.list||[]).forEach(emp=>{
+    const pd = (appData.employeePayments||{})[emp.id]||{};
+    const salario = calcLiquido(pd, emp.id);
+    funcTotal += salario;
+    if (pd.folhaPaga) folhaPago += salario; else folhaAberto += salario;
+  });
+
+  const eTotal = eT.net;
+  const pTotal = pT.net;
+  const paid = eT.despesasPago + eT.receitasRecebido + pT.despesasPago + pT.receitasRecebido + folhaPago;
+  const pending = eT.netAberto + pT.netAberto + folhaAberto;
+
+  set('dash-empresa-total', fmtBRL(eTotal));
+  set('dash-pessoal-total', fmtBRL(pTotal));
+  set('dash-func-total', fmtBRL(funcTotal));
+  set('dash-total-geral', fmtBRL(eTotal + pTotal + funcTotal));
+  set('dash-paid', fmtBRL(paid));
+  set('dash-pending', fmtBRL(pending));
+
+  renderAlerts();
+}
+
+function renderAlerts() {
+  const container = document.getElementById('alerts-container');
+  const today = new Date(); today.setHours(0,0,0,0);
+  const alerts = [];
+
+  function collectItems(group, label) {
+    Object.entries(appData[group].blocks||{}).forEach(([bid,block])=>{
+      (block.items||[]).forEach((item,idx)=>{
+        normalizeBlockItem(item);
+        if (isItemFullyPaid(item)) return;
+        const due = item.dueDate ? new Date(item.dueDate+'T00:00:00') : null;
+        if (!due) return;
+        const diff = Math.ceil((due-today)/(1000*60*60*24));
+        if (diff <= 7) alerts.push({...item, diff, group, bid, idx, label, blockName: block.name, remaining: getItemRemaining(item)});
+      });
+    });
+  }
+  collectItems('empresa','Empresa');
+  collectItems('pessoal','Pessoal');
+  alerts.sort((a, b) => {
+    const da = a.dueDate || '';
+    const db = b.dueDate || '';
+    if (da && db && da !== db) return da.localeCompare(db);
+    return a.diff - b.diff;
+  });
+
+  if (alerts.length === 0) {
+    container.innerHTML = '<div class="text-gray text-sm">✅ Nenhuma conta ou recebimento previsto nos próximos 7 dias.</div>';
+    return;
+  }
+
+  function renderAlertRow(a) {
+    const icon = a.group === 'empresa' ? '🏢' : '👤';
+    const receita = isReceitaItem(a);
+    const cls = a.diff < 0 ? 'danger' : (a.diff <= 3 ? 'warning' : 'ok');
+    const diffText = receita
+      ? (a.diff < 0 ? `Atrasado há ${Math.abs(a.diff)} dias` : (a.diff === 0 ? 'Previsto hoje' : `Previsto em ${a.diff} dias`))
+      : (a.diff < 0 ? `Venceu há ${Math.abs(a.diff)} dias` : (a.diff === 0 ? 'Vence hoje' : `Vence em ${a.diff} dias`));
+    const tipoBadge = receita ? '<span class="badge badge-receita" style="margin-right:6px;">Receita</span>' : '';
+    const rem = a.remaining ?? getItemRemaining(a);
+    const partial = isItemPartiallyPaid(a);
+    const valueHtml = partial
+      ? `<div>${fmtBRL(rem)} <span style="font-size:10px;color:var(--gray-400);">de ${fmtBRL(a.value)}</span></div>`
+      : fmtBRL(a.value);
+    const payBtns = canWrite()
+      ? (isItemFullyPaid(a)
+        ? ''
+        : `<button class="btn btn-sm btn-success" onclick="payItemFull('${a.group}','${a.bid}',${a.idx})">${receita ? 'Receber' : 'Pagar'}</button>
+           <button class="btn btn-sm btn-ghost" onclick="openPartialPayment('${a.group}','${a.bid}',${a.idx})">Parcial</button>`)
+      : '';
+    return `<div class="alert-item ${cls}">
+      <span class="alert-type-icon" title="${a.label}">${icon}</span>
+      <div class="alert-info">
+        <div class="alert-name">${tipoBadge}${escHtml(a.desc)}${partial ? ` <span class="badge badge-partial" style="margin-left:4px;">Parcial</span>` : ''}</div>
+        <div class="alert-meta">${escHtml(a.blockName)} · ${fmtDate(a.dueDate)} · <span class="alert-due ${cls}">${diffText}</span></div>
+      </div>
+      <div class="alert-actions">
+        <div class="alert-value ${receita ? 'value-receita' : ''}">${valueHtml}</div>
+        ${payBtns}
+      </div>
+    </div>`;
+  }
+
+  function renderAlertGroup(title, items) {
+    if (!items.length) return '';
+    let despesas = 0, receitas = 0;
+    items.forEach(a => {
+      const rem = a.remaining ?? getItemRemaining(a);
+      if (isReceitaItem(a)) receitas += rem; else despesas += rem;
+    });
+    const subtotalLine = receitas > 0
+      ? `<div class="alert-group-subtotal"><span>Despesas</span><span>${fmtBRL(despesas)}</span></div>
+         <div class="alert-group-subtotal"><span>Receitas</span><span class="value-receita">${fmtBRL(receitas)}</span></div>
+         <div class="alert-group-subtotal"><span>Saldo ${title}</span><span>${fmtBRL(despesas - receitas)}</span></div>`
+      : `<div class="alert-group-subtotal"><span>Subtotal ${title}</span><span>${fmtBRL(despesas)}</span></div>`;
+    return `<div class="alert-group">
+      <div class="alert-group-label">${title}</div>
+      ${items.map(renderAlertRow).join('')}
+      ${subtotalLine}
+    </div>`;
+  }
+
+  const empresaAlerts = alerts.filter(a => a.group === 'empresa');
+  const pessoalAlerts = alerts.filter(a => a.group === 'pessoal');
+
+  container.innerHTML = `<div class="alerts-panel">
+    ${renderAlertGroup('Empresa', empresaAlerts)}
+    ${renderAlertGroup('Pessoal', pessoalAlerts)}
+  </div>`;
+}
+
+function updateCashflow() {
+  if (isEmployeeView()) return;
+  const emConta  = parseFloat(document.getElementById('cf-em-conta').value)||0;
+  const recebido = parseFloat(document.getElementById('cf-recebido').value)||0;
+  const previsao = parseFloat(document.getElementById('cf-previsao').value)||0;
+
+  const eOpen = calcGroupTotals(appData.empresa.blocks);
+  const pOpen = calcGroupTotals(appData.pessoal.blocks);
+  const despesasEmpresa = eOpen.despesasAberto;
+  const receitasEmpresa = eOpen.receitasAberto;
+  const despesasPessoal = pOpen.despesasAberto;
+  const receitasPessoal = pOpen.receitasAberto;
+
+  let folha = 0;
+  (appData.employees.list||[]).forEach(emp => {
+    const pd = (appData.employeePayments||{})[emp.id]||{};
+    if (!pd.folhaPaga) folha += calcLiquido(pd, emp.id);
+  });
+
+  const totalContas = despesasEmpresa + despesasPessoal + folha - receitasEmpresa - receitasPessoal;
+
+  // Lógica:
+  // Falta = Total contas - Em conta  (quanto falta para cobrir tudo)
+  // Previsão de fechamento = Previsão de recebimento - Falta
+  // Prev fechamento = Previsão − Já recebido − Em aberto + Em conta
+  const prevFechamento = previsao - recebido - totalContas + emConta;
+  const percentRecebido = previsao > 0 ? Math.min(100, Math.round((recebido/previsao)*100)) : 0;
+
+  function cfLine(name, value, extraClass = '') {
+    return `<div class="cf-line ${extraClass}"><span class="cf-line-name">${name}</span><span class="cf-line-value">${fmtBRL(value)}</span></div>`;
+  }
+
+  function buildBlockGroup(blocks, icon) {
+    const despesasLines = [], receitasLines = [];
+    let despesas = 0, receitas = 0;
+    Object.values(blocks || {}).forEach(b => {
+      let d = 0, r = 0;
+      (b.items || []).forEach(i => {
+        normalizeBlockItem(i);
+        if (isItemFullyPaid(i)) return;
+        const v = getItemRemaining(i);
+        if (isReceitaItem(i)) r += v; else d += v;
+      });
+      if (d > 0) { despesasLines.push(cfLine(`${icon} ${escHtml(b.name)} (desp.)`, d)); despesas += d; }
+      if (r > 0) { receitasLines.push(cfLine(`${icon} ${escHtml(b.name)} (rec.)`, r, 'cf-line-receita')); receitas += r; }
+    });
+    return { despesasLines, receitasLines, despesas, receitas, net: despesas - receitas };
+  }
+
+  const empresaGroup = buildBlockGroup(appData.empresa.blocks, '🏢');
+  const pessoalGroup = buildBlockGroup(appData.pessoal.blocks, '👤');
+
+  let pendingHtml = '<div class="cf-section-title">Contas em aberto</div>';
+
+  if (empresaGroup.despesasLines.length || empresaGroup.receitasLines.length) {
+    pendingHtml += `<div class="cf-group-label">Empresa</div>`;
+    pendingHtml += empresaGroup.despesasLines.join('');
+    pendingHtml += empresaGroup.receitasLines.join('');
+    if (empresaGroup.receitas > 0) {
+      pendingHtml += cfLine('Subtotal despesas Empresa', empresaGroup.despesas, 'cf-line-subtotal');
+      pendingHtml += cfLine('Subtotal receitas Empresa', empresaGroup.receitas, 'cf-line-receita cf-line-subtotal');
+      pendingHtml += cfLine('Saldo Empresa', empresaGroup.net, 'cf-line-subtotal');
+    } else {
+      pendingHtml += cfLine('Subtotal Empresa', empresaGroup.despesas, 'cf-line-subtotal');
+    }
+  }
+  if (pessoalGroup.despesasLines.length || pessoalGroup.receitasLines.length) {
+    pendingHtml += `<div class="cf-group-label">Pessoal</div>`;
+    pendingHtml += pessoalGroup.despesasLines.join('');
+    pendingHtml += pessoalGroup.receitasLines.join('');
+    if (pessoalGroup.receitas > 0) {
+      pendingHtml += cfLine('Subtotal despesas Pessoal', pessoalGroup.despesas, 'cf-line-subtotal');
+      pendingHtml += cfLine('Subtotal receitas Pessoal', pessoalGroup.receitas, 'cf-line-receita cf-line-subtotal');
+      pendingHtml += cfLine('Saldo Pessoal', pessoalGroup.net, 'cf-line-subtotal');
+    } else {
+      pendingHtml += cfLine('Subtotal Pessoal', pessoalGroup.despesas, 'cf-line-subtotal');
+    }
+  }
+  if (folha > 0) {
+    pendingHtml += `<div class="cf-group-label">Funcionários</div>${cfLine('👥 Folha de pagamento', folha)}`;
+    pendingHtml += cfLine('Subtotal Funcionários', folha, 'cf-line-subtotal');
+  }
+
+  const hasPending = empresaGroup.despesasLines.length || empresaGroup.receitasLines.length
+    || pessoalGroup.despesasLines.length || pessoalGroup.receitasLines.length || folha > 0;
+  const pendingSection = hasPending
+    ? `<div class="cf-section">${pendingHtml}<div class="cf-line cf-line-total"><span class="cf-line-name">Total em aberto</span><span class="cf-line-value">${fmtBRL(totalContas)}</span></div></div>`
+    : `<div class="cf-section"><div class="cf-section-title">Contas em aberto</div><div class="cf-line cf-line-sub"><span class="cf-line-name">Nenhuma conta pendente</span><span class="cf-line-value">${fmtBRL(0)}</span></div></div>`;
+
+  // Atualiza stat box no resumo
+  const pfEl = document.getElementById('dash-prev-fechamento');
+  const pfBox = document.getElementById('dash-prev-fechamento-box');
+  if (pfEl) {
+    pfEl.textContent = fmtBRL(prevFechamento);
+    pfEl.className = 'stat-value ' + (prevFechamento >= 0 ? 'green' : 'red');
+  }
+  if (pfBox) pfBox.style.display = (emConta || previsao || recebido) ? '' : 'none';
+
+  const el = document.getElementById('cashflow-result');
+  el.className = '';
+  el.innerHTML = `
+    <div class="cf-panel">
+      ${pendingSection}
+      <div class="cf-section">
+        <div class="cf-section-title">Caixa e recebimentos</div>
+        ${cfLine('💰 Dinheiro em conta', emConta)}
+        ${cfLine('📈 Previsão de recebimento', previsao)}
+        <div class="cf-line cf-line-sub">
+          <span class="cf-line-name">↳ Já recebido <span class="cf-badge">${percentRecebido}%</span></span>
+          <span class="cf-line-value">${fmtBRL(recebido)}</span>
+        </div>
+      </div>
+    </div>`;
+
+  appData.cashflow = { emConta, recebido, previsao };
+  clearTimeout(window._cfTimer);
+  window._cfTimer = setTimeout(saveCashflow, 1500);
+}
+
+// =============================================
+// EMPLOYEES
+// =============================================
+let activeEmpTab = null;
+
+function renderEmployees() {
+  const subtabs = document.getElementById('emp-subtabs');
+  const container = document.getElementById('employees-container');
+  const list = appData.employees.list || [];
+
+  if (list.length === 0) {
+    subtabs.innerHTML = '';
+    container.innerHTML = '<div class="text-gray text-sm" style="padding:20px;text-align:center;">Nenhum funcionário. Clique em "+ Novo Funcionário".</div>';
+    return;
+  }
+
+  // Keep active tab valid
+  if (!activeEmpTab || !list.find(e=>e.id===activeEmpTab)) {
+    activeEmpTab = list[0].id;
+  }
+
+  // Render sub-tab buttons
+  subtabs.innerHTML = list.map(emp => {
+    const isActive = emp.id === activeEmpTab;
+    return `<button onclick="switchEmpTab('${emp.id}')" style="
+      padding:9px 18px;border:none;background:none;cursor:pointer;font-size:13px;font-weight:500;
+      color:${isActive ? 'var(--primary)' : 'var(--gray-500)'};
+      border-bottom:${isActive ? '2px solid var(--primary)' : '2px solid transparent'};
+      margin-bottom:-2px;transition:all 0.15s;white-space:nowrap;
+    ">${escHtml(emp.name.split(' ')[0])}</button>`;
+  }).join('');
+
+  // Render active employee
+  const emp = list.find(e=>e.id===activeEmpTab);
+  if (!emp) return;
+  const pd = (appData.employeePayments||{})[emp.id] || {};
+  container.innerHTML = '';
+  const div = document.createElement('div');
+  div.className = 'employee-card';
+  div.dataset.empid = emp.id;
+  div.innerHTML = buildEmployeeCard(emp, pd);
+  container.appendChild(div);
+}
+
+function switchEmpTab(eid) {
+  activeEmpTab = eid;
+  renderEmployees();
+}
+
+function buildEmployeeCard(emp, pd, readOnly = false) {
+  if (!pd.decimoTerceiro) pd.decimoTerceiro = {};
+  pd.decimoTerceiro = normalizeDecimoTerceiro(pd.decimoTerceiro);
+  const thirteenth = pd.decimoTerceiro;
+  const decimoPago = getDecimoPago(thirteenth);
+  const decimoLancado = getDecimoLancado(thirteenth);
+  const decimoRestante = (parseFloat(thirteenth.valorTotal) || 0) - decimoPago;
+  const receitas = pd.receitas || [];
+  const descontos_list = pd.descontos_list || [];
+
+  const shiftPay = calcEmpShiftPay(emp.id);
+  const totalReceitas = receitas.reduce((s,r)=>s+(parseFloat(r.valor)||0),0) + shiftPay.plantao + shiftPay.dobra;
+  const totalDescontos = descontos_list.reduce((s,d)=>s+(parseFloat(d.valor)||0),0);
+  const liquido = totalReceitas - totalDescontos;
+
+  const autoLines = [
+    shiftPay.plantao > 0 ? { nome: 'Plantão (escala)', valor: shiftPay.plantao } : null,
+    shiftPay.dobra > 0   ? { nome: 'Dobra (escala)',   valor: shiftPay.dobra   } : null,
+  ].filter(Boolean);
+
+  const autoRowsReadOnly = autoLines.map(a=>`<tr style="background:var(--primary-light);">
+    <td>${escHtml(a.nome)} <span style="font-size:10px;color:var(--primary);">●auto</span></td>
+    <td class="font-bold">${fmtBRL(a.valor)}</td>
+  </tr>`).join('');
+
+  const autoRowsEdit = autoLines.map(a=>`
+    <div style="display:flex;gap:6px;align-items:center;margin-bottom:6px;background:var(--primary-light);padding:6px 8px;border-radius:var(--radius);">
+      <input type="text" class="form-control" style="flex:2;background:var(--gray-100);color:var(--gray-500);" value="${escHtml(a.nome)}" disabled>
+      <input type="number" class="form-control" style="flex:1;min-width:90px;background:var(--gray-100);color:var(--gray-500);" value="${a.valor}" disabled>
+      <span style="width:32px;font-size:10px;color:var(--primary);text-align:center;">auto</span>
+    </div>`).join('');
+
+  const receitasHTML = readOnly
+    ? (receitas.length || autoLines.length
+      ? `<table class="data-table"><thead><tr><th>Descrição</th><th>Valor</th></tr></thead><tbody>${receitas.map(r=>`<tr><td>${escHtml(r.nome)}</td><td class="font-bold">${fmtBRL(r.valor)}</td></tr>`).join('')}${autoRowsReadOnly}</tbody></table>`
+      : '<div class="text-gray text-sm">Nenhuma receita neste mês.</div>')
+    : receitas.map((r,i)=>`
+    <div style="display:flex;gap:6px;align-items:center;margin-bottom:6px;">
+      <input type="text" class="form-control" style="flex:2;" value="${escHtml(r.nome)}" placeholder="Ex: Salário, Hora Extra..." onchange="updateEmpLine('${emp.id}','receitas',${i},'nome',this.value)">
+      <input type="number" class="form-control" style="flex:1;min-width:90px;" value="${r.valor||''}" placeholder="0,00" onchange="updateEmpLine('${emp.id}','receitas',${i},'valor',this.value)">
+      <button class="btn btn-sm btn-danger btn-icon" onclick="removeEmpLine('${emp.id}','receitas',${i})">✕</button>
+    </div>`).join('') + autoRowsEdit;
+
+  const descontosHTML = readOnly
+    ? (descontos_list.length
+      ? `<table class="data-table"><thead><tr><th>Descrição</th><th>Valor</th></tr></thead><tbody>${descontos_list.map(d=>`<tr><td>${escHtml(d.nome)}</td><td class="font-bold">${fmtBRL(d.valor)}</td></tr>`).join('')}</tbody></table>`
+      : '<div class="text-gray text-sm">Nenhum desconto neste mês.</div>')
+    : descontos_list.map((d,i)=>`
+    <div style="display:flex;gap:6px;align-items:center;margin-bottom:6px;">
+      <input type="text" class="form-control" style="flex:2;" value="${escHtml(d.nome)}" placeholder="Ex: INSS, Adiantamento..." onchange="updateEmpLine('${emp.id}','descontos_list',${i},'nome',this.value)">
+      <input type="number" class="form-control" style="flex:1;min-width:90px;" value="${d.valor||''}" placeholder="0,00" onchange="updateEmpLine('${emp.id}','descontos_list',${i},'valor',this.value)">
+      <button class="btn btn-sm btn-danger btn-icon" onclick="removeEmpLine('${emp.id}','descontos_list',${i})">✕</button>
+    </div>`).join('');
+
+  normalizeFerias(emp);
+  const vacSection = buildVacationSection(emp, readOnly);
+
+  const headerActions = readOnly
+    ? (pd.folhaPaga
+      ? `<span style="background:var(--success-light);color:var(--success);padding:5px 12px;border-radius:20px;font-size:12px;font-weight:600;">✅ Folha Paga</span>`
+      : `<span style="background:var(--warning-light);color:var(--warning);padding:5px 12px;border-radius:20px;font-size:12px;font-weight:600;">⏳ Folha em aberto</span>`)
+    : `${pd.folhaPaga
+          ? `<span style="background:var(--success-light);color:var(--success);padding:5px 12px;border-radius:20px;font-size:12px;font-weight:600;">✅ Folha Paga</span>
+             <button class="btn btn-sm btn-ghost" onclick="toggleFolhaPaga('${emp.id}')">Reabrir</button>`
+          : `<button class="btn btn-success" onclick="toggleFolhaPaga('${emp.id}')">✓ Marcar Folha Paga — ${fmtBRL(liquido)}</button>`
+        }
+        <button class="btn btn-sm btn-ghost" onclick="editEmployee('${emp.id}')">✏️ Editar</button>
+        <button class="btn btn-sm btn-danger" onclick="deleteEmployee('${emp.id}')">🗑️</button>`;
+
+  return `
+    <div class="employee-header">
+      <div>
+        <div class="employee-name">${escHtml(emp.name)}</div>
+        <div class="text-xs text-gray">${escHtml(emp.cargo||'')} ${emp.email?'· '+emp.email:''}</div>
+      </div>
+      <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">${headerActions}</div>
+    </div>
+    <div class="employee-body">
+      <div class="emp-grid">
+        <div>
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+            <div class="card-title">💰 Receitas — ${MONTHS[currentMonth]}</div>
+            ${readOnly ? '' : `<button class="btn btn-sm btn-success" onclick="addEmpLine('${emp.id}','receitas')">+ Receita</button>`}
+          </div>
+          ${readOnly ? '' : `<div style="display:flex;gap:6px;margin-bottom:4px;">
+            <span class="text-xs text-gray" style="flex:2;">Descrição</span>
+            <span class="text-xs text-gray" style="flex:1;">Valor</span>
+            <span style="width:32px;"></span>
+          </div>`}
+          ${receitasHTML || '<div class="text-gray text-sm" style="margin-bottom:8px;">Nenhuma receita. Clique em + Receita.</div>'}
+          <div style="background:var(--success-light);border-radius:var(--radius);padding:8px 12px;margin-top:4px;display:flex;justify-content:space-between;">
+            <span style="font-size:12px;color:var(--success);">Total Receitas</span>
+            <span class="emp-total-receitas" style="font-weight:700;color:var(--success);">${fmtBRL(totalReceitas)}</span>
+          </div>
+        </div>
+        <div>
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+            <div class="card-title">➖ Descontos — ${MONTHS[currentMonth]}</div>
+            ${readOnly ? '' : `<button class="btn btn-sm btn-danger" onclick="addEmpLine('${emp.id}','descontos_list')">+ Desconto</button>`}
+          </div>
+          ${readOnly ? '' : `<div style="display:flex;gap:6px;margin-bottom:4px;">
+            <span class="text-xs text-gray" style="flex:2;">Descrição</span>
+            <span class="text-xs text-gray" style="flex:1;">Valor</span>
+            <span style="width:32px;"></span>
+          </div>`}
+          ${descontosHTML || '<div class="text-gray text-sm" style="margin-bottom:8px;">Nenhum desconto. Clique em + Desconto.</div>'}
+          <div style="background:var(--danger-light);border-radius:var(--radius);padding:8px 12px;margin-top:4px;display:flex;justify-content:space-between;">
+            <span style="font-size:12px;color:var(--danger);">Total Descontos</span>
+            <span class="emp-total-descontos" style="font-weight:700;color:var(--danger);">${fmtBRL(totalDescontos)}</span>
+          </div>
+        </div>
+      </div>
+      <div style="background:${pd.folhaPaga?'var(--success-light)':' var(--primary-light)'};border-radius:var(--radius);padding:12px 16px;margin-top:12px;display:flex;justify-content:space-between;align-items:center;">
+        <span style="font-size:12px;font-weight:600;color:${pd.folhaPaga?'var(--success)':' var(--primary)'};">💵 Líquido a Pagar</span>
+        <span class="emp-liquido" style="font-weight:700;font-size:20px;color:${pd.folhaPaga?'var(--success)':' var(--primary)'};">${fmtBRL(liquido)}</span>
+      </div>
+      <div style="margin-top:16px;">
+        <div class="card-title" style="margin-bottom:10px;">🎄 13º Salário</div>
+        <div class="form-group mb-1"><div class="form-label">Valor Total do 13º</div>
+          ${readOnly
+            ? `<div class="form-control" style="background:var(--gray-50);">${fmtBRL(thirteenth.valorTotal||0)}</div>`
+            : `<input type="number" step="0.01" class="form-control" value="${thirteenth.valorTotal||''}" onchange="updateDecimo('${emp.id}','valorTotal',this.value)" placeholder="0,00">`}
+        </div>
+        <div class="form-label" style="margin:12px 0 6px;">Pagamentos parcelados</div>
+        ${readOnly
+          ? ((thirteenth.pagamentos||[]).length
+            ? (thirteenth.pagamentos||[]).map(pg=>`<div class="vac-pgto-row" style="background:var(--gray-50);padding:6px 10px;border-radius:var(--radius);margin-bottom:4px;">
+                <span class="text-sm">${escHtml(pg.desc||'Parcela')}</span>
+                <span class="font-bold">${fmtBRL(pg.valor)}</span>
+                <span class="text-xs text-gray">${fmtDate(pg.dataPgto)} ${pg.pago?'✅':'⏳'}</span>
+              </div>`).join('')
+            : '<div class="text-gray text-sm">Nenhuma parcela lançada.</div>')
+          : `${(thirteenth.pagamentos||[]).map((pg,pi)=>`
+            <div class="vac-pgto-row">
+              <input type="text" placeholder="Ex: 1ª parcela" value="${escHtml(pg.desc||'')}" onchange="updateDecimoPagamento('${emp.id}',${pi},'desc',this.value)">
+              <input type="number" step="0.01" placeholder="Valor" value="${pg.valor||''}" style="max-width:110px;" onchange="updateDecimoPagamento('${emp.id}',${pi},'valor',this.value)">
+              <input type="date" value="${pg.dataPgto||''}" style="max-width:140px;" onchange="updateDecimoPagamento('${emp.id}',${pi},'dataPgto',this.value)">
+              <input type="text" placeholder="Forma" value="${escHtml(pg.forma||'')}" style="max-width:100px;" onchange="updateDecimoPagamento('${emp.id}',${pi},'forma',this.value)">
+              <button class="btn btn-sm ${pg.pago?'btn-ghost':'btn-success'}" onclick="toggleDecimoPagamento('${emp.id}',${pi})">${pg.pago?'✅ Pago':'Marcar pago'}</button>
+              <button class="btn btn-sm btn-danger btn-icon" onclick="removeDecimoPagamento('${emp.id}',${pi})">✕</button>
+            </div>`).join('') || '<div class="text-gray text-xs" style="margin-bottom:6px;">Nenhuma parcela lançada.</div>'}
+            <button class="btn btn-ghost btn-sm" onclick="addDecimoPagamento('${emp.id}')">+ Parcela</button>`}
+        <div style="margin-top:10px;display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px;">
+          <div class="stat-box"><div class="stat-label">Total lançado</div><div class="stat-value blue emp-decimo-lancado">${fmtBRL(decimoLancado)}</div></div>
+          <div class="stat-box"><div class="stat-label">Já pago</div><div class="stat-value green emp-decimo-pago">${fmtBRL(decimoPago)}</div></div>
+          <div class="stat-box"><div class="stat-label">Restante</div><div class="stat-value orange emp-decimo-restante">${fmtBRL(decimoRestante)}</div></div>
+        </div>
+      </div>
+      <div style="margin-top:16px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+          <div class="card-title">🌴 Férias</div>
+          ${readOnly ? '' : `<button class="btn btn-ghost btn-sm" onclick="addAquisitivoPeriod('${emp.id}')">+ Período aquisitivo</button>`}
+        </div>
+        ${vacSection}
+      </div>
+    </div>`;
+}
+
+function calcEmpShiftPay(empId) {
+  let plantao = 0, dobra = 0;
+  Object.values(appData.prevEscala?.events || {}).forEach(dayEvs => {
+    dayEvs.forEach(ev => {
+      if (ev.empId !== empId) return;
+      if (ev.type === 'remunerado') plantao += 200;
+      else if (ev.type === 'meio-plantao') plantao += 100;
+      else if (ev.type === 'dobra') dobra += 50;
+    });
+  });
+  return { plantao, dobra };
+}
+
+function calcLiquido(pd, empId) {
+  const r = (pd.receitas||[]).reduce((s,x)=>s+(parseFloat(x.valor)||0),0);
+  const d = (pd.descontos_list||[]).reduce((s,x)=>s+(parseFloat(x.valor)||0),0);
+  const shift = empId ? calcEmpShiftPay(empId) : { plantao: 0, dobra: 0 };
+  return r + shift.plantao + shift.dobra - d;
+}
+
+function toggleFolhaPaga(eid) {
+  if (!canWrite()) return;
+  if (!appData.employeePayments) appData.employeePayments = {};
+  if (!appData.employeePayments[eid]) appData.employeePayments[eid] = {};
+  appData.employeePayments[eid].folhaPaga = !appData.employeePayments[eid].folhaPaga;
+  saveEmployeePayments().then(()=>{ renderEmployees(); renderDashboard(); updateCashflow(); });
+}
+
+function addEmpLine(eid, tipo) {
+  if (!appData.employeePayments) appData.employeePayments = {};
+  if (!appData.employeePayments[eid]) appData.employeePayments[eid] = {};
+  if (!appData.employeePayments[eid][tipo]) appData.employeePayments[eid][tipo] = [];
+  appData.employeePayments[eid][tipo].push({ nome: '', valor: '' });
+  saveEmployeePayments().then(()=>renderEmployees());
+}
+
+function removeEmpLine(eid, tipo, idx) {
+  appData.employeePayments[eid][tipo].splice(idx, 1);
+  saveEmployeePayments().then(()=>{ renderEmployees(); renderDashboard(); });
+}
+
+function updateEmpLine(eid, tipo, idx, field, val) {
+  if (!appData.employeePayments) appData.employeePayments = {};
+  if (!appData.employeePayments[eid]) appData.employeePayments[eid] = {};
+  if (!appData.employeePayments[eid][tipo]) appData.employeePayments[eid][tipo] = [];
+  appData.employeePayments[eid][tipo][idx][field] = field === 'valor' ? (parseFloat(val)||0) : val;
+  // Update totals in place without re-rendering the whole card
+  updateEmpTotalsInPlace(eid);
+  clearTimeout(window._epTimer);
+  window._epTimer = setTimeout(()=>{ saveEmployeePayments(); renderDashboard(); }, 1500);
+}
+
+function updateEmpTotalsInPlace(eid) {
+  const pd = (appData.employeePayments||{})[eid] || {};
+  const totalR = (pd.receitas||[]).reduce((s,r)=>s+(parseFloat(r.valor)||0),0);
+  const totalD = (pd.descontos_list||[]).reduce((s,d)=>s+(parseFloat(d.valor)||0),0);
+  const liq = totalR - totalD;
+  const card = document.querySelector(`[data-empid="${eid}"]`);
+  if (!card) return;
+  const trEl = card.querySelector('.emp-total-receitas');
+  const tdEl = card.querySelector('.emp-total-descontos');
+  const liqEl = card.querySelector('.emp-liquido');
+  if (trEl) trEl.textContent = fmtBRL(totalR);
+  if (tdEl) tdEl.textContent = fmtBRL(totalD);
+  if (liqEl) liqEl.textContent = fmtBRL(liq);
+}
+
+
+function addEmployee() {
+  openModal(`
+    <div class="modal-title">Novo Funcionário</div>
+    <div class="form-row">
+      <div class="form-group"><div class="form-label">Nome</div><input type="text" class="form-control" id="m-emp-name"></div>
+      <div class="form-group"><div class="form-label">Cargo</div><input type="text" class="form-control" id="m-emp-cargo"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><div class="form-label">Salário Base (R$)</div><input type="number" class="form-control" id="m-emp-salario"></div>
+      <div class="form-group"><div class="form-label">E-mail Google</div><input type="email" class="form-control" id="m-emp-email" placeholder="funcionario@gmail.com"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><div class="form-label">Dias de Férias/ano</div><input type="number" class="form-control" id="m-emp-ferias" value="30"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal()">Cancelar</button>
+      <button class="btn btn-primary" onclick="confirmAddEmployee()">Adicionar</button>
+    </div>`);
+}
+
+function confirmAddEmployee() {
+  const name = document.getElementById('m-emp-name').value.trim();
+  if (!name) return alert('Informe o nome.');
+  const emp = {
+    id: 'emp' + Date.now(),
+    name,
+    cargo: document.getElementById('m-emp-cargo').value.trim(),
+    salarioBase: parseFloat(document.getElementById('m-emp-salario').value)||0,
+    email: document.getElementById('m-emp-email').value.trim().toLowerCase(),
+    diasFerias: parseInt(document.getElementById('m-emp-ferias').value)||30,
+    ferias: {
+      aquisitivos: [{
+        id: 'aq' + Date.now(),
+        referencia: `${currentYear}/${currentYear + 1}`,
+        diasDireito: parseInt(document.getElementById('m-emp-ferias').value) || 30,
+        gozos: []
+      }]
+    }
+  };
+  if (!appData.employees.list) appData.employees.list = [];
+  appData.employees.list.push(emp);
+  saveEmployees().then(()=>{ renderEmployees(); renderCalendar('ferias'); closeModal(); });
+}
+
+function editEmployee(eid) {
+  const emp = appData.employees.list.find(e=>e.id===eid);
+  if (!emp) return;
+  openModal(`
+    <div class="modal-title">Editar Funcionário</div>
+    <div class="form-row">
+      <div class="form-group"><div class="form-label">Nome</div><input type="text" class="form-control" id="m-emp-name" value="${escHtml(emp.name)}"></div>
+      <div class="form-group"><div class="form-label">Cargo</div><input type="text" class="form-control" id="m-emp-cargo" value="${escHtml(emp.cargo||'')}"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><div class="form-label">Salário Base (R$)</div><input type="number" class="form-control" id="m-emp-salario" value="${emp.salarioBase||0}"></div>
+      <div class="form-group"><div class="form-label">E-mail Google</div><input type="email" class="form-control" id="m-emp-email" value="${emp.email||''}"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><div class="form-label">Dias de Férias/ano</div><input type="number" class="form-control" id="m-emp-ferias" value="${emp.diasFerias||30}"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal()">Cancelar</button>
+      <button class="btn btn-primary" onclick="confirmEditEmployee('${eid}')">Salvar</button>
+    </div>`);
+}
+
+function confirmEditEmployee(eid) {
+  const emp = appData.employees.list.find(e=>e.id===eid);
+  if (!emp) return;
+  emp.name = document.getElementById('m-emp-name').value.trim();
+  emp.cargo = document.getElementById('m-emp-cargo').value.trim();
+  emp.salarioBase = parseFloat(document.getElementById('m-emp-salario').value)||0;
+  emp.email = document.getElementById('m-emp-email').value.trim().toLowerCase();
+  emp.diasFerias = parseInt(document.getElementById('m-emp-ferias').value)||30;
+  saveEmployees().then(()=>{ renderEmployees(); closeModal(); });
+}
+
+function deleteEmployee(eid) {
+  if (!confirm('Excluir este funcionário?')) return;
+  appData.employees.list = appData.employees.list.filter(e=>e.id!==eid);
+  saveEmployees().then(()=>{ renderEmployees(); renderCalendar('ferias'); });
+}
+
+function updateEmpPayment(eid, field, val) {
+  if (!appData.employeePayments) appData.employeePayments = {};
+  if (!appData.employeePayments[eid]) appData.employeePayments[eid] = {};
+  appData.employeePayments[eid][field] = parseFloat(val)||val;
+  clearTimeout(window._epTimer);
+  window._epTimer = setTimeout(()=>{ saveEmployeePayments(); renderEmployees(); renderDashboard(); }, 800);
+}
+
+function normalizeDecimoTerceiro(dt) {
+  if (!dt) dt = {};
+  if (!dt.pagamentos) {
+    dt.pagamentos = [];
+    if (parseFloat(dt.valorPago) > 0) {
+      dt.pagamentos.push({
+        desc: 'Pagamento anterior',
+        valor: dt.valorPago,
+        dataPgto: dt.dataUltimoPgto || '',
+        forma: dt.forma || '',
+        pago: true
+      });
+    }
+  }
+  return dt;
+}
+
+function getDecimoPago(dt) {
+  return (dt.pagamentos || []).filter(p => p.pago).reduce((s, p) => s + (parseFloat(p.valor) || 0), 0);
+}
+
+function getDecimoLancado(dt) {
+  return (dt.pagamentos || []).reduce((s, p) => s + (parseFloat(p.valor) || 0), 0);
+}
+
+function syncDecimoTotals(eid) {
+  const dt = appData.employeePayments?.[eid]?.decimoTerceiro;
+  if (!dt) return;
+  dt.valorPago = getDecimoPago(dt);
+  const paid = dt.pagamentos?.filter(p => p.pago && p.dataPgto).sort((a, b) => (b.dataPgto || '').localeCompare(a.dataPgto || ''));
+  if (paid?.length) {
+    dt.dataUltimoPgto = paid[0].dataPgto;
+    dt.forma = paid[0].forma || dt.forma || '';
+  }
+}
+
+function updateDecimoTotalsInPlace(eid) {
+  const dt = normalizeDecimoTerceiro(appData.employeePayments?.[eid]?.decimoTerceiro || {});
+  const card = document.querySelector(`[data-empid="${eid}"]`);
+  if (!card) return;
+  const pago = getDecimoPago(dt);
+  const lancado = getDecimoLancado(dt);
+  const restante = (parseFloat(dt.valorTotal) || 0) - pago;
+  const elPago = card.querySelector('.emp-decimo-pago');
+  const elLancado = card.querySelector('.emp-decimo-lancado');
+  const elRestante = card.querySelector('.emp-decimo-restante');
+  if (elPago) elPago.textContent = fmtBRL(pago);
+  if (elLancado) elLancado.textContent = fmtBRL(lancado);
+  if (elRestante) elRestante.textContent = fmtBRL(restante);
+}
+
+function scheduleDecimoSave() {
+  clearTimeout(window._dtTimer);
+  window._dtTimer = setTimeout(saveEmployeePayments, 1500);
+}
+
+function updateDecimo(eid, field, val) {
+  if (!canWrite()) return;
+  if (!appData.employeePayments) appData.employeePayments = {};
+  if (!appData.employeePayments[eid]) appData.employeePayments[eid] = {};
+  appData.employeePayments[eid].decimoTerceiro = normalizeDecimoTerceiro(appData.employeePayments[eid].decimoTerceiro);
+  appData.employeePayments[eid].decimoTerceiro[field] = field === 'valorTotal' ? (parseFloat(val) || 0) : val;
+  syncDecimoTotals(eid);
+  updateDecimoTotalsInPlace(eid);
+  scheduleDecimoSave();
+}
+
+function addDecimoPagamento(eid) {
+  if (!canWrite()) return;
+  if (!appData.employeePayments) appData.employeePayments = {};
+  if (!appData.employeePayments[eid]) appData.employeePayments[eid] = {};
+  appData.employeePayments[eid].decimoTerceiro = normalizeDecimoTerceiro(appData.employeePayments[eid].decimoTerceiro);
+  appData.employeePayments[eid].decimoTerceiro.pagamentos.push({ desc: '', valor: '', dataPgto: '', forma: '', pago: false });
+  saveEmployeePayments().then(() => renderEmployees());
+}
+
+function removeDecimoPagamento(eid, pi) {
+  if (!canWrite()) return;
+  const dt = appData.employeePayments?.[eid]?.decimoTerceiro;
+  if (!dt?.pagamentos) return;
+  dt.pagamentos.splice(pi, 1);
+  syncDecimoTotals(eid);
+  scheduleDecimoSave();
+  renderEmployees();
+}
+
+function updateDecimoPagamento(eid, pi, field, val) {
+  if (!canWrite()) return;
+  const pg = appData.employeePayments?.[eid]?.decimoTerceiro?.pagamentos?.[pi];
+  if (!pg) return;
+  if (field === 'valor') pg[field] = parseFloat(val) || 0;
+  else pg[field] = val;
+  syncDecimoTotals(eid);
+  updateDecimoTotalsInPlace(eid);
+  scheduleDecimoSave();
+}
+
+function toggleDecimoPagamento(eid, pi) {
+  if (!canWrite()) return;
+  const pg = appData.employeePayments?.[eid]?.decimoTerceiro?.pagamentos?.[pi];
+  if (!pg) return;
+  pg.pago = !pg.pago;
+  syncDecimoTotals(eid);
+  scheduleDecimoSave();
+  renderEmployees();
+}
+
+function normalizeFerias(emp) {
+  if (!emp.ferias) emp.ferias = {};
+  if (emp.ferias.aquisitivos && emp.ferias.aquisitivos.length) return;
+  const dias = parseInt(emp.diasFerias) || 30;
+  const oldPeriods = emp.ferias.periods || [];
+  const year = currentYear;
+  emp.ferias.aquisitivos = [{
+    id: 'aq' + Date.now(),
+    referencia: `${year - 1}/${year}`,
+    diasDireito: dias,
+    gozos: oldPeriods.map((p, i) => ({
+      id: 'gz' + Date.now() + i,
+      start: p.start || '',
+      end: p.end || '',
+      dias: calcPeriodDays(p.start, p.end) || '',
+      valorTotal: 0,
+      pagamentos: []
+    }))
+  }];
+  delete emp.ferias.periods;
+}
+
+function getGozoDays(gozo) {
+  const manual = parseInt(gozo.dias);
+  if (!isNaN(manual) && manual > 0) return manual;
+  return calcPeriodDays(gozo.start, gozo.end);
+}
+
+function getAquisitivoStats(aq) {
+  const diasUsados = (aq.gozos || []).reduce((s, g) => s + getGozoDays(g), 0);
+  const diasDireito = parseInt(aq.diasDireito) || 0;
+  let totalPagar = 0, totalPago = 0;
+  (aq.gozos || []).forEach(g => {
+    totalPagar += parseFloat(g.valorTotal) || 0;
+    (g.pagamentos || []).forEach(pg => {
+      if (pg.pago) totalPago += parseFloat(pg.valor) || 0;
+    });
+  });
+  return { diasUsados, diasDireito, restante: diasDireito - diasUsados, totalPagar, totalPago, restantePgto: totalPagar - totalPago };
+}
+
+function buildVacationSection(emp, readOnly = false) {
+  normalizeFerias(emp);
+  const aquisitivos = emp.ferias.aquisitivos || [];
+  if (!aquisitivos.length) {
+    return '<div class="text-gray text-sm">Nenhum período aquisitivo. Clique em "+ Período aquisitivo".</div>';
+  }
+
+  return aquisitivos.map((aq, ai) => {
+    const st = getAquisitivoStats(aq);
+    const gozosHtml = (aq.gozos || []).map((gz, gi) => {
+      const dias = getGozoDays(gz);
+      const pgtoTotal = (gz.pagamentos || []).reduce((s, p) => s + (parseFloat(p.valor) || 0), 0);
+      const pgtoPago = (gz.pagamentos || []).filter(p => p.pago).reduce((s, p) => s + (parseFloat(p.valor) || 0), 0);
+
+      if (readOnly) {
+        const pgtoLines = (gz.pagamentos || []).map(pg =>
+          `<div class="text-xs text-gray" style="margin-top:4px;">${escHtml(pg.desc || 'Pagamento')}: ${fmtBRL(pg.valor)} ${pg.pago ? '✅' : '⏳'}</div>`
+        ).join('');
+        return `<div class="vac-gozo-card">
+          <div class="vac-gozo-title">Gozo — ${fmtDate(gz.start)} → ${fmtDate(gz.end)} (${dias} dias)</div>
+          <div class="text-xs text-gray">Valor total: ${fmtBRL(gz.valorTotal)} · Pago: ${fmtBRL(pgtoPago)}</div>
+          ${pgtoLines}
+        </div>`;
+      }
+
+      const pagamentosHtml = (gz.pagamentos || []).map((pg, pi) => `
+        <div class="vac-pgto-row">
+          <input type="text" placeholder="Ex: 1ª parcela" value="${escHtml(pg.desc || '')}" onchange="updateVacPagamento('${emp.id}',${ai},${gi},${pi},'desc',this.value)">
+          <input type="number" step="0.01" placeholder="Valor" value="${pg.valor || ''}" style="max-width:110px;" onchange="updateVacPagamento('${emp.id}',${ai},${gi},${pi},'valor',this.value)">
+          <input type="date" value="${pg.dataPgto || ''}" style="max-width:140px;" onchange="updateVacPagamento('${emp.id}',${ai},${gi},${pi},'dataPgto',this.value)">
+          <button class="btn btn-sm ${pg.pago ? 'btn-ghost' : 'btn-success'}" onclick="toggleVacPagamento('${emp.id}',${ai},${gi},${pi})">${pg.pago ? '✅ Pago' : 'Marcar pago'}</button>
+          <button class="btn btn-sm btn-danger btn-icon" onclick="removeVacPagamento('${emp.id}',${ai},${gi},${pi})">✕</button>
+        </div>`).join('');
+
+      return `<div class="vac-gozo-card">
+        <div class="vac-gozo-title">Período de gozo ${gi + 1}</div>
+        <div class="period-row">
+          <input type="date" value="${gz.start || ''}" onchange="updateVacGozo('${emp.id}',${ai},${gi},'start',this.value)">
+          <span>→</span>
+          <input type="date" value="${gz.end || ''}" onchange="updateVacGozo('${emp.id}',${ai},${gi},'end',this.value)">
+          <input type="number" title="Dias de férias" placeholder="Dias" value="${gz.dias !== undefined && gz.dias !== '' ? gz.dias : dias}" style="max-width:70px;" onchange="updateVacGozo('${emp.id}',${ai},${gi},'dias',this.value)">
+          <span class="text-xs text-gray">${dias} d</span>
+          <button class="btn btn-sm btn-danger btn-icon" onclick="removeVacGozo('${emp.id}',${ai},${gi})">✕</button>
+        </div>
+        <div class="form-group" style="margin:8px 0;">
+          <div class="form-label">Valor total das férias</div>
+          <input type="number" step="0.01" class="form-control" value="${gz.valorTotal || ''}" placeholder="0,00" onchange="updateVacGozo('${emp.id}',${ai},${gi},'valorTotal',this.value)">
+        </div>
+        <div class="form-label" style="margin-bottom:6px;">Pagamentos parcelados</div>
+        ${pagamentosHtml || '<div class="text-gray text-xs" style="margin-bottom:6px;">Nenhum pagamento lançado.</div>'}
+        <button class="btn btn-ghost btn-sm" onclick="addVacPagamento('${emp.id}',${ai},${gi})">+ Pagamento</button>
+        <div class="text-xs text-gray" style="margin-top:6px;">Lançado: ${fmtBRL(pgtoTotal)} · Pago: ${fmtBRL(pgtoPago)}</div>
+      </div>`;
+    }).join('');
+
+    const headerFields = readOnly
+      ? `<div><strong>${escHtml(aq.referencia)}</strong> · Direito: ${st.diasDireito} dias</div>`
+      : `<div style="display:flex;gap:8px;flex-wrap:wrap;flex:1;">
+          <div class="form-group" style="flex:1;min-width:140px;margin:0;">
+            <div class="form-label">Período aquisitivo</div>
+            <input type="text" class="form-control" value="${escHtml(aq.referencia || '')}" placeholder="Ex: 2024/2025" onchange="updateAquisitivo('${emp.id}',${ai},'referencia',this.value)">
+          </div>
+          <div class="form-group" style="width:120px;margin:0;">
+            <div class="form-label">Dias de direito</div>
+            <input type="number" class="form-control" value="${aq.diasDireito || 30}" onchange="updateAquisitivo('${emp.id}',${ai},'diasDireito',this.value)">
+          </div>
+        </div>
+        <button class="btn btn-sm btn-danger" onclick="removeAquisitivoPeriod('${emp.id}',${ai})">🗑️</button>`;
+
+    return `<div class="vac-aq-block">
+      <div class="vac-aq-header">${headerFields}</div>
+      <div class="vac-aq-body">
+        ${gozosHtml || '<div class="text-gray text-sm" style="margin-bottom:8px;">Nenhum gozo neste período.</div>'}
+        ${readOnly ? '' : `<button class="btn btn-ghost btn-sm" onclick="addVacGozo('${emp.id}',${ai})">+ Período de gozo</button>`}
+        <div style="margin-top:10px;display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px;">
+          <div class="stat-box"><div class="stat-label">Dias usados</div><div class="stat-value blue">${st.diasUsados}</div></div>
+          <div class="stat-box"><div class="stat-label">Dias restantes</div><div class="stat-value ${st.restante < 0 ? 'red' : 'green'}">${st.restante}</div></div>
+          <div class="stat-box"><div class="stat-label">Total férias</div><div class="stat-value orange">${fmtBRL(st.totalPagar)}</div></div>
+          <div class="stat-box"><div class="stat-label">Já pago</div><div class="stat-value green">${fmtBRL(st.totalPago)}</div></div>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function scheduleVacSave() {
+  clearTimeout(window._vpTimer);
+  window._vpTimer = setTimeout(() => {
+    saveEmployees().then(() => { renderEmployees(); renderCalendar('ferias'); });
+  }, 600);
+}
+
+function addAquisitivoPeriod(eid) {
+  if (!canWrite()) return;
+  const emp = appData.employees.list.find(e => e.id === eid);
+  if (!emp) return;
+  normalizeFerias(emp);
+  const y = currentYear;
+  emp.ferias.aquisitivos.push({
+    id: 'aq' + Date.now(),
+    referencia: `${y}/${y + 1}`,
+    diasDireito: parseInt(emp.diasFerias) || 30,
+    gozos: []
+  });
+  saveEmployees().then(() => renderEmployees());
+}
+
+function removeAquisitivoPeriod(eid, ai) {
+  if (!canWrite()) return;
+  if (!confirm('Excluir este período aquisitivo e todos os gozos?')) return;
+  const emp = appData.employees.list.find(e => e.id === eid);
+  if (!emp?.ferias?.aquisitivos) return;
+  emp.ferias.aquisitivos.splice(ai, 1);
+  saveEmployees().then(() => { renderEmployees(); renderCalendar('ferias'); });
+}
+
+function updateAquisitivo(eid, ai, field, val) {
+  if (!canWrite()) return;
+  const emp = appData.employees.list.find(e => e.id === eid);
+  if (!emp?.ferias?.aquisitivos?.[ai]) return;
+  emp.ferias.aquisitivos[ai][field] = field === 'diasDireito' ? (parseInt(val) || 0) : val;
+  scheduleVacSave();
+}
+
+function addVacGozo(eid, ai) {
+  if (!canWrite()) return;
+  const emp = appData.employees.list.find(e => e.id === eid);
+  if (!emp?.ferias?.aquisitivos?.[ai]) return;
+  if (!emp.ferias.aquisitivos[ai].gozos) emp.ferias.aquisitivos[ai].gozos = [];
+  emp.ferias.aquisitivos[ai].gozos.push({
+    id: 'gz' + Date.now(),
+    start: '', end: '', dias: '', valorTotal: 0, pagamentos: []
+  });
+  saveEmployees().then(() => renderEmployees());
+}
+
+function removeVacGozo(eid, ai, gi) {
+  if (!canWrite()) return;
+  const emp = appData.employees.list.find(e => e.id === eid);
+  if (!emp?.ferias?.aquisitivos?.[ai]?.gozos) return;
+  emp.ferias.aquisitivos[ai].gozos.splice(gi, 1);
+  saveEmployees().then(() => { renderEmployees(); renderCalendar('ferias'); });
+}
+
+function updateVacGozo(eid, ai, gi, field, val) {
+  if (!canWrite()) return;
+  const emp = appData.employees.list.find(e => e.id === eid);
+  const gz = emp?.ferias?.aquisitivos?.[ai]?.gozos?.[gi];
+  if (!gz) return;
+  if (field === 'valorTotal') gz[field] = parseFloat(val) || 0;
+  else if (field === 'dias') gz[field] = val === '' ? '' : (parseInt(val) || 0);
+  else gz[field] = val;
+  scheduleVacSave();
+}
+
+function addVacPagamento(eid, ai, gi) {
+  if (!canWrite()) return;
+  const emp = appData.employees.list.find(e => e.id === eid);
+  const gz = emp?.ferias?.aquisitivos?.[ai]?.gozos?.[gi];
+  if (!gz) return;
+  if (!gz.pagamentos) gz.pagamentos = [];
+  gz.pagamentos.push({ desc: '', valor: '', dataPgto: '', pago: false });
+  saveEmployees().then(() => renderEmployees());
+}
+
+function removeVacPagamento(eid, ai, gi, pi) {
+  if (!canWrite()) return;
+  const emp = appData.employees.list.find(e => e.id === eid);
+  if (!emp?.ferias?.aquisitivos?.[ai]?.gozos?.[gi]?.pagamentos) return;
+  emp.ferias.aquisitivos[ai].gozos[gi].pagamentos.splice(pi, 1);
+  scheduleVacSave();
+}
+
+function updateVacPagamento(eid, ai, gi, pi, field, val) {
+  if (!canWrite()) return;
+  const emp = appData.employees.list.find(e => e.id === eid);
+  const pg = emp?.ferias?.aquisitivos?.[ai]?.gozos?.[gi]?.pagamentos?.[pi];
+  if (!pg) return;
+  if (field === 'valor') pg[field] = parseFloat(val) || 0;
+  else pg[field] = val;
+  scheduleVacSave();
+}
+
+function toggleVacPagamento(eid, ai, gi, pi) {
+  if (!canWrite()) return;
+  const emp = appData.employees.list.find(e => e.id === eid);
+  const pg = emp?.ferias?.aquisitivos?.[ai]?.gozos?.[gi]?.pagamentos?.[pi];
+  if (!pg) return;
+  pg.pago = !pg.pago;
+  scheduleVacSave();
+}
+
+function calcPeriodDays(start, end) {
+  if (!start || !end) return 0;
+  const s = new Date(start+'T00:00:00');
+  const e = new Date(end+'T00:00:00');
+  return Math.max(0, Math.ceil((e-s)/(1000*60*60*24)) + 1);
+}
+
+// =============================================
+// CALENDARS
+// =============================================
+const SHIFT_TYPES = [
+  { value: 'remunerado', label: 'Plantão Remunerado', cls: 'remunerado', pay: 200 },
+  { value: 'nao-remunerado', label: 'Não Remunerado', cls: 'nao-remunerado', pay: 0 },
+  { value: 'hora-extra', label: 'Hora Extra', cls: 'hora-extra', pay: 0 },
+  { value: 'meio-plantao', label: 'Meio Plantão', cls: 'meio-plantao', pay: 100 },
+  { value: 'dobra', label: 'Dobra', cls: 'dobra', pay: 50 }
+];
+
+const EMP_COLORS = ['#1e40af','#065f46','#92400e','#5b21b6','#9f1239','#0c4a6e'];
+
+function renderCalendar(type) {
+  const month = type === 'escala' ? calEscalaMonth : calFeriasMonth;
+  const year  = type === 'escala' ? calEscalaYear  : calFeriasYear;
+  const gridId = `cal-${type}-grid`;
+  const titleId = `cal-${type}-title`;
+  const gridEl = document.getElementById(gridId);
+  const titleEl = document.getElementById(titleId);
+  if (!gridEl || !titleEl) return;
+
+  titleEl.textContent = `${MONTHS[month]} ${year}`;
+
+  const firstDay = new Date(year, month, 1).getDay();
+  const daysInMonth = new Date(year, month+1, 0).getDate();
+  const prevDays = new Date(year, month, 0).getDate();
+
+  let html = '<div class="cal-grid">';
+  ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'].forEach(d=>{ html += `<div class="cal-header-day">${d}</div>`; });
+
+  for (let i = 0; i < firstDay; i++) {
+    html += `<div class="cal-day other-month"><div class="cal-day-num">${prevDays - firstDay + i + 1}</div></div>`;
+  }
+
+  const today = new Date(); today.setHours(0,0,0,0);
+
+  for (let d = 1; d <= daysInMonth; d++) {
+    const dateStr = `${year}-${String(month+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const isToday = (new Date(dateStr+'T00:00:00').getTime() === today.getTime());
+    let eventsHTML = '';
+
+    if (type === 'escala') {
+      const dayEvents = (appData.escala.events||{})[dateStr] || [];
+      dayEvents.forEach(ev=>{
+        const t = SHIFT_TYPES.find(s=>s.value===ev.type)||{cls:'',label:ev.type};
+        const emp = (appData.employees.list||[]).find(e=>e.id===ev.empId);
+        eventsHTML += `<div class="cal-event ${t.cls}">${escHtml(emp?emp.name.split(' ')[0]:'?')}</div>`;
+      });
+    } else {
+      (appData.employees.list||[]).forEach((emp,idx)=>{
+        normalizeFerias(emp);
+        (emp.ferias?.aquisitivos||[]).forEach(aq=>{
+          (aq.gozos||[]).forEach(g=>{
+            if (!g.start||!g.end) return;
+            if (dateStr >= g.start && dateStr <= g.end) {
+              eventsHTML += `<div class="cal-event ferias" style="background:${EMP_COLORS[idx%EMP_COLORS.length]}22;color:${EMP_COLORS[idx%EMP_COLORS.length]};" title="${escHtml((aq.referencia||'Férias') + ' · ' + fmtDate(g.start) + ' a ' + fmtDate(g.end))}">${escHtml(emp.name.split(' ')[0])}</div>`;
+            }
+          });
+        });
+      });
+    }
+
+    const clickAttr = (type === 'escala' && canWrite()) ? `onclick="openShiftModal('${dateStr}')"` : '';
+    html += `<div class="cal-day ${isToday?'today':''}" ${clickAttr} style="${!canWrite() && type==='escala' ? 'cursor:default;' : ''}">
+      <div class="cal-day-num">${d}</div>${eventsHTML}
+    </div>`;
+  }
+
+  const total = firstDay + daysInMonth;
+  const trailing = total % 7 === 0 ? 0 : 7 - (total % 7);
+  for (let d = 1; d <= trailing; d++) {
+    html += `<div class="cal-day other-month"><div class="cal-day-num">${d}</div></div>`;
+  }
+  html += '</div>';
+  gridEl.innerHTML = html;
+
+  if (type === 'escala') renderShiftSummary();
+  if (type === 'ferias') renderFeriasLegend();
+}
+
+function renderShiftSummary() {
+  const container = document.getElementById('shift-summary');
+  if (!container) return;
+  const totals = {};
+  Object.values(appData.escala.events||{}).forEach(dayEvs=>{
+    dayEvs.forEach(ev=>{
+      const t = SHIFT_TYPES.find(s=>s.value===ev.type);
+      if (!t) return;
+      if (!totals[ev.empId]) totals[ev.empId] = { pay: 0 };
+      totals[ev.empId][ev.type] = (totals[ev.empId][ev.type]||0) + 1;
+      totals[ev.empId].pay += t.pay;
+    });
+  });
+  const emps = appData.employees.list||[];
+  if (emps.length === 0) { container.innerHTML = '<div class="text-gray text-sm">Nenhum funcionário.</div>'; return; }
+  container.innerHTML = emps.map(e=>{
+    const t = totals[e.id] || { pay: 0 };
+    const lines = SHIFT_TYPES
+      .filter(st => t[st.value] && st.pay > 0)
+      .map(st => `<div style="display:flex;justify-content:space-between;font-size:12px;color:var(--gray-600);margin-top:3px;">
+        <span>${st.label}</span>
+        <span style="font-weight:600;">${t[st.value]}</span>
+      </div>`).join('');
+    return `<div class="shift-box" style="min-width:180px;">
+      <div class="shift-box-name" style="margin-bottom:6px;">${escHtml(e.name.split(' ')[0])}</div>
+      ${lines || '<div style="font-size:12px;color:var(--gray-400);">Nenhum plantão</div>'}
+      <div style="display:flex;justify-content:space-between;font-size:13px;font-weight:700;color:var(--success);margin-top:8px;padding-top:6px;border-top:1px solid var(--gray-200);">
+        <span>Total</span><span>${fmtBRL(t.pay)}</span>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function renderFeriasLegend() {
+  const legend = document.getElementById('ferias-legend');
+  legend.innerHTML = (appData.employees.list||[]).map((e,i)=>`
+    <div class="legend-item">
+      <div class="legend-dot" style="background:${EMP_COLORS[i%EMP_COLORS.length]};"></div>
+      ${escHtml(e.name)}
+    </div>`).join('');
+}
+
+function prevCalMonth(type) {
+  if (type==='escala') { calEscalaMonth--; if(calEscalaMonth<0){calEscalaMonth=11;calEscalaYear--;} }
+  else { calFeriasMonth--; if(calFeriasMonth<0){calFeriasMonth=11;calFeriasYear--;} }
+  renderCalendar(type);
+}
+function nextCalMonth(type) {
+  if (type==='escala') { calEscalaMonth++; if(calEscalaMonth>11){calEscalaMonth=0;calEscalaYear++;} }
+  else { calFeriasMonth++; if(calFeriasMonth>11){calFeriasMonth=0;calFeriasYear++;} }
+  renderCalendar(type);
+}
+
+function openShiftModal(dateStr) {
+  if (!canWrite()) return;
+  const emps = appData.employees.list||[];
+  if (emps.length === 0) return alert('Cadastre funcionários primeiro.');
+  const existing = (appData.escala.events||{})[dateStr]||[];
+
+  const existingRows = existing.map((ev,idx)=>{
+    const t = SHIFT_TYPES.find(s=>s.value===ev.type)||SHIFT_TYPES[0];
+    const emp = emps.find(e=>e.id===ev.empId);
+    return `<div style="display:flex;gap:8px;align-items:center;margin-bottom:6px;">
+      <span style="flex:1;font-size:13px;">${escHtml(emp?emp.name:'?')} — ${t.label}</span>
+      <button class="btn btn-sm btn-danger btn-icon" onclick="removeShiftEvent('${dateStr}',${idx})">✕</button>
+    </div>`;
+  }).join('');
+
+  openModal(`
+    <div class="modal-title">Escala — ${fmtDate(dateStr)}</div>
+    <div style="margin-bottom:12px;">${existingRows || '<div class="text-gray text-sm">Nenhum plantão neste dia.</div>'}</div>
+    <hr style="margin:12px 0;border-color:var(--gray-200);">
+    <div class="card-title" style="margin-bottom:10px;">Adicionar Plantão</div>
+    <div class="form-row">
+      <div class="form-group"><div class="form-label">Funcionário</div>
+        <select class="form-control" id="m-shift-emp">
+          ${emps.map(e=>`<option value="${e.id}">${escHtml(e.name)}</option>`).join('')}
+        </select>
+      </div>
+      <div class="form-group"><div class="form-label">Tipo</div>
+        <select class="form-control" id="m-shift-type">
+          ${SHIFT_TYPES.map(t=>`<option value="${t.value}">${t.label}</option>`).join('')}
+        </select>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal()">Fechar</button>
+      <button class="btn btn-primary" onclick="confirmAddShift('${dateStr}')">Adicionar</button>
+    </div>`);
+}
+
+function confirmAddShift(dateStr) {
+  if (!canWrite()) return;
+  const empId = document.getElementById('m-shift-emp').value;
+  const type = document.getElementById('m-shift-type').value;
+  if (!appData.escala.events) appData.escala.events = {};
+  if (!appData.escala.events[dateStr]) appData.escala.events[dateStr] = [];
+  appData.escala.events[dateStr].push({ empId, type });
+  // Reopen modal with updated list instead of closing
+  saveEscala().then(()=>{ renderCalendar('escala'); openShiftModal(dateStr); });
+}
+
+function removeShiftEvent(dateStr, idx) {
+  if (!canWrite()) return;
+  appData.escala.events[dateStr].splice(idx, 1);
+  if (appData.escala.events[dateStr].length === 0) delete appData.escala.events[dateStr];
+  saveEscala().then(()=>{ renderCalendar('escala'); openShiftModal(dateStr); });
+}
+
+// =============================================
+// TABS
+// =============================================
+function showTab(name, btn) {
+  if (isEmployeeView() && !['minha-area','escala','ferias'].includes(name)) return;
+  document.querySelectorAll('.tab-pane').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.navtab').forEach(b=>b.classList.remove('active'));
+  document.getElementById('tab-'+name).classList.add('active');
+  if (btn) btn.classList.add('active');
+}
+
+// =============================================
+// MODAL
+// =============================================
+function openModal(html) {
+  document.getElementById('modal-box').innerHTML = html;
+  document.getElementById('modal-overlay').classList.remove('hidden');
+}
+function closeModal() {
+  partialPaymentCtx = null;
+  document.getElementById('modal-overlay').classList.add('hidden');
+}
+function closeModalOnOverlay(e) {
+  if (e.target === document.getElementById('modal-overlay')) closeModal();
+}
+
+// =============================================
+// UTILS
+// =============================================
+function fmtBRL(val) {
+  return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(parseFloat(val)||0);
+}
+function fmtDate(dateStr) {
+  if (!dateStr) return '—';
+  const parts = dateStr.split('-');
+  return `${parts[2]}/${parts[1]}/${parts[0]}`;
+}
+function isOverdue(dateStr) {
+  if (!dateStr) return false;
+  const due = new Date(dateStr+'T00:00:00');
+  const today = new Date(); today.setHours(0,0,0,0);
+  return due < today;
+}
+function escHtml(str) {
+  if (!str) return '';
+  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+function set(id, val) {
+  const el = document.getElementById(id);
+  if (el) el.textContent = val;
+}
+
+// Google Sign In
+document.getElementById('google-signin-btn').addEventListener('click', async () => {
+  const provider = new firebase.auth.GoogleAuthProvider();
+  provider.setCustomParameters({ prompt: 'select_account' });
+  try {
+    await auth.signInWithPopup(provider);
+  } catch(e) {
+    const el = document.getElementById('auth-error');
+    if (el) el.textContent = 'Erro ao entrar: ' + e.message;
+  }
+});
+
+// START
+init();
+</script>
+</body>
+</html>
