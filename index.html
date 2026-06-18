@@ -1629,7 +1629,7 @@ function renderEmployeePortal() {
     salaryEl.innerHTML = '';
     const div = document.createElement('div');
     div.className = 'employee-card';
-    div.innerHTML = buildEmployeeCard(emp, pd, true);
+    div.innerHTML = buildEmployeeCard(emp, pd, true, true);
     salaryEl.appendChild(div);
   }
 }
@@ -2568,7 +2568,7 @@ function switchEmpTab(eid) {
   renderEmployees();
 }
 
-function buildEmployeeCard(emp, pd, readOnly = false) {
+function buildEmployeeCard(emp, pd, readOnly = false, hideValues = false) {
   if (!pd.decimoTerceiro) pd.decimoTerceiro = {};
   pd.decimoTerceiro = normalizeDecimoTerceiro(pd.decimoTerceiro);
   const thirteenth = pd.decimoTerceiro;
@@ -2590,7 +2590,7 @@ function buildEmployeeCard(emp, pd, readOnly = false) {
 
   const autoRowsReadOnly = autoLines.map(a=>`<tr style="background:var(--primary-light);">
     <td>${escHtml(a.nome)} <span style="font-size:10px;color:var(--primary);">●auto</span></td>
-    <td class="font-bold">${fmtBRL(a.valor)}</td>
+    ${hideValues ? '' : `<td class="font-bold">${fmtBRL(a.valor)}</td>`}
   </tr>`).join('');
 
   const autoRowsEdit = autoLines.map(a=>`
@@ -2602,7 +2602,7 @@ function buildEmployeeCard(emp, pd, readOnly = false) {
 
   const receitasHTML = readOnly
     ? (receitas.length || autoLines.length
-      ? `<table class="data-table"><thead><tr><th>Descrição</th><th>Valor</th></tr></thead><tbody>${receitas.map(r=>`<tr><td>${escHtml(r.nome)}</td><td class="font-bold">${fmtBRL(r.valor)}</td></tr>`).join('')}${autoRowsReadOnly}</tbody></table>`
+      ? `<table class="data-table"><thead><tr><th>Descrição</th>${hideValues ? '' : '<th>Valor</th>'}</tr></thead><tbody>${receitas.map(r=>`<tr><td>${escHtml(r.nome)}</td>${hideValues ? '' : `<td class="font-bold">${fmtBRL(r.valor)}</td>`}</tr>`).join('')}${autoRowsReadOnly}</tbody></table>`
       : '<div class="text-gray text-sm">Nenhuma receita neste mês.</div>')
     : receitas.map((r,i)=>`
     <div style="display:flex;gap:6px;align-items:center;margin-bottom:6px;">
@@ -2613,7 +2613,7 @@ function buildEmployeeCard(emp, pd, readOnly = false) {
 
   const descontosHTML = readOnly
     ? (descontos_list.length
-      ? `<table class="data-table"><thead><tr><th>Descrição</th><th>Valor</th></tr></thead><tbody>${descontos_list.map(d=>`<tr><td>${escHtml(d.nome)}</td><td class="font-bold">${fmtBRL(d.valor)}</td></tr>`).join('')}</tbody></table>`
+      ? `<table class="data-table"><thead><tr><th>Descrição</th>${hideValues ? '' : '<th>Valor</th>'}</tr></thead><tbody>${descontos_list.map(d=>`<tr><td>${escHtml(d.nome)}</td>${hideValues ? '' : `<td class="font-bold">${fmtBRL(d.valor)}</td>`}</tr>`).join('')}</tbody></table>`
       : '<div class="text-gray text-sm">Nenhum desconto neste mês.</div>')
     : descontos_list.map((d,i)=>`
     <div style="display:flex;gap:6px;align-items:center;margin-bottom:6px;">
@@ -2658,10 +2658,10 @@ function buildEmployeeCard(emp, pd, readOnly = false) {
             <span style="width:32px;"></span>
           </div>`}
           ${receitasHTML || '<div class="text-gray text-sm" style="margin-bottom:8px;">Nenhuma receita. Clique em + Receita.</div>'}
-          <div style="background:var(--success-light);border-radius:var(--radius);padding:8px 12px;margin-top:4px;display:flex;justify-content:space-between;">
+          ${hideValues ? '' : `<div style="background:var(--success-light);border-radius:var(--radius);padding:8px 12px;margin-top:4px;display:flex;justify-content:space-between;">
             <span style="font-size:12px;color:var(--success);">Total Receitas</span>
             <span class="emp-total-receitas" style="font-weight:700;color:var(--success);">${fmtBRL(totalReceitas)}</span>
-          </div>
+          </div>`}
         </div>
         <div>
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
@@ -2674,16 +2674,16 @@ function buildEmployeeCard(emp, pd, readOnly = false) {
             <span style="width:32px;"></span>
           </div>`}
           ${descontosHTML || '<div class="text-gray text-sm" style="margin-bottom:8px;">Nenhum desconto. Clique em + Desconto.</div>'}
-          <div style="background:var(--danger-light);border-radius:var(--radius);padding:8px 12px;margin-top:4px;display:flex;justify-content:space-between;">
+          ${hideValues ? '' : `<div style="background:var(--danger-light);border-radius:var(--radius);padding:8px 12px;margin-top:4px;display:flex;justify-content:space-between;">
             <span style="font-size:12px;color:var(--danger);">Total Descontos</span>
             <span class="emp-total-descontos" style="font-weight:700;color:var(--danger);">${fmtBRL(totalDescontos)}</span>
-          </div>
+          </div>`}
         </div>
       </div>
-      <div style="background:${pd.folhaPaga?'var(--success-light)':' var(--primary-light)'};border-radius:var(--radius);padding:12px 16px;margin-top:12px;display:flex;justify-content:space-between;align-items:center;">
+      ${hideValues ? '' : `<div style="background:${pd.folhaPaga?'var(--success-light)':' var(--primary-light)'};border-radius:var(--radius);padding:12px 16px;margin-top:12px;display:flex;justify-content:space-between;align-items:center;">
         <span style="font-size:12px;font-weight:600;color:${pd.folhaPaga?'var(--success)':' var(--primary)'};">💵 Líquido a Pagar</span>
         <span class="emp-liquido" style="font-weight:700;font-size:20px;color:${pd.folhaPaga?'var(--success)':' var(--primary)'};">${fmtBRL(liquido)}</span>
-      </div>
+      </div>`}
       <div style="margin-top:16px;">
         <div class="card-title" style="margin-bottom:10px;">🎄 13º Salário</div>
         <div class="form-group mb-1"><div class="form-label">Valor Total do 13º</div>
