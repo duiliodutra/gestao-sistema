@@ -7,6 +7,10 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <title>Gestão — Sistema</title>
+<link rel="icon" type="image/png" sizes="32x32" href="assets/icons/favicon-32.png">
+<link rel="apple-touch-icon" sizes="180x180" href="assets/icons/apple-touch-icon.png">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#1a56db">
 <style>
   :root {
     --primary: #1a56db;
@@ -700,8 +704,13 @@ window.addEventListener('unhandledrejection', function(e) {
 
     <!-- ===== DASHBOARD ===== -->
     <div class="tab-pane active" id="tab-dashboard">
-      <div class="section-title">Painel Principal</div>
-      <div class="section-desc" id="dashboard-period-label">Carregando...</div>
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:4px;">
+        <div>
+          <div class="section-title">Painel Principal</div>
+          <div class="section-desc" id="dashboard-period-label">Carregando...</div>
+        </div>
+        <button class="btn btn-primary" onclick="openQuickEntryModal()">+ Novo lançamento</button>
+      </div>
 
       <!-- COPY BANNERS (substituídos pelo menu Mês na topbar) -->
       <div class="copy-banner" id="copy-banner" style="display:none !important;"></div>
@@ -2143,6 +2152,85 @@ function deleteBlock(group, bid) {
   (group === 'empresa' ? saveEmpresa() : savePessoal()).then(() => { renderBlocks(group); renderDashboard(); updateCashflow(); });
 }
 
+function quickEntryBlockOptions(group) {
+  const blocks = Object.entries(appData[group]?.blocks || {});
+  const options = blocks.map(([bid, block]) => '<option value="' + bid + '">' + escHtml(block.name || 'Sem nome') + '</option>').join('');
+  return options + '<option value="__new">+ Criar novo bloco...</option>';
+}
+
+function openQuickEntryModal() {
+  if (!canWrite()) return;
+  const employees = appData.employees?.list || [];
+  const employeeOptions = employees.map(emp => '<option value="' + emp.id + '">' + escHtml(emp.name) + '</option>').join('') || '<option value="">Nenhum funcionário cadastrado</option>';
+  const html = [
+    '<div class="modal-title">Novo lançamento</div>',
+    '<div class="form-row">',
+    '<div class="form-group"><div class="form-label">Onde lançar?</div><select class="form-control" id="quick-dest" onchange="updateQuickEntryMode()"><option value="empresa">Empresa</option><option value="pessoal">Pessoal</option><option value="funcionario">Funcionário</option></select></div>',
+    '<div class="form-group quick-account-field"><div class="form-label">Tipo</div><select class="form-control" id="quick-account-tipo"><option value="despesa">Dívida / Despesa</option><option value="receita">Receita / Entrada</option></select></div>',
+    '<div class="form-group quick-employee-field" style="display:none;"><div class="form-label">Tipo</div><select class="form-control" id="quick-employee-tipo"><option value="receitas">Acréscimo</option><option value="descontos_list">Desconto</option></select></div>',
+    '</div>',
+    '<div class="form-row quick-account-field"><div class="form-group"><div class="form-label">Bloco</div><select class="form-control" id="quick-block" onchange="updateQuickEntryMode()">' + quickEntryBlockOptions('empresa') + '</select></div><div class="form-group" id="quick-new-block-wrap" style="display:none;"><div class="form-label">Nome do novo bloco</div><input type="text" class="form-control" id="quick-new-block" placeholder="Ex: Fornecedores, Serviços..."></div></div>',
+    '<div class="form-row quick-employee-field" style="display:none;"><div class="form-group"><div class="form-label">Funcionário</div><select class="form-control" id="quick-employee">' + employeeOptions + '</select></div></div>',
+    '<div class="form-row"><div class="form-group"><div class="form-label">Descrição</div><input type="text" class="form-control" id="quick-desc" placeholder="Ex: Conta de energia, pagamento extra..."></div><div class="form-group"><div class="form-label">Valor (R$)</div><input type="number" step="0.01" class="form-control" id="quick-value" placeholder="0,00"></div></div>',
+    '<div class="form-row quick-account-field"><div class="form-group"><div class="form-label">Vencimento / Data prevista</div><input type="date" class="form-control" id="quick-date"></div></div>',
+    '<div class="modal-footer"><button class="btn btn-ghost" onclick="closeModal()">Cancelar</button><button class="btn btn-primary" onclick="confirmQuickEntry()">Adicionar</button></div>'
+  ].join('');
+  openModal(html);
+  updateQuickEntryMode();
+  setTimeout(() => document.getElementById('quick-desc')?.focus(), 50);
+}
+
+function updateQuickEntryMode() {
+  const dest = document.getElementById('quick-dest')?.value || 'empresa';
+  const isEmployee = dest === 'funcionario';
+  document.querySelectorAll('.quick-account-field').forEach(el => { el.style.display = isEmployee ? 'none' : ''; });
+  document.querySelectorAll('.quick-employee-field').forEach(el => { el.style.display = isEmployee ? '' : 'none'; });
+  const blockSelect = document.getElementById('quick-block');
+  if (!isEmployee && blockSelect) {
+    const previous = blockSelect.value;
+    blockSelect.innerHTML = quickEntryBlockOptions(dest);
+    if ([...blockSelect.options].some(opt => opt.value === previous)) blockSelect.value = previous;
+  }
+  const newBlockWrap = document.getElementById('quick-new-block-wrap');
+  if (newBlockWrap && blockSelect) newBlockWrap.style.display = blockSelect.value === '__new' ? '' : 'none';
+}
+
+function confirmQuickEntry() {
+  if (!canWrite()) return;
+  const dest = document.getElementById('quick-dest')?.value || 'empresa';
+  const desc = document.getElementById('quick-desc')?.value.trim() || '';
+  const value = parseFloat(document.getElementById('quick-value')?.value) || 0;
+  if (!desc) return alert('Informe a descrição.');
+  if (value <= 0) return alert('Informe um valor maior que zero.');
+  if (dest === 'funcionario') {
+    const eid = document.getElementById('quick-employee')?.value;
+    const tipo = document.getElementById('quick-employee-tipo')?.value === 'descontos_list' ? 'descontos_list' : 'receitas';
+    if (!eid) return alert('Selecione um funcionário.');
+    if (!appData.employeePayments) appData.employeePayments = {};
+    if (!appData.employeePayments[eid]) appData.employeePayments[eid] = {};
+    if (!appData.employeePayments[eid][tipo]) appData.employeePayments[eid][tipo] = [];
+    appData.employeePayments[eid][tipo].push({ nome: desc, valor: value });
+    saveEmployeePayments().then(() => { renderEmployees(); renderDashboard(); updateCashflow(); closeModal(); });
+    return;
+  }
+  const group = dest === 'pessoal' ? 'pessoal' : 'empresa';
+  const tipo = document.getElementById('quick-account-tipo')?.value === 'receita' ? 'receita' : 'despesa';
+  const dueDate = document.getElementById('quick-date')?.value || '';
+  let bid = document.getElementById('quick-block')?.value;
+  if (!appData[group]) appData[group] = { blocks: {} };
+  if (!appData[group].blocks) appData[group].blocks = {};
+  if (bid === '__new' || !bid) {
+    const blockName = document.getElementById('quick-new-block')?.value.trim() || 'Lançamentos';
+    bid = 'block' + Date.now();
+    appData[group].blocks[bid] = { name: blockName, items: [] };
+  }
+  if (!appData[group].blocks[bid]) return alert('Selecione um bloco válido.');
+  const item = { desc, dueDate, value, tipo, paid: false, paidAmount: 0 };
+  normalizeBlockItem(item);
+  appData[group].blocks[bid].items.push(item);
+  activeBlockTab[group] = bid;
+  (group === 'empresa' ? saveEmpresa() : savePessoal()).then(() => { renderBlocks(group); renderDashboard(); updateCashflow(); closeModal(); });
+}
 function addItemToBlock(group, bid, tipo = 'despesa') {
   openModal(`
     <div class="modal-title">Novo ${tipo === 'receita' ? 'Receita' : 'Despesa'}</div>
@@ -2780,7 +2868,8 @@ function updateEmpLine(eid, tipo, idx, field, val) {
 
 function updateEmpTotalsInPlace(eid) {
   const pd = (appData.employeePayments||{})[eid] || {};
-  const totalR = (pd.receitas||[]).reduce((s,r)=>s+(parseFloat(r.valor)||0),0);
+  const shiftPay = calcEmpShiftPay(eid);
+  const totalR = (pd.receitas||[]).reduce((s,r)=>s+(parseFloat(r.valor)||0),0) + shiftPay.plantao + shiftPay.dobra;
   const totalD = (pd.descontos_list||[]).reduce((s,d)=>s+(parseFloat(d.valor)||0),0);
   const liq = totalR - totalD;
   const card = document.querySelector(`[data-empid="${eid}"]`);
