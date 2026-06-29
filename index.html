@@ -2172,11 +2172,13 @@ function openQuickEntryModal() {
     '<div class="form-row quick-account-field"><div class="form-group"><div class="form-label">Bloco</div><select class="form-control" id="quick-block" onchange="updateQuickEntryMode()">' + quickEntryBlockOptions('empresa') + '</select></div><div class="form-group" id="quick-new-block-wrap" style="display:none;"><div class="form-label">Nome do novo bloco</div><input type="text" class="form-control" id="quick-new-block" placeholder="Ex: Fornecedores, Serviços..."></div></div>',
     '<div class="form-row quick-employee-field" style="display:none;"><div class="form-group"><div class="form-label">Funcionário</div><select class="form-control" id="quick-employee">' + employeeOptions + '</select></div></div>',
     '<div class="form-row"><div class="form-group"><div class="form-label">Descrição</div><input type="text" class="form-control" id="quick-desc" placeholder="Ex: Conta de energia, pagamento extra..."></div><div class="form-group"><div class="form-label">Valor (R$)</div><input type="number" step="0.01" class="form-control" id="quick-value" placeholder="0,00"></div></div>',
-    '<div class="form-row quick-account-field"><div class="form-group"><div class="form-label">Vencimento / Data prevista</div><input type="date" class="form-control" id="quick-date"></div></div>',
+    '<div class="form-row"><div class="form-group"><div class="form-label" id="quick-date-label">Vencimento / Data prevista</div><input type="date" class="form-control" id="quick-date"></div></div>',
     '<div class="modal-footer"><button class="btn btn-ghost" onclick="closeModal()">Cancelar</button><button class="btn btn-primary" onclick="confirmQuickEntry()">Adicionar</button></div>'
   ].join('');
   openModal(html);
   updateQuickEntryMode();
+  const dateInput = document.getElementById('quick-date');
+  if (dateInput && !dateInput.value) dateInput.value = todayISO();
   setTimeout(() => document.getElementById('quick-desc')?.focus(), 50);
 }
 
@@ -2193,6 +2195,8 @@ function updateQuickEntryMode() {
   }
   const newBlockWrap = document.getElementById('quick-new-block-wrap');
   if (newBlockWrap && blockSelect) newBlockWrap.style.display = blockSelect.value === '__new' ? '' : 'none';
+  const dateLabel = document.getElementById('quick-date-label');
+  if (dateLabel) dateLabel.textContent = isEmployee ? 'Data do lançamento' : 'Vencimento / Data prevista';
 }
 
 function confirmQuickEntry() {
@@ -2209,7 +2213,8 @@ function confirmQuickEntry() {
     if (!appData.employeePayments) appData.employeePayments = {};
     if (!appData.employeePayments[eid]) appData.employeePayments[eid] = {};
     if (!appData.employeePayments[eid][tipo]) appData.employeePayments[eid][tipo] = [];
-    appData.employeePayments[eid][tipo].push({ nome: desc, valor: value });
+    const dataLancamento = document.getElementById('quick-date')?.value || todayISO();
+    appData.employeePayments[eid][tipo].push({ nome: desc, valor: value, dataLancamento });
     saveEmployeePayments().then(() => { renderEmployees(); renderDashboard(); updateCashflow(); closeModal(); });
     return;
   }
@@ -2677,12 +2682,14 @@ function buildEmployeeCard(emp, pd, readOnly = false, hideValues = false) {
   ].filter(Boolean);
 
   const autoRowsReadOnly = autoLines.map(a=>`<tr style="background:var(--primary-light);">
+    <td>Escala</td>
     <td>${escHtml(a.nome)} <span style="font-size:10px;color:var(--primary);">●auto</span></td>
     ${hideValues ? '' : `<td class="font-bold">${fmtBRL(a.valor)}</td>`}
   </tr>`).join('');
 
   const autoRowsEdit = autoLines.map(a=>`
     <div style="display:flex;gap:6px;align-items:center;margin-bottom:6px;background:var(--primary-light);padding:6px 8px;border-radius:var(--radius);">
+      <input type="text" class="form-control" style="flex:0 0 130px;background:var(--gray-100);color:var(--gray-500);" value="Escala" disabled>
       <input type="text" class="form-control" style="flex:2;background:var(--gray-100);color:var(--gray-500);" value="${escHtml(a.nome)}" disabled>
       <input type="number" class="form-control" style="flex:1;min-width:90px;background:var(--gray-100);color:var(--gray-500);" value="${a.valor}" disabled>
       <span style="width:32px;font-size:10px;color:var(--primary);text-align:center;">auto</span>
@@ -2690,10 +2697,11 @@ function buildEmployeeCard(emp, pd, readOnly = false, hideValues = false) {
 
   const receitasHTML = readOnly
     ? (receitas.length || autoLines.length
-      ? `<table class="data-table"><thead><tr><th>Descrição</th>${hideValues ? '' : '<th>Valor</th>'}</tr></thead><tbody>${receitas.map(r=>`<tr><td>${escHtml(r.nome)}</td>${hideValues ? '' : `<td class="font-bold">${fmtBRL(r.valor)}</td>`}</tr>`).join('')}${autoRowsReadOnly}</tbody></table>`
+      ? `<table class="data-table"><thead><tr><th>Data</th><th>Descrição</th>${hideValues ? '' : '<th>Valor</th>'}</tr></thead><tbody>${receitas.map(r=>`<tr><td>${fmtDate(r.dataLancamento || r.data || '')}</td><td>${escHtml(r.nome)}</td>${hideValues ? '' : `<td class="font-bold">${fmtBRL(r.valor)}</td>`}</tr>`).join('')}${autoRowsReadOnly}</tbody></table>`
       : '<div class="text-gray text-sm">Nenhuma receita neste mês.</div>')
     : receitas.map((r,i)=>`
     <div style="display:flex;gap:6px;align-items:center;margin-bottom:6px;">
+      <input type="date" class="form-control" style="flex:0 0 130px;" value="${r.dataLancamento || r.data || ''}" onchange="updateEmpLine('${emp.id}','receitas',${i},'dataLancamento',this.value)">
       <input type="text" class="form-control" style="flex:2;" value="${escHtml(r.nome)}" placeholder="Ex: Salário, Hora Extra..." onchange="updateEmpLine('${emp.id}','receitas',${i},'nome',this.value)">
       <input type="number" class="form-control" style="flex:1;min-width:90px;" value="${r.valor||''}" placeholder="0,00" onchange="updateEmpLine('${emp.id}','receitas',${i},'valor',this.value)">
       <button class="btn btn-sm btn-danger btn-icon" onclick="removeEmpLine('${emp.id}','receitas',${i})">✕</button>
@@ -2701,10 +2709,11 @@ function buildEmployeeCard(emp, pd, readOnly = false, hideValues = false) {
 
   const descontosHTML = readOnly
     ? (descontos_list.length
-      ? `<table class="data-table"><thead><tr><th>Descrição</th>${hideValues ? '' : '<th>Valor</th>'}</tr></thead><tbody>${descontos_list.map(d=>`<tr><td>${escHtml(d.nome)}</td>${hideValues ? '' : `<td class="font-bold">${fmtBRL(d.valor)}</td>`}</tr>`).join('')}</tbody></table>`
+      ? `<table class="data-table"><thead><tr><th>Data</th><th>Descrição</th>${hideValues ? '' : '<th>Valor</th>'}</tr></thead><tbody>${descontos_list.map(d=>`<tr><td>${fmtDate(d.dataLancamento || d.data || '')}</td><td>${escHtml(d.nome)}</td>${hideValues ? '' : `<td class="font-bold">${fmtBRL(d.valor)}</td>`}</tr>`).join('')}</tbody></table>`
       : '<div class="text-gray text-sm">Nenhum desconto neste mês.</div>')
     : descontos_list.map((d,i)=>`
     <div style="display:flex;gap:6px;align-items:center;margin-bottom:6px;">
+      <input type="date" class="form-control" style="flex:0 0 130px;" value="${d.dataLancamento || d.data || ''}" onchange="updateEmpLine('${emp.id}','descontos_list',${i},'dataLancamento',this.value)">
       <input type="text" class="form-control" style="flex:2;" value="${escHtml(d.nome)}" placeholder="Ex: INSS, Adiantamento..." onchange="updateEmpLine('${emp.id}','descontos_list',${i},'nome',this.value)">
       <input type="number" class="form-control" style="flex:1;min-width:90px;" value="${d.valor||''}" placeholder="0,00" onchange="updateEmpLine('${emp.id}','descontos_list',${i},'valor',this.value)">
       <button class="btn btn-sm btn-danger btn-icon" onclick="removeEmpLine('${emp.id}','descontos_list',${i})">✕</button>
@@ -2741,6 +2750,7 @@ function buildEmployeeCard(emp, pd, readOnly = false, hideValues = false) {
             ${readOnly ? '' : `<button class="btn btn-sm btn-success" onclick="addEmpLine('${emp.id}','receitas')">+ Receita</button>`}
           </div>
           ${readOnly ? '' : `<div style="display:flex;gap:6px;margin-bottom:4px;">
+            <span class="text-xs text-gray" style="flex:0 0 130px;">Data</span>
             <span class="text-xs text-gray" style="flex:2;">Descrição</span>
             <span class="text-xs text-gray" style="flex:1;">Valor</span>
             <span style="width:32px;"></span>
@@ -2757,6 +2767,7 @@ function buildEmployeeCard(emp, pd, readOnly = false, hideValues = false) {
             ${readOnly ? '' : `<button class="btn btn-sm btn-danger" onclick="addEmpLine('${emp.id}','descontos_list')">+ Desconto</button>`}
           </div>
           ${readOnly ? '' : `<div style="display:flex;gap:6px;margin-bottom:4px;">
+            <span class="text-xs text-gray" style="flex:0 0 130px;">Data</span>
             <span class="text-xs text-gray" style="flex:2;">Descrição</span>
             <span class="text-xs text-gray" style="flex:1;">Valor</span>
             <span style="width:32px;"></span>
@@ -2846,7 +2857,7 @@ function addEmpLine(eid, tipo) {
   if (!appData.employeePayments) appData.employeePayments = {};
   if (!appData.employeePayments[eid]) appData.employeePayments[eid] = {};
   if (!appData.employeePayments[eid][tipo]) appData.employeePayments[eid][tipo] = [];
-  appData.employeePayments[eid][tipo].push({ nome: '', valor: '' });
+  appData.employeePayments[eid][tipo].push({ nome: '', valor: '', dataLancamento: todayISO() });
   saveEmployeePayments().then(()=>renderEmployees());
 }
 
@@ -3046,7 +3057,7 @@ function addDecimoPagamento(eid) {
   if (!appData.employeePayments) appData.employeePayments = {};
   if (!appData.employeePayments[eid]) appData.employeePayments[eid] = {};
   appData.employeePayments[eid].decimoTerceiro = normalizeDecimoTerceiro(appData.employeePayments[eid].decimoTerceiro);
-  appData.employeePayments[eid].decimoTerceiro.pagamentos.push({ desc: '', valor: '', dataPgto: '', forma: '', pago: false });
+  appData.employeePayments[eid].decimoTerceiro.pagamentos.push({ desc: '', valor: '', dataPgto: todayISO(), forma: '', pago: false });
   saveEmployeePayments().then(() => renderEmployees());
 }
 
@@ -3542,6 +3553,9 @@ function closeModalOnOverlay(e) {
 // =============================================
 function fmtBRL(val) {
   return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(parseFloat(val)||0);
+}
+function todayISO() {
+  return new Date().toISOString().slice(0, 10);
 }
 function fmtDate(dateStr) {
   if (!dateStr) return '—';
