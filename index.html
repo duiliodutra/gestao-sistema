@@ -825,6 +825,7 @@ window.addEventListener('unhandledrejection', function(e) {
           <div class="section-desc">Controle de pagamentos, férias e 13º</div>
         </div>
         <div id="func-admin-controls">
+          <button class="btn btn-success" onclick="exportPayrollReceitas()">Exportar Salários</button>
           <button class="btn btn-primary" onclick="addEmployee()">+ Novo Funcionário</button>
         </div>
       </div>
@@ -2614,6 +2615,124 @@ function updateCashflow() {
 // =============================================
 let activeEmpTab = null;
 
+function buildPayrollReceitaRows() {
+  const rows = [];
+  (appData.employees.list || []).forEach(emp => {
+    if ((emp.name || '').trim().toLowerCase().includes('deyse')) return;
+    const pd = (appData.employeePayments || {})[emp.id] || {};
+    const receitas = (pd.receitas || [])
+      .filter(r => (r.nome && r.nome.trim()) || (parseFloat(r.valor) || 0) > 0)
+      .map(r => ({
+        nome: r.nome || 'Receita',
+        valor: parseFloat(r.valor) || 0,
+      }));
+    const shiftPay = calcEmpShiftPay(emp.id);
+    if (shiftPay.plantao > 0) receitas.push({ nome: 'Plantão (escala)', valor: shiftPay.plantao });
+    if (shiftPay.dobra > 0) receitas.push({ nome: 'Dobra (escala)', valor: shiftPay.dobra });
+
+    receitas.forEach(receita => {
+      rows.push({
+        funcionario: emp.name || '',
+        cargo: emp.cargo || '',
+        email: emp.email || '',
+        mes: MONTHS[currentMonth],
+        ano: currentYear,
+        descricao: receita.nome,
+        valor: receita.valor,
+      });
+    });
+  });
+  return rows;
+}
+
+function exportPayrollReceitas() {
+  const rows = buildPayrollReceitaRows();
+  if (!rows.length) {
+    alert('Não há receitas lançadas para exportar neste mês.');
+    return;
+  }
+
+  const money = v => (parseFloat(v) || 0).toFixed(2).replace('.', ',');
+  const cell = v => escHtml(String(v ?? ''));
+  let totalGeral = 0;
+  const byEmployee = new Map();
+
+  rows.forEach(row => {
+    const key = row.funcionario;
+    if (!byEmployee.has(key)) byEmployee.set(key, []);
+    byEmployee.get(key).push(row);
+  });
+
+  const bodyRows = [];
+  byEmployee.forEach((items, funcionario) => {
+    let subtotal = 0;
+    items.forEach(row => {
+      subtotal += row.valor;
+      totalGeral += row.valor;
+      bodyRows.push(`
+        <tr>
+          <td>${cell(row.funcionario)}</td>
+          <td>${cell(row.cargo)}</td>
+          <td>${cell(row.email)}</td>
+          <td>${cell(row.mes)}</td>
+          <td>${cell(row.ano)}</td>
+          <td>${cell(row.descricao)}</td>
+          <td style="mso-number-format:'0,00';">${money(row.valor)}</td>
+        </tr>`);
+    });
+    bodyRows.push(`
+      <tr style="font-weight:bold;background:#dcfce7;">
+        <td colspan="6">Subtotal - ${cell(funcionario)}</td>
+        <td style="mso-number-format:'0,00';">${money(subtotal)}</td>
+      </tr>`);
+  });
+
+  bodyRows.push(`
+    <tr style="font-weight:bold;background:#bbf7d0;">
+      <td colspan="6">Total Geral</td>
+      <td style="mso-number-format:'0,00';">${money(totalGeral)}</td>
+    </tr>`);
+
+  const html = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <style>
+    table { border-collapse: collapse; font-family: Arial, sans-serif; font-size: 12px; }
+    th, td { border: 1px solid #d1d5db; padding: 6px 8px; }
+    th { background: #16a34a; color: #fff; font-weight: bold; }
+  </style>
+</head>
+<body>
+  <h2>Salários Brutos - ${MONTHS[currentMonth]} ${currentYear}</h2>
+  <p>Exportação contém apenas receitas/salário bruto. Descontos, férias e 13º não foram incluídos.</p>
+  <table>
+    <thead>
+      <tr>
+        <th>Funcionário</th>
+        <th>Cargo</th>
+        <th>E-mail</th>
+        <th>Mês</th>
+        <th>Ano</th>
+        <th>Descrição</th>
+        <th>Valor</th>
+      </tr>
+    </thead>
+    <tbody>${bodyRows.join('')}</tbody>
+  </table>
+</body>
+</html>`;
+
+  const blob = new Blob(['\ufeff', html], { type: 'application/vnd.ms-excel;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `salarios-brutos-${currentYear}-${String(currentMonth + 1).padStart(2, '0')}.xls`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
 function renderEmployees() {
   const subtabs = document.getElementById('emp-subtabs');
   const container = document.getElementById('employees-container');
@@ -3585,3 +3704,4 @@ init();
 </script>
 </body>
 </html>
+
