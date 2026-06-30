@@ -2651,8 +2651,8 @@ function exportPayrollReceitas() {
     return;
   }
 
+  const csvCell = v => `"${String(v ?? '').replace(/"/g, '""')}"`;
   const money = v => (parseFloat(v) || 0).toFixed(2).replace('.', ',');
-  const cell = v => escHtml(String(v ?? ''));
   let totalGeral = 0;
   const byEmployee = new Map();
 
@@ -2662,69 +2662,34 @@ function exportPayrollReceitas() {
     byEmployee.get(key).push(row);
   });
 
-  const bodyRows = [];
+  const csvRows = [
+    ['Funcionário', 'Cargo', 'Mês', 'Ano', 'Descrição', 'Valor'].map(csvCell).join(';'),
+  ];
+
   byEmployee.forEach((items, funcionario) => {
     let subtotal = 0;
     items.forEach(row => {
       subtotal += row.valor;
       totalGeral += row.valor;
-      bodyRows.push(`
-        <tr>
-          <td>${cell(row.funcionario)}</td>
-          <td>${cell(row.cargo)}</td>
-          <td>${cell(row.mes)}</td>
-          <td>${cell(row.ano)}</td>
-          <td>${cell(row.descricao)}</td>
-          <td style="mso-number-format:'0,00';">${money(row.valor)}</td>
-        </tr>`);
+      csvRows.push([
+        row.funcionario,
+        row.cargo,
+        row.mes,
+        row.ano,
+        row.descricao,
+        money(row.valor),
+      ].map(csvCell).join(';'));
     });
-    bodyRows.push(`
-      <tr style="font-weight:bold;background:#dcfce7;">
-        <td colspan="5">Subtotal - ${cell(funcionario)}</td>
-        <td style="mso-number-format:'0,00';">${money(subtotal)}</td>
-      </tr>`);
+    csvRows.push(['Subtotal - ' + funcionario, '', '', '', '', money(subtotal)].map(csvCell).join(';'));
   });
 
-  bodyRows.push(`
-    <tr style="font-weight:bold;background:#bbf7d0;">
-      <td colspan="5">Total Geral</td>
-      <td style="mso-number-format:'0,00';">${money(totalGeral)}</td>
-    </tr>`);
+  csvRows.push(['Total Geral', '', '', '', '', money(totalGeral)].map(csvCell).join(';'));
 
-  const html = `<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="UTF-8">
-  <style>
-    table { border-collapse: collapse; font-family: Arial, sans-serif; font-size: 12px; }
-    th, td { border: 1px solid #d1d5db; padding: 6px 8px; }
-    th { background: #16a34a; color: #fff; font-weight: bold; }
-  </style>
-</head>
-<body>
-  <h2>Salários Brutos - ${MONTHS[currentMonth]} ${currentYear}</h2>
-  <p>Exportação contém apenas receitas/salário bruto. Descontos, férias e 13º não foram incluídos.</p>
-  <table>
-    <thead>
-      <tr>
-        <th>Funcionário</th>
-        <th>Cargo</th>
-        <th>Mês</th>
-        <th>Ano</th>
-        <th>Descrição</th>
-        <th>Valor</th>
-      </tr>
-    </thead>
-    <tbody>${bodyRows.join('')}</tbody>
-  </table>
-</body>
-</html>`;
-
-  const blob = new Blob(['\ufeff', html], { type: 'application/vnd.ms-excel;charset=utf-8;' });
+  const blob = new Blob(['\ufeff', csvRows.join('\r\n')], { type: 'text/csv;charset=utf-8;' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = `salarios-brutos-${currentYear}-${String(currentMonth + 1).padStart(2, '0')}.xls`;
+  a.download = `salarios-brutos-${currentYear}-${String(currentMonth + 1).padStart(2, '0')}.csv`;
   document.body.appendChild(a);
   a.click();
   a.remove();
