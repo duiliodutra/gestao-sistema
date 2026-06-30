@@ -2634,7 +2634,6 @@ function buildPayrollReceitaRows() {
       rows.push({
         funcionario: emp.name || '',
         cargo: emp.cargo || '',
-        email: emp.email || '',
         mes: MONTHS[currentMonth],
         ano: currentYear,
         descricao: receita.nome,
@@ -2673,7 +2672,6 @@ function exportPayrollReceitas() {
         <tr>
           <td>${cell(row.funcionario)}</td>
           <td>${cell(row.cargo)}</td>
-          <td>${cell(row.email)}</td>
           <td>${cell(row.mes)}</td>
           <td>${cell(row.ano)}</td>
           <td>${cell(row.descricao)}</td>
@@ -2682,14 +2680,14 @@ function exportPayrollReceitas() {
     });
     bodyRows.push(`
       <tr style="font-weight:bold;background:#dcfce7;">
-        <td colspan="6">Subtotal - ${cell(funcionario)}</td>
+        <td colspan="5">Subtotal - ${cell(funcionario)}</td>
         <td style="mso-number-format:'0,00';">${money(subtotal)}</td>
       </tr>`);
   });
 
   bodyRows.push(`
     <tr style="font-weight:bold;background:#bbf7d0;">
-      <td colspan="6">Total Geral</td>
+      <td colspan="5">Total Geral</td>
       <td style="mso-number-format:'0,00';">${money(totalGeral)}</td>
     </tr>`);
 
@@ -2711,7 +2709,6 @@ function exportPayrollReceitas() {
       <tr>
         <th>Funcionário</th>
         <th>Cargo</th>
-        <th>E-mail</th>
         <th>Mês</th>
         <th>Ano</th>
         <th>Descrição</th>
