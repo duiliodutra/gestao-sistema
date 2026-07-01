@@ -3213,8 +3213,36 @@ function updateEmpLineCobranca(eid, tipo, idx, cobranca) {
 function updateEmpLineParcelas(eid, tipo, idx, val) {
   const line = appData.employeePayments?.[eid]?.[tipo]?.[idx];
   if (!line?.parcela) return;
-  line.parcela.total = Math.max(line.parcela.atual, parseInt(val) || 2);
-  saveEmployeePayments().then(() => renderEmployees());
+  const total = Math.max(line.parcela.atual, parseInt(val) || 2);
+  line.parcela.total = total;
+  saveEmployeePayments().then(() => {
+    propagateEmpParcela(eid, tipo, line);
+    renderEmployees();
+  });
+}
+
+async function propagateEmpParcela(eid, tipo, baseLine) {
+  if (!canWrite()) return;
+  const total = baseLine.parcela?.total || 0;
+  for (let i = 2; i <= total; i++) {
+    let m = currentMonth + (i - 1), y = currentYear;
+    while (m > 11) { m -= 12; y++; }
+    const key = `${y}-${String(m + 1).padStart(2, '0')}`;
+    const ref = db.collection('months').doc(key).collection('employees').doc('payments');
+    const snap = await ref.get();
+    const data = snap.exists ? snap.data() : {};
+    if (!data[eid]) data[eid] = { receitas: [], descontos_list: [], folhaPaga: false };
+    if (!data[eid][tipo]) data[eid][tipo] = [];
+    const already = data[eid][tipo].some(l =>
+      l.nome === baseLine.nome &&
+      Math.abs((parseFloat(l.valor)||0) - (parseFloat(baseLine.valor)||0)) < 0.01 &&
+      l.parcela?.atual === i
+    );
+    if (!already) {
+      data[eid][tipo].push({ ...baseLine, parcela: { atual: i, total } });
+      await ref.set(data);
+    }
+  }
 }
 
 async function propagateEmpLine(eid, tipo, line) {
