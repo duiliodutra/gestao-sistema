@@ -1397,18 +1397,48 @@ async function loadMonthData() {
   const key = getMonthKey();
   document.getElementById('dashboard-period-label').textContent = `${MONTHS[currentMonth]} ${currentYear}`;
 
-  const eDoc = await db.collection('months').doc(key).collection('empresa').doc('data').get();
+  let pm = currentMonth - 1, py = currentYear;
+  if (pm < 0) { pm = 11; py--; }
+  const prevKey = `${py}-${String(pm + 1).padStart(2, '0')}`;
+
+  const [eDoc, pDoc, cfDoc, epDoc, esDoc, prevEDoc, prevPDoc, prevEpDoc, prevEsDoc] = await Promise.all([
+    db.collection('months').doc(key).collection('empresa').doc('data').get(),
+    db.collection('months').doc(key).collection('pessoal').doc('data').get(),
+    db.collection('months').doc(key).collection('cashflow').doc('data').get(),
+    db.collection('months').doc(key).collection('employees').doc('payments').get(),
+    db.collection('months').doc(key).collection('escala').doc('data').get(),
+    db.collection('months').doc(prevKey).collection('empresa').doc('data').get(),
+    db.collection('months').doc(prevKey).collection('pessoal').doc('data').get(),
+    db.collection('months').doc(prevKey).collection('employees').doc('payments').get(),
+    db.collection('months').doc(prevKey).collection('escala').doc('data').get(),
+  ]);
+
+  // Empresa — auto-seed from previous month if current is empty
   appData.empresa = eDoc.exists ? eDoc.data() : { blocks: {} };
   if (!appData.empresa.blocks) appData.empresa.blocks = {};
+  if (!eDoc.exists && prevEDoc.exists && canWrite()) {
+    const prev = prevEDoc.data();
+    if (Object.keys(prev.blocks || {}).length > 0) {
+      appData.empresa = copyBlocks(prev);
+      saveEmpresa().catch(() => {});
+    }
+  }
 
-  const pDoc = await db.collection('months').doc(key).collection('pessoal').doc('data').get();
+  // Pessoal — auto-seed from previous month if current is empty
   appData.pessoal = pDoc.exists ? pDoc.data() : { blocks: {} };
   if (!appData.pessoal.blocks) appData.pessoal.blocks = {};
+  if (!pDoc.exists && prevPDoc.exists && canWrite()) {
+    const prev = prevPDoc.data();
+    if (Object.keys(prev.blocks || {}).length > 0) {
+      appData.pessoal = copyBlocks(prev);
+      savePessoal().catch(() => {});
+    }
+  }
+
   normalizeAllBlockItems();
   sortGroupBlocks('empresa');
   sortGroupBlocks('pessoal');
 
-  const cfDoc = await db.collection('months').doc(key).collection('cashflow').doc('data').get();
   appData.cashflow = cfDoc.exists ? cfDoc.data() : {};
   const cfEmConta = document.getElementById('cf-em-conta');
   const cfRecebido = document.getElementById('cf-recebido');
@@ -1421,17 +1451,19 @@ async function loadMonthData() {
   appData.employees = empDoc.exists ? empDoc.data() : { list: [] };
   if (!appData.employees.list) appData.employees.list = [];
 
-  const epDoc = await db.collection('months').doc(key).collection('employees').doc('payments').get();
+  // Employee payments — auto-seed from previous month if current is empty
   appData.employeePayments = epDoc.exists ? epDoc.data() : {};
+  if (!epDoc.exists && prevEpDoc.exists && canWrite()) {
+    const prev = prevEpDoc.data();
+    if (Object.keys(prev || {}).length > 0) {
+      appData.employeePayments = copyEmployeePayments(prev, {});
+      saveEmployeePayments().catch(() => {});
+    }
+  }
 
-  const esDoc = await db.collection('months').doc(key).collection('escala').doc('data').get();
   appData.escala = esDoc.exists ? esDoc.data() : { events: {} };
   if (!appData.escala.events) appData.escala.events = {};
 
-  let pm = currentMonth - 1, py = currentYear;
-  if (pm < 0) { pm = 11; py--; }
-  const prevKey = `${py}-${String(pm + 1).padStart(2, '0')}`;
-  const prevEsDoc = await db.collection('months').doc(prevKey).collection('escala').doc('data').get();
   appData.prevEscala = prevEsDoc.exists ? prevEsDoc.data() : { events: {} };
   if (!appData.prevEscala.events) appData.prevEscala.events = {};
 
@@ -1439,8 +1471,6 @@ async function loadMonthData() {
   closeMonthMenu();
   updateMonthMenuState();
   await updateNewItemsBanner();
-  ensureRecorrenteForward().catch(() => {});
-  ensureEmpRecorrenteForward().catch(() => {});
   renderAll();
 }
 
@@ -2286,17 +2316,6 @@ function toggleParcelaField() {
   if (wrap) wrap.style.display = v === 'parcelado' ? '' : 'none';
 }
 
-async function ensureRecorrenteForward() {
-  if (!canWrite()) return;
-  for (const group of ['empresa', 'pessoal']) {
-    for (const [bid, block] of Object.entries(appData[group]?.blocks || {})) {
-      for (const item of (block.items || [])) {
-        if (item.recorrente) await propagateRecorrente(group, bid, item);
-      }
-    }
-  }
-}
-
 async function propagateRecorrente(group, bid, item) {
   const col = group === 'empresa' ? 'empresa' : 'pessoal';
   const blockName = appData[group]?.blocks[bid]?.name;
@@ -3107,18 +3126,6 @@ async function propagateEmpLine(eid, tipo, line) {
     if (!already) {
       data[eid][tipo].push({ ...line });
       await ref.set(data);
-    }
-  }
-}
-
-async function ensureEmpRecorrenteForward() {
-  if (!canWrite()) return;
-  const payments = appData.employeePayments || {};
-  for (const [eid, pd] of Object.entries(payments)) {
-    for (const tipo of ['receitas', 'descontos_list']) {
-      for (const line of (pd[tipo] || [])) {
-        if (line.recorrente) await propagateEmpLine(eid, tipo, line);
-      }
     }
   }
 }
