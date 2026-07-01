@@ -1443,39 +1443,20 @@ async function loadMonthData() {
   if (pm < 0) { pm = 11; py--; }
   const prevKey = `${py}-${String(pm + 1).padStart(2, '0')}`;
 
-  const [eDoc, pDoc, cfDoc, epDoc, esDoc, prevEDoc, prevPDoc, prevEpDoc, prevEsDoc] = await Promise.all([
+  const [eDoc, pDoc, cfDoc, epDoc, esDoc, prevEsDoc] = await Promise.all([
     db.collection('months').doc(key).collection('empresa').doc('data').get(),
     db.collection('months').doc(key).collection('pessoal').doc('data').get(),
     db.collection('months').doc(key).collection('cashflow').doc('data').get(),
     db.collection('months').doc(key).collection('employees').doc('payments').get(),
     db.collection('months').doc(key).collection('escala').doc('data').get(),
-    db.collection('months').doc(prevKey).collection('empresa').doc('data').get(),
-    db.collection('months').doc(prevKey).collection('pessoal').doc('data').get(),
-    db.collection('months').doc(prevKey).collection('employees').doc('payments').get(),
     db.collection('months').doc(prevKey).collection('escala').doc('data').get(),
   ]);
 
-  // Empresa — auto-seed from previous month if current is empty
   appData.empresa = eDoc.exists ? eDoc.data() : { blocks: {} };
   if (!appData.empresa.blocks) appData.empresa.blocks = {};
-  if (!eDoc.exists && prevEDoc.exists && canWrite()) {
-    const prev = prevEDoc.data();
-    if (Object.keys(prev.blocks || {}).length > 0) {
-      appData.empresa = copyBlocks(prev);
-      saveEmpresa().catch(() => {});
-    }
-  }
 
-  // Pessoal — auto-seed from previous month if current is empty
   appData.pessoal = pDoc.exists ? pDoc.data() : { blocks: {} };
   if (!appData.pessoal.blocks) appData.pessoal.blocks = {};
-  if (!pDoc.exists && prevPDoc.exists && canWrite()) {
-    const prev = prevPDoc.data();
-    if (Object.keys(prev.blocks || {}).length > 0) {
-      appData.pessoal = copyBlocks(prev);
-      savePessoal().catch(() => {});
-    }
-  }
 
   normalizeAllBlockItems();
   sortGroupBlocks('empresa');
@@ -1493,15 +1474,7 @@ async function loadMonthData() {
   appData.employees = empDoc.exists ? empDoc.data() : { list: [] };
   if (!appData.employees.list) appData.employees.list = [];
 
-  // Employee payments — auto-seed from previous month if current is empty
   appData.employeePayments = epDoc.exists ? epDoc.data() : {};
-  if (!epDoc.exists && prevEpDoc.exists && canWrite()) {
-    const prev = prevEpDoc.data();
-    if (Object.keys(prev || {}).length > 0) {
-      appData.employeePayments = copyEmployeePayments(prev, {});
-      saveEmployeePayments().catch(() => {});
-    }
-  }
 
   appData.escala = esDoc.exists ? esDoc.data() : { events: {} };
   if (!appData.escala.events) appData.escala.events = {};
@@ -1513,6 +1486,7 @@ async function loadMonthData() {
   closeMonthMenu();
   updateMonthMenuState();
   await updateNewItemsBanner();
+  ensureRecorrenteForward().catch(() => {});
   renderAll();
 }
 
@@ -2358,6 +2332,51 @@ function toggleParcelaField() {
   if (wrap) wrap.style.display = v === 'parcelado' ? '' : 'none';
 }
 
+async function ensureRecorrenteForward() {
+  if (!canWrite()) return;
+  for (const group of ['empresa', 'pessoal']) {
+    for (const [bid, block] of Object.entries(appData[group]?.blocks || {})) {
+      for (const item of (block.items || [])) {
+        if (item.recorrente) await propagateRecorrente(group, bid, item);
+      }
+    }
+  }
+}
+
+async function propagateParcela(group, bid, baseItem) {
+  if (!canWrite()) return;
+  const col = group;
+  const blockName = appData[group]?.blocks[bid]?.name;
+  const total = baseItem.parcela?.total || 0;
+  for (let i = 2; i <= total; i++) {
+    let m = currentMonth + (i - 1), y = currentYear;
+    while (m > 11) { m -= 12; y++; }
+    const key = `${y}-${String(m + 1).padStart(2, '0')}`;
+    const ref = db.collection('months').doc(key).collection(col).doc('data');
+    const snap = await ref.get();
+    const data = snap.exists ? snap.data() : { blocks: {} };
+    if (!data.blocks) data.blocks = {};
+    const matchEntry = Object.entries(data.blocks).find(([, b]) => b.name === blockName);
+    const blockId = matchEntry ? matchEntry[0] : bid;
+    if (!data.blocks[blockId]) data.blocks[blockId] = { name: blockName, items: [] };
+    if (!data.blocks[blockId].items) data.blocks[blockId].items = [];
+    const already = data.blocks[blockId].items.some(ci =>
+      ci.desc === baseItem.desc && getItemTipo(ci) === getItemTipo(baseItem) &&
+      Math.abs((parseFloat(ci.value) || 0) - (parseFloat(baseItem.value) || 0)) < 0.01 &&
+      ci.parcela?.atual === i
+    );
+    if (!already) {
+      let dueDate = baseItem.dueDate;
+      if (dueDate) {
+        const parts = dueDate.split('-');
+        if (parts.length === 3) dueDate = `${y}-${String(m + 1).padStart(2, '0')}-${parts[2]}`;
+      }
+      data.blocks[blockId].items.push({ ...baseItem, dueDate, paid: false, paidAmount: 0, parcela: { atual: i, total } });
+      await ref.set(data);
+    }
+  }
+}
+
 async function propagateRecorrente(group, bid, item) {
   const col = group === 'empresa' ? 'empresa' : 'pessoal';
   const blockName = appData[group]?.blocks[bid]?.name;
@@ -2414,6 +2433,7 @@ function confirmAddItem(group, bid) {
   const saveNow = group === 'empresa' ? saveEmpresa() : savePessoal();
   saveNow.then(async () => {
     if (newItem.recorrente) await propagateRecorrente(group, bid, newItem);
+    else if (newItem.parcela) await propagateParcela(group, bid, newItem);
     renderBlocks(group); renderDashboard(); updateCashflow(); closeModal();
   });
 }
@@ -2475,6 +2495,7 @@ function confirmEditItem(group, bid, idx) {
   const saveNow = group === 'empresa' ? saveEmpresa() : savePessoal();
   saveNow.then(async () => {
     if (updated.recorrente) await propagateRecorrente(group, bid, updated);
+    else if (updated.parcela?.atual === 1) await propagateParcela(group, bid, updated);
     renderBlocks(group); renderDashboard(); updateCashflow(); closeModal();
   });
 }
