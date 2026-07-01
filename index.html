@@ -667,7 +667,7 @@ window.addEventListener('unhandledrejection', function(e) {
           📋 Mês <span id="month-menu-badge" class="month-menu-badge hidden"></span> ▾
         </button>
         <div class="month-menu-dropdown hidden" id="month-menu-dropdown">
-          <button class="month-menu-item" type="button" onclick="openCopyMonthModal()">Copiar do mês anterior</button>
+          <button class="month-menu-item" type="button" onclick="mergeFromPrevMonth()">Mesclar do mês anterior</button>
           <button class="month-menu-item" type="button" id="month-menu-copy-new" style="display:none;" onclick="openCopyNewItemsModal()">Copiar novos boletos (<span id="month-menu-new-count">0</span>)</button>
           <div class="month-menu-divider"></div>
           <button class="month-menu-item danger" type="button" onclick="openResetMonthModal()">Zerar dados deste mês</button>
@@ -1167,6 +1167,48 @@ function updateMonthMenuState() {
   }
   if (copyNewBtn) copyNewBtn.style.display = newCount > 0 ? 'block' : 'none';
   if (newCountEl) newCountEl.textContent = String(newCount);
+}
+
+async function mergeFromPrevMonth() {
+  closeMonthMenu();
+  let pm = currentMonth - 1, py = currentYear;
+  if (pm < 0) { pm = 11; py--; }
+  const prevKey = `${py}-${String(pm + 1).padStart(2, '0')}`;
+  const [prevEDoc, prevPDoc, prevEpDoc] = await Promise.all([
+    db.collection('months').doc(prevKey).collection('empresa').doc('data').get(),
+    db.collection('months').doc(prevKey).collection('pessoal').doc('data').get(),
+    db.collection('months').doc(prevKey).collection('employees').doc('payments').get(),
+  ]);
+  let changed = false;
+  // Merge blocks: add items from prev month that don't exist in current month
+  for (const [group, prevDoc] of [['empresa', prevEDoc], ['pessoal', prevPDoc]]) {
+    if (!prevDoc.exists) continue;
+    const prev = copyBlocks(prevDoc.data()); // applies parcela/recorrente logic
+    for (const [bid, prevBlock] of Object.entries(prev.blocks || {})) {
+      const curBlock = appData[group].blocks[bid];
+      if (!curBlock) { appData[group].blocks[bid] = prevBlock; changed = true; continue; }
+      for (const item of (prevBlock.items || [])) {
+        const exists = (curBlock.items || []).some(ci =>
+          ci.desc === item.desc && getItemTipo(ci) === getItemTipo(item) &&
+          Math.abs((parseFloat(ci.value)||0) - (parseFloat(item.value)||0)) < 0.01
+        );
+        if (!exists) { if (!curBlock.items) curBlock.items = []; curBlock.items.push(item); changed = true; }
+      }
+    }
+  }
+  // Merge employee payments
+  if (prevEpDoc.exists) {
+    const merged = copyEmployeePayments(prevEpDoc.data(), appData.employeePayments);
+    const before = JSON.stringify(appData.employeePayments);
+    if (JSON.stringify(merged) !== before) { appData.employeePayments = merged; changed = true; }
+  }
+  if (changed) {
+    await Promise.all([saveEmpresa(), savePessoal(), saveEmployeePayments()]);
+    renderAll();
+    renderDashboard();
+    updateCashflow();
+  }
+  alert(changed ? 'Itens do mês anterior mesclados com sucesso!' : 'Nenhum item novo encontrado para mesclar.');
 }
 
 function openCopyMonthModal() {
