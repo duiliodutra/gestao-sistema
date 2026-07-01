@@ -1439,6 +1439,7 @@ async function loadMonthData() {
   closeMonthMenu();
   updateMonthMenuState();
   await updateNewItemsBanner();
+  ensureRecorrenteForward().catch(() => {});
   renderAll();
 }
 
@@ -2271,6 +2272,17 @@ function toggleParcelaField() {
   const v = document.getElementById('m-item-cobranca')?.value;
   const wrap = document.getElementById('m-parcelas-wrap');
   if (wrap) wrap.style.display = v === 'parcelado' ? '' : 'none';
+}
+
+async function ensureRecorrenteForward() {
+  if (!canWrite()) return;
+  for (const group of ['empresa', 'pessoal']) {
+    for (const [bid, block] of Object.entries(appData[group]?.blocks || {})) {
+      for (const item of (block.items || [])) {
+        if (item.recorrente) await propagateRecorrente(group, bid, item);
+      }
+    }
+  }
 }
 
 async function propagateRecorrente(group, bid, item) {
