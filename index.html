@@ -1440,6 +1440,7 @@ async function loadMonthData() {
   updateMonthMenuState();
   await updateNewItemsBanner();
   ensureRecorrenteForward().catch(() => {});
+  ensureEmpRecorrenteForward().catch(() => {});
   renderAll();
 }
 
@@ -1508,8 +1509,19 @@ async function copyFromPreviousMonth() {
   function copyEmployeePayments(src, current = {}) {
     const result = JSON.parse(JSON.stringify(current));
     Object.entries(src || {}).forEach(([eid, pd]) => {
+      if (!result[eid]) result[eid] = { receitas: [], descontos_list: [], folhaPaga: false };
       if (isEmptyPayment(result[eid])) {
-        result[eid] = JSON.parse(JSON.stringify(pd));
+        // copy only recorrente/parcela lines, not normal ones
+        const filterLines = lines => (lines || []).reduce((acc, line) => {
+          if (line.recorrente) { acc.push({ ...line, paid: false }); }
+          else if (line.parcela) {
+            const next = line.parcela.atual + 1;
+            if (next <= line.parcela.total) acc.push({ ...line, parcela: { atual: next, total: line.parcela.total } });
+          }
+          return acc;
+        }, []);
+        result[eid].receitas = filterLines(pd.receitas);
+        result[eid].descontos_list = filterLines(pd.descontos_list);
         result[eid].folhaPaga = false;
       }
     });
@@ -2869,25 +2881,41 @@ function buildEmployeeCard(emp, pd, readOnly = false, hideValues = false) {
       <span style="width:32px;font-size:10px;color:var(--primary);text-align:center;">auto</span>
     </div>`).join('');
 
+  function empLineBadge(line) {
+    if (line.recorrente) return ' <span style="font-size:10px;background:#e0f2fe;color:#0369a1;padding:1px 5px;border-radius:10px;">🔄</span>';
+    if (line.parcela) return ` <span style="font-size:10px;background:#f3e8ff;color:#7c3aed;padding:1px 5px;border-radius:10px;">${line.parcela.atual}/${line.parcela.total}</span>`;
+    return '';
+  }
+  function empLineSelect(line, eid, tipo, i) {
+    const v = line.recorrente ? 'recorrente' : (line.parcela ? 'parcelado' : 'normal');
+    return `<select class="form-control" style="flex:0 0 auto;width:120px;font-size:11px;padding:4px 6px;" onchange="updateEmpLineCobranca('${eid}','${tipo}',${i},this.value)">
+      <option value="normal" ${v==='normal'?'selected':''}>Normal</option>
+      <option value="recorrente" ${v==='recorrente'?'selected':''}>🔄 Recorrente</option>
+      <option value="parcelado" ${v==='parcelado'?'selected':''}>📅 Parcelado</option>
+    </select>${v==='parcelado'?`<input type="number" min="2" max="120" class="form-control" style="width:60px;font-size:11px;" placeholder="Parc." value="${line.parcela?.total||''}" onchange="updateEmpLineParcelas('${eid}','${tipo}',${i},this.value)" title="Total de parcelas">`:''}`;
+  }
+
   const receitasHTML = readOnly
     ? (receitas.length || autoLines.length
-      ? `<table class="data-table"><thead><tr><th>Descrição</th>${hideValues ? '' : '<th>Valor</th>'}</tr></thead><tbody>${receitas.map(r=>`<tr><td>${escHtml(r.nome)}</td>${hideValues ? '' : `<td class="font-bold">${fmtBRL(r.valor)}</td>`}</tr>`).join('')}${autoRowsReadOnly}</tbody></table>`
+      ? `<table class="data-table"><thead><tr><th>Descrição</th>${hideValues ? '' : '<th>Valor</th>'}</tr></thead><tbody>${receitas.map(r=>`<tr><td>${escHtml(r.nome)}${empLineBadge(r)}</td>${hideValues ? '' : `<td class="font-bold">${fmtBRL(r.valor)}</td>`}</tr>`).join('')}${autoRowsReadOnly}</tbody></table>`
       : '<div class="text-gray text-sm">Nenhuma receita neste mês.</div>')
     : receitas.map((r,i)=>`
-    <div style="display:flex;gap:6px;align-items:center;margin-bottom:6px;">
-      <input type="text" class="form-control" style="flex:2;" value="${escHtml(r.nome)}" placeholder="Ex: Salário, Hora Extra..." onchange="updateEmpLine('${emp.id}','receitas',${i},'nome',this.value)">
-      <input type="number" class="form-control" style="flex:1;min-width:90px;" value="${r.valor||''}" placeholder="0,00" onchange="updateEmpLine('${emp.id}','receitas',${i},'valor',this.value)">
+    <div style="display:flex;gap:6px;align-items:center;margin-bottom:6px;flex-wrap:wrap;">
+      <input type="text" class="form-control" style="flex:2;min-width:120px;" value="${escHtml(r.nome)}" placeholder="Ex: Salário, Hora Extra..." onchange="updateEmpLine('${emp.id}','receitas',${i},'nome',this.value)">
+      <input type="number" class="form-control" style="flex:1;min-width:80px;" value="${r.valor||''}" placeholder="0,00" onchange="updateEmpLine('${emp.id}','receitas',${i},'valor',this.value)">
+      ${empLineSelect(r, emp.id, 'receitas', i)}
       <button class="btn btn-sm btn-danger btn-icon" onclick="removeEmpLine('${emp.id}','receitas',${i})">✕</button>
     </div>`).join('') + autoRowsEdit;
 
   const descontosHTML = readOnly
     ? (descontos_list.length
-      ? `<table class="data-table"><thead><tr><th>Descrição</th>${hideValues ? '' : '<th>Valor</th>'}</tr></thead><tbody>${descontos_list.map(d=>`<tr><td>${escHtml(d.nome)}</td>${hideValues ? '' : `<td class="font-bold">${fmtBRL(d.valor)}</td>`}</tr>`).join('')}</tbody></table>`
+      ? `<table class="data-table"><thead><tr><th>Descrição</th>${hideValues ? '' : '<th>Valor</th>'}</tr></thead><tbody>${descontos_list.map(d=>`<tr><td>${escHtml(d.nome)}${empLineBadge(d)}</td>${hideValues ? '' : `<td class="font-bold">${fmtBRL(d.valor)}</td>`}</tr>`).join('')}</tbody></table>`
       : '<div class="text-gray text-sm">Nenhum desconto neste mês.</div>')
     : descontos_list.map((d,i)=>`
-    <div style="display:flex;gap:6px;align-items:center;margin-bottom:6px;">
-      <input type="text" class="form-control" style="flex:2;" value="${escHtml(d.nome)}" placeholder="Ex: INSS, Adiantamento..." onchange="updateEmpLine('${emp.id}','descontos_list',${i},'nome',this.value)">
-      <input type="number" class="form-control" style="flex:1;min-width:90px;" value="${d.valor||''}" placeholder="0,00" onchange="updateEmpLine('${emp.id}','descontos_list',${i},'valor',this.value)">
+    <div style="display:flex;gap:6px;align-items:center;margin-bottom:6px;flex-wrap:wrap;">
+      <input type="text" class="form-control" style="flex:2;min-width:120px;" value="${escHtml(d.nome)}" placeholder="Ex: INSS, Adiantamento..." onchange="updateEmpLine('${emp.id}','descontos_list',${i},'nome',this.value)">
+      <input type="number" class="form-control" style="flex:1;min-width:80px;" value="${d.valor||''}" placeholder="0,00" onchange="updateEmpLine('${emp.id}','descontos_list',${i},'valor',this.value)">
+      ${empLineSelect(d, emp.id, 'descontos_list', i)}
       <button class="btn btn-sm btn-danger btn-icon" onclick="removeEmpLine('${emp.id}','descontos_list',${i})">✕</button>
     </div>`).join('');
 
@@ -3034,6 +3062,59 @@ function addEmpLine(eid, tipo) {
 function removeEmpLine(eid, tipo, idx) {
   appData.employeePayments[eid][tipo].splice(idx, 1);
   saveEmployeePayments().then(()=>{ renderEmployees(); renderDashboard(); });
+}
+
+function updateEmpLineCobranca(eid, tipo, idx, cobranca) {
+  if (!appData.employeePayments?.[eid]?.[tipo]) return;
+  const line = appData.employeePayments[eid][tipo][idx];
+  delete line.recorrente; delete line.parcela;
+  if (cobranca === 'recorrente') {
+    line.recorrente = true;
+    propagateEmpLine(eid, tipo, line);
+  } else if (cobranca === 'parcelado') {
+    line.parcela = { atual: 1, total: 2 };
+  }
+  saveEmployeePayments().then(() => renderEmployees());
+}
+
+function updateEmpLineParcelas(eid, tipo, idx, val) {
+  const line = appData.employeePayments?.[eid]?.[tipo]?.[idx];
+  if (!line?.parcela) return;
+  line.parcela.total = Math.max(line.parcela.atual, parseInt(val) || 2);
+  saveEmployeePayments().then(() => renderEmployees());
+}
+
+async function propagateEmpLine(eid, tipo, line) {
+  if (!canWrite()) return;
+  for (let i = 1; i <= 3; i++) {
+    let m = currentMonth + i, y = currentYear;
+    if (m > 11) { m -= 12; y++; }
+    const key = `${y}-${String(m + 1).padStart(2, '0')}`;
+    const ref = db.collection('months').doc(key).collection('employees').doc('payments');
+    const snap = await ref.get();
+    const data = snap.exists ? snap.data() : {};
+    if (!data[eid]) data[eid] = { receitas: [], descontos_list: [], folhaPaga: false };
+    if (!data[eid][tipo]) data[eid][tipo] = [];
+    const already = data[eid][tipo].some(l =>
+      l.nome === line.nome && Math.abs((parseFloat(l.valor)||0) - (parseFloat(line.valor)||0)) < 0.01 && l.recorrente
+    );
+    if (!already) {
+      data[eid][tipo].push({ ...line });
+      await ref.set(data);
+    }
+  }
+}
+
+async function ensureEmpRecorrenteForward() {
+  if (!canWrite()) return;
+  const payments = appData.employeePayments || {};
+  for (const [eid, pd] of Object.entries(payments)) {
+    for (const tipo of ['receitas', 'descontos_list']) {
+      for (const line of (pd[tipo] || [])) {
+        if (line.recorrente) await propagateEmpLine(eid, tipo, line);
+      }
+    }
+  }
 }
 
 function updateEmpLine(eid, tipo, idx, field, val) {
