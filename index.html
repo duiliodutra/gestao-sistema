@@ -1169,6 +1169,34 @@ function updateMonthMenuState() {
   if (newCountEl) newCountEl.textContent = String(newCount);
 }
 
+async function importBlockFromPrevMonth(group, bid) {
+  if (!canWrite()) return;
+  let pm = currentMonth - 1, py = currentYear;
+  if (pm < 0) { pm = 11; py--; }
+  const prevKey = `${py}-${String(pm + 1).padStart(2, '0')}`;
+  const snap = await db.collection('months').doc(prevKey).collection(group).doc('data').get();
+  if (!snap.exists) { alert('Nenhum dado encontrado no mês anterior.'); return; }
+  const prevData = snap.data();
+  const blockName = appData[group].blocks[bid]?.name;
+  const prevBlockEntry = Object.entries(prevData.blocks || {}).find(([, b]) => b.name === blockName);
+  if (!prevBlockEntry) { alert(`Bloco "${blockName}" não encontrado no mês anterior.`); return; }
+  const prevBlock = copyBlocks({ blocks: { [prevBlockEntry[0]]: prevBlockEntry[1] } });
+  const prevItems = prevBlock.blocks[prevBlockEntry[0]]?.items || [];
+  if (!appData[group].blocks[bid].items) appData[group].blocks[bid].items = [];
+  let added = 0;
+  for (const item of prevItems) {
+    const exists = appData[group].blocks[bid].items.some(ci =>
+      ci.desc === item.desc && getItemTipo(ci) === getItemTipo(item) &&
+      Math.abs((parseFloat(ci.value) || 0) - (parseFloat(item.value) || 0)) < 0.01
+    );
+    if (!exists) { appData[group].blocks[bid].items.push(item); added++; }
+  }
+  if (added === 0) { alert('Todos os itens já estão neste bloco.'); return; }
+  (group === 'empresa' ? saveEmpresa() : savePessoal()).then(() => {
+    renderBlocks(group); renderDashboard(); updateCashflow();
+  });
+}
+
 async function mergeFromPrevMonth() {
   closeMonthMenu();
   let pm = currentMonth - 1, py = currentYear;
@@ -2072,6 +2100,7 @@ function renderBlocks(group) {
         <div class="block-total" title="Despesas menos receitas">${fmtBRL(bt.net)}</div>
         <button class="btn btn-sm btn-ghost" onclick="addItemToBlock('${group}','${bid}','despesa')">+ Despesa</button>
         <button class="btn btn-sm btn-ghost" onclick="addItemToBlock('${group}','${bid}','receita')">+ Receita</button>
+        <button class="btn btn-sm btn-ghost" onclick="importBlockFromPrevMonth('${group}','${bid}')" title="Puxar itens do mês anterior para este bloco">↙ Mês ant.</button>
         <button class="btn btn-sm btn-ghost" onclick="editBlockName('${group}','${bid}')">✏️</button>
         <button class="btn btn-sm btn-danger" onclick="deleteBlock('${group}','${bid}')">🗑️</button>
       </div>
