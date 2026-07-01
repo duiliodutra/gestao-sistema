@@ -1186,8 +1186,7 @@ async function importBlockFromPrevMonth(group, bid) {
   let added = 0;
   for (const item of prevItems) {
     const exists = appData[group].blocks[bid].items.some(ci =>
-      ci.desc === item.desc && getItemTipo(ci) === getItemTipo(item) &&
-      Math.abs((parseFloat(ci.value) || 0) - (parseFloat(item.value) || 0)) < 0.01
+      ci.desc === item.desc && getItemTipo(ci) === getItemTipo(item)
     );
     if (!exists) { appData[group].blocks[bid].items.push(item); added++; }
   }
@@ -1514,7 +1513,6 @@ async function loadMonthData() {
   closeMonthMenu();
   updateMonthMenuState();
   await updateNewItemsBanner();
-  ensureRecorrenteForward().catch(() => {});
   renderAll();
 }
 
