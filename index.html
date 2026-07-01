@@ -1479,16 +1479,17 @@ async function copyFromPreviousMonth() {
   function copyBlocks(src) {
     const newBlocks = {};
     Object.entries(src.blocks || {}).forEach(([bid, block]) => {
-      newBlocks[bid] = {
-        ...block,
-        items: (block.items || []).map(item => ({
-          ...item,
-          tipo: getItemTipo(item),
-          paid: false,
-          paidAmount: 0,
-          dueDate: advanceDateToCurrentMonth(item.dueDate)
-        }))
-      };
+      const items = (block.items || []).reduce((acc, item) => {
+        if (item.parcela) {
+          const next = item.parcela.atual + 1;
+          if (next > item.parcela.total) return acc; // última parcela cumprida, não copia
+          acc.push({ ...item, tipo: getItemTipo(item), paid: false, paidAmount: 0, dueDate: advanceDateToCurrentMonth(item.dueDate), parcela: { atual: next, total: item.parcela.total } });
+        } else {
+          acc.push({ ...item, tipo: getItemTipo(item), paid: false, paidAmount: 0, dueDate: advanceDateToCurrentMonth(item.dueDate) });
+        }
+        return acc;
+      }, []);
+      newBlocks[bid] = { ...block, items };
     });
     return { blocks: newBlocks };
   }
@@ -2034,7 +2035,7 @@ function renderBlockItems(group, bid, items) {
     return `<tr>
       ${selectCell}
       <td><span class="badge ${receita ? 'badge-receita' : 'badge-despesa'}">${receita ? 'Receita' : 'Despesa'}</span></td>
-      <td>${escHtml(item.desc)}</td>
+      <td>${escHtml(item.desc)}${item.recorrente ? ' <span style="font-size:11px;background:#e0f2fe;color:#0369a1;padding:1px 6px;border-radius:10px;">🔄 recorrente</span>' : ''}${item.parcela ? ` <span style="font-size:11px;background:#f3e8ff;color:#7c3aed;padding:1px 6px;border-radius:10px;">📅 ${item.parcela.atual}/${item.parcela.total}</span>` : ''}</td>
       <td>${fmtDate(item.dueDate)}</td>
       <td>${renderItemValueHtml(item)}</td>
       <td><span class="badge ${st.cls}">${st.text}</span></td>
@@ -2058,7 +2059,7 @@ function renderBlockItems(group, bid, items) {
         <div style="display:flex;align-items:flex-start;gap:0;flex:1;min-width:0;">
           ${selectBox}
           <div style="min-width:0;">
-            <div class="item-card-title">${escHtml(item.desc)}</div>
+            <div class="item-card-title">${escHtml(item.desc)}${item.recorrente ? ' <span style="font-size:10px;background:#e0f2fe;color:#0369a1;padding:1px 5px;border-radius:10px;">🔄</span>' : ''}${item.parcela ? ` <span style="font-size:10px;background:#f3e8ff;color:#7c3aed;padding:1px 5px;border-radius:10px;">${item.parcela.atual}/${item.parcela.total}</span>` : ''}</div>
             <div class="item-card-meta">${fmtDate(item.dueDate)} · <span class="badge ${receita ? 'badge-receita' : 'badge-despesa'}">${receita ? 'Receita' : 'Despesa'}</span></div>
           </div>
         </div>
@@ -2158,10 +2159,27 @@ function addItemToBlock(group, bid, tipo = 'despesa') {
       <div class="form-label">Valor (R$)</div>
       <input type="number" step="0.01" class="form-control" id="m-item-value" placeholder="0,00">
     </div></div>
+    <div class="form-row"><div class="form-group">
+      <div class="form-label">Tipo de cobrança</div>
+      <select class="form-control" id="m-item-cobranca" onchange="toggleParcelaField()">
+        <option value="normal">Normal (uma vez)</option>
+        <option value="recorrente">🔄 Recorrente (todo mês)</option>
+        <option value="parcelado">📅 Parcelado</option>
+      </select>
+    </div><div class="form-group" id="m-parcelas-wrap" style="display:none;">
+      <div class="form-label">Nº de parcelas</div>
+      <input type="number" min="2" max="120" class="form-control" id="m-item-parcelas" placeholder="Ex: 12">
+    </div></div>
     <div class="modal-footer">
       <button class="btn btn-ghost" onclick="closeModal()">Cancelar</button>
       <button class="btn btn-primary" onclick="confirmAddItem('${group}','${bid}')">Adicionar</button>
     </div>`);
+}
+
+function toggleParcelaField() {
+  const v = document.getElementById('m-item-cobranca')?.value;
+  const wrap = document.getElementById('m-parcelas-wrap');
+  if (wrap) wrap.style.display = v === 'parcelado' ? '' : 'none';
 }
 
 function confirmAddItem(group, bid) {
@@ -2169,15 +2187,26 @@ function confirmAddItem(group, bid) {
   const dueDate = document.getElementById('m-item-date').value;
   const value = parseFloat(document.getElementById('m-item-value').value) || 0;
   const tipo = document.getElementById('m-item-tipo')?.value === 'receita' ? 'receita' : 'despesa';
+  const cobranca = document.getElementById('m-item-cobranca')?.value || 'normal';
   if (!desc) return alert('Informe a descrição.');
   if (!appData[group].blocks[bid].items) appData[group].blocks[bid].items = [];
-  appData[group].blocks[bid].items.push({ desc, dueDate, value, tipo, paid: false, paidAmount: 0 });
+  const newItem = { desc, dueDate, value, tipo, paid: false, paidAmount: 0 };
+  if (cobranca === 'recorrente') {
+    newItem.recorrente = true;
+  } else if (cobranca === 'parcelado') {
+    const total = parseInt(document.getElementById('m-item-parcelas')?.value) || 2;
+    if (total < 2) return alert('Informe ao menos 2 parcelas.');
+    newItem.parcela = { atual: 1, total };
+  }
+  appData[group].blocks[bid].items.push(newItem);
   (group === 'empresa' ? saveEmpresa() : savePessoal()).then(() => { renderBlocks(group); renderDashboard(); updateCashflow(); closeModal(); });
 }
 
 function editItem(group, bid, idx) {
   const item = appData[group].blocks[bid].items[idx];
   const tipo = getItemTipo(item);
+  const cobranca = item.recorrente ? 'recorrente' : (item.parcela ? 'parcelado' : 'normal');
+  const parcelasDisplay = item.parcela ? `${item.parcela.atual}/${item.parcela.total}` : '';
   openModal(`
     <div class="modal-title">Editar Item</div>
     ${itemTipoSelectHtml(tipo)}
@@ -2192,6 +2221,17 @@ function editItem(group, bid, idx) {
       <div class="form-label">Valor (R$)</div>
       <input type="number" step="0.01" class="form-control" id="m-item-value" value="${item.value||0}">
     </div></div>
+    <div class="form-row"><div class="form-group">
+      <div class="form-label">Tipo de cobrança</div>
+      <select class="form-control" id="m-item-cobranca" onchange="toggleParcelaField()">
+        <option value="normal" ${cobranca==='normal'?'selected':''}>Normal (uma vez)</option>
+        <option value="recorrente" ${cobranca==='recorrente'?'selected':''}>🔄 Recorrente (todo mês)</option>
+        <option value="parcelado" ${cobranca==='parcelado'?'selected':''}>📅 Parcelado</option>
+      </select>
+    </div><div class="form-group" id="m-parcelas-wrap" style="display:${cobranca==='parcelado'?'':'none'};">
+      <div class="form-label">Parcela ${parcelasDisplay ? `(atual: ${parcelasDisplay})` : ''} — total</div>
+      <input type="number" min="2" max="120" class="form-control" id="m-item-parcelas" value="${item.parcela?.total||''}">
+    </div></div>
     <div class="modal-footer">
       <button class="btn btn-ghost" onclick="closeModal()">Cancelar</button>
       <button class="btn btn-primary" onclick="confirmEditItem('${group}','${bid}',${idx})">Salvar</button>
@@ -2203,9 +2243,17 @@ function confirmEditItem(group, bid, idx) {
   const dueDate = document.getElementById('m-item-date').value;
   const value = parseFloat(document.getElementById('m-item-value').value) || 0;
   const tipo = document.getElementById('m-item-tipo')?.value === 'receita' ? 'receita' : 'despesa';
+  const cobranca = document.getElementById('m-item-cobranca')?.value || 'normal';
   if (!desc) return;
   const prev = appData[group].blocks[bid].items[idx];
   const updated = { ...prev, desc, dueDate, value, tipo };
+  delete updated.recorrente; delete updated.parcela;
+  if (cobranca === 'recorrente') {
+    updated.recorrente = true;
+  } else if (cobranca === 'parcelado') {
+    const total = parseInt(document.getElementById('m-item-parcelas')?.value) || prev.parcela?.total || 2;
+    updated.parcela = { atual: prev.parcela?.atual || 1, total };
+  }
   normalizeBlockItem(updated);
   appData[group].blocks[bid].items[idx] = updated;
   (group === 'empresa' ? saveEmpresa() : savePessoal()).then(() => { renderBlocks(group); renderDashboard(); updateCashflow(); closeModal(); });
