@@ -2273,6 +2273,36 @@ function toggleParcelaField() {
   if (wrap) wrap.style.display = v === 'parcelado' ? '' : 'none';
 }
 
+async function propagateRecorrente(group, bid, item) {
+  const col = group === 'empresa' ? 'empresa' : 'pessoal';
+  for (let i = 1; i <= 3; i++) {
+    let m = currentMonth + i, y = currentYear;
+    if (m > 11) { m -= 12; y++; }
+    const key = `${y}-${String(m + 1).padStart(2, '0')}`;
+    const ref = db.collection('months').doc(key).collection(col).doc('data');
+    const snap = await ref.get();
+    const data = snap.exists ? snap.data() : { blocks: {} };
+    if (!data.blocks) data.blocks = {};
+    const block = Object.values(data.blocks).find(b => b.name === appData[group].blocks[bid]?.name);
+    const blockId = block ? Object.keys(data.blocks).find(k => data.blocks[k].name === block.name) : bid;
+    if (!data.blocks[blockId]) data.blocks[blockId] = { ...(appData[group].blocks[bid] || {}), items: [] };
+    if (!data.blocks[blockId].items) data.blocks[blockId].items = [];
+    const already = data.blocks[blockId].items.some(ci =>
+      ci.desc === item.desc && getItemTipo(ci) === getItemTipo(item) &&
+      Math.abs((parseFloat(ci.value)||0) - (parseFloat(item.value)||0)) < 0.01 && ci.recorrente
+    );
+    if (!already) {
+      let dueDate = item.dueDate;
+      if (dueDate) {
+        const parts = dueDate.split('-');
+        if (parts.length === 3) dueDate = `${y}-${String(m+1).padStart(2,'0')}-${parts[2]}`;
+      }
+      data.blocks[blockId].items.push({ ...item, dueDate, paid: false, paidAmount: 0 });
+      await ref.set(data);
+    }
+  }
+}
+
 function confirmAddItem(group, bid) {
   const desc = document.getElementById('m-item-desc').value.trim();
   const dueDate = document.getElementById('m-item-date').value;
@@ -2290,7 +2320,11 @@ function confirmAddItem(group, bid) {
     newItem.parcela = { atual: 1, total };
   }
   appData[group].blocks[bid].items.push(newItem);
-  (group === 'empresa' ? saveEmpresa() : savePessoal()).then(() => { renderBlocks(group); renderDashboard(); updateCashflow(); closeModal(); });
+  const saveNow = group === 'empresa' ? saveEmpresa() : savePessoal();
+  saveNow.then(async () => {
+    if (newItem.recorrente) await propagateRecorrente(group, bid, newItem);
+    renderBlocks(group); renderDashboard(); updateCashflow(); closeModal();
+  });
 }
 
 function editItem(group, bid, idx) {
@@ -2347,7 +2381,11 @@ function confirmEditItem(group, bid, idx) {
   }
   normalizeBlockItem(updated);
   appData[group].blocks[bid].items[idx] = updated;
-  (group === 'empresa' ? saveEmpresa() : savePessoal()).then(() => { renderBlocks(group); renderDashboard(); updateCashflow(); closeModal(); });
+  const saveNow = group === 'empresa' ? saveEmpresa() : savePessoal();
+  saveNow.then(async () => {
+    if (updated.recorrente) await propagateRecorrente(group, bid, updated);
+    renderBlocks(group); renderDashboard(); updateCashflow(); closeModal();
+  });
 }
 
 function deleteItem(group, bid, idx) {
