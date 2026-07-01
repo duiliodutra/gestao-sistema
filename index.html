@@ -3025,7 +3025,7 @@ function buildEmployeeCard(emp, pd, readOnly = false, hideValues = false) {
       <option value="normal" ${v==='normal'?'selected':''}>Normal</option>
       <option value="recorrente" ${v==='recorrente'?'selected':''}>🔄 Recorrente</option>
       <option value="parcelado" ${v==='parcelado'?'selected':''}>📅 Parcelado</option>
-    </select>${v==='parcelado'?`<input type="number" min="2" max="120" class="form-control" style="width:60px;font-size:11px;" placeholder="Parc." value="${line.parcela?.total||''}" onchange="updateEmpLineParcelas('${eid}','${tipo}',${i},this.value)" title="Total de parcelas">`:''}`;
+    </select>${line.parcela ? `<span style="font-size:11px;background:#f3e8ff;color:#7c3aed;padding:2px 7px;border-radius:10px;white-space:nowrap;">${line.parcela.atual}/${line.parcela.total}</span><input type="number" min="${line.parcela.atual}" max="120" class="form-control" style="width:52px;font-size:11px;" value="${line.parcela.total}" onchange="updateEmpLineParcelas('${eid}','${tipo}',${i},this.value)" title="Total de parcelas">` : ''}`;
   }
 
   const receitasHTML = readOnly
