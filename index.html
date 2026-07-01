@@ -3064,6 +3064,7 @@ function buildEmployeeCard(emp, pd, readOnly = false, hideValues = false) {
              <button class="btn btn-sm btn-ghost" onclick="toggleFolhaPaga('${emp.id}')">Reabrir</button>`
           : `<button class="btn btn-success" onclick="toggleFolhaPaga('${emp.id}')">✓ Marcar Folha Paga — ${fmtBRL(liquido)}</button>`
         }
+        <button class="btn btn-sm btn-ghost" onclick="importEmpFromPrevMonth('${emp.id}')">↙ Mês ant.</button>
         <button class="btn btn-sm btn-ghost" onclick="editEmployee('${emp.id}')">✏️ Editar</button>
         <button class="btn btn-sm btn-danger" onclick="deleteEmployee('${emp.id}')">🗑️</button>`;
 
@@ -3174,6 +3175,36 @@ function calcLiquido(pd, empId) {
   const d = (pd.descontos_list||[]).reduce((s,x)=>s+(parseFloat(x.valor)||0),0);
   const shift = empId ? calcEmpShiftPay(empId) : { plantao: 0, dobra: 0 };
   return r + shift.plantao + shift.dobra - d;
+}
+
+async function importEmpFromPrevMonth(eid) {
+  if (!canWrite()) return;
+  let pm = currentMonth - 1, py = currentYear;
+  if (pm < 0) { pm = 11; py--; }
+  const prevKey = `${py}-${String(pm + 1).padStart(2, '0')}`;
+  const snap = await db.collection('months').doc(prevKey).collection('employees').doc('payments').get();
+  if (!snap.exists || !snap.data()[eid]) { alert('Nenhum dado do mês anterior para este funcionário.'); return; }
+  const prev = snap.data()[eid];
+  if (!appData.employeePayments[eid]) appData.employeePayments[eid] = { receitas: [], descontos_list: [], folhaPaga: false };
+  let added = 0;
+  for (const tipo of ['receitas', 'descontos_list']) {
+    if (!appData.employeePayments[eid][tipo]) appData.employeePayments[eid][tipo] = [];
+    for (const line of (prev[tipo] || [])) {
+      // skip normal items (no recorrente, no parcela)
+      if (!line.recorrente && !line.parcela) continue;
+      // skip if parcela is at last installment
+      if (line.parcela && line.parcela.atual >= line.parcela.total) continue;
+      const exists = appData.employeePayments[eid][tipo].some(l => l.nome === line.nome);
+      if (!exists) {
+        const nextLine = { ...line };
+        if (nextLine.parcela) nextLine.parcela = { atual: nextLine.parcela.atual + 1, total: nextLine.parcela.total };
+        appData.employeePayments[eid][tipo].push(nextLine);
+        added++;
+      }
+    }
+  }
+  if (added === 0) { alert('Nenhum item novo (recorrente/parcelado) para importar.'); return; }
+  saveEmployeePayments().then(() => { renderEmployees(); renderDashboard(); updateCashflow(); });
 }
 
 function toggleFolhaPaga(eid) {
