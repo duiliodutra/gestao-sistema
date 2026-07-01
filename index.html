@@ -626,11 +626,17 @@
 <script>
 window.onerror = function(msg, src, line, col, err) {
   var el = document.getElementById('global-error');
-  if (el) { el.style.display='block'; el.textContent = 'Erro: ' + msg + ' (linha ' + line + ')'; }
+  var bar = document.getElementById('debug-bar');
+  var text = 'Erro: ' + msg + ' (linha ' + line + ')';
+  if (el) { el.style.display='block'; el.textContent = text; }
+  if (bar) { bar.style.display='block'; bar.textContent = 'ERRO: ' + msg + ' (linha ' + line + ')'; }
 };
 window.addEventListener('unhandledrejection', function(e) {
   var el = document.getElementById('global-error');
-  if (el) { el.style.display='block'; el.textContent = 'Erro: ' + (e.reason && e.reason.message ? e.reason.message : e.reason); }
+  var bar = document.getElementById('debug-bar');
+  var text = 'Erro: ' + (e.reason && e.reason.message ? e.reason.message : e.reason);
+  if (el) { el.style.display='block'; el.textContent = text; }
+  if (bar) { bar.style.display='block'; bar.textContent = 'ERRO: ' + text; }
 });
 </script>
 
@@ -887,17 +893,6 @@ window.addEventListener('unhandledrejection', function(e) {
 <script src="https://cdn.jsdelivr.net/npm/firebase@10.12.0/firebase-firestore-compat.min.js"></script>
 
 <script>
-// Global error catcher for debugging
-window.onerror = function(msg, src, line, col, err) {
-  const bar = document.getElementById('debug-bar');
-  if (bar) { bar.style.display='block'; bar.textContent = 'ERRO: ' + msg + ' (linha ' + line + ')'; }
-  return false;
-};
-window.addEventListener('unhandledrejection', function(e) {
-  const bar = document.getElementById('debug-bar');
-  if (bar) { bar.style.display='block'; bar.textContent = 'ERRO: ' + (e.reason?.message || e.reason); }
-});
-
 // =============================================
 // FIREBASE CONFIG
 // =============================================
@@ -1187,6 +1182,27 @@ function copyBlocks(src) {
   return { blocks: newBlocks };
 }
 
+function copyEmployeePayments(src, current = {}) {
+  const result = JSON.parse(JSON.stringify(current));
+  Object.entries(src || {}).forEach(([eid, pd]) => {
+    if (!result[eid]) result[eid] = { receitas: [], descontos_list: [], folhaPaga: false };
+    if (isEmptyPayment(result[eid])) {
+      const filterLines = lines => (lines || []).reduce((acc, line) => {
+        if (line.recorrente) { acc.push({ ...line, paid: false }); }
+        else if (line.parcela) {
+          const next = line.parcela.atual + 1;
+          if (next <= line.parcela.total) acc.push({ ...line, parcela: { atual: next, total: line.parcela.total } });
+        }
+        return acc;
+      }, []);
+      result[eid].receitas = filterLines(pd.receitas);
+      result[eid].descontos_list = filterLines(pd.descontos_list);
+      result[eid].folhaPaga = false;
+    }
+  });
+  return result;
+}
+
 async function importBlockFromPrevMonth(group, bid) {
   if (!canWrite()) return;
   let pm = currentMonth - 1, py = currentYear;
@@ -1256,39 +1272,10 @@ async function mergeFromPrevMonth() {
   alert(changed ? 'Itens do mês anterior mesclados com sucesso!' : 'Nenhum item novo encontrado para mesclar.');
 }
 
-function openCopyMonthModal() {
-  closeMonthMenu();
-  const { label } = getPreviousMonthKey();
-  const missing = getMissingCopySections();
-  const period = `${MONTHS[currentMonth]} ${currentYear}`;
-  const body = missing.length
-    ? `<p style="font-size:13px;color:var(--gray-600);line-height:1.5;margin-bottom:16px;">
-        Copiar de <strong>${label}</strong> para <strong>${period}</strong> apenas o que ainda está vazio:<br>
-        <strong>${missing.join(', ')}</strong>.
-      </p>
-      <p style="font-size:12px;color:var(--gray-400);">Se já copiou e editou boletos, use <strong>Zerar dados deste mês</strong> antes de copiar novamente.</p>`
-    : `<p style="font-size:13px;color:var(--gray-600);line-height:1.5;margin-bottom:16px;">
-        Este mês já possui todos os dados. Nada será copiado de <strong>${label}</strong>.
-      </p>
-      <p style="font-size:12px;color:var(--gray-400);">Para recopiar tudo, primeiro use <strong>Zerar dados deste mês</strong>.</p>`;
-  openModal(`
-    <div class="modal-title">Copiar do mês anterior</div>
-    ${body}
-    <div class="modal-footer">
-      <button class="btn btn-ghost" onclick="closeModal()">Cancelar</button>
-      <button class="btn btn-primary" ${missing.length ? '' : 'disabled'} onclick="confirmCopyMonth()">Copiar</button>
-    </div>`);
-}
-
-function confirmCopyMonth() {
-  closeModal();
-  copyFromPreviousMonth();
-}
-
 function openCopyNewItemsModal() {
   closeMonthMenu();
   if (pendingNewItems.length === 0) return;
-  const { prevLabel } = getPreviousMonthKey();
+  const { label: prevLabel } = getPreviousMonthKey();
   const count = pendingNewItems.length;
   const noun = count === 1 ? 'boleto' : 'boletos';
   openModal(`
@@ -1577,46 +1564,6 @@ async function copyFromPreviousMonth() {
     db.collection('months').doc(prevKey).collection('escala').doc('data').get(),
     db.collection('months').doc(prevKey).collection('cashflow').doc('data').get()
   ]);
-
-  function copyBlocks(src) {
-    const newBlocks = {};
-    Object.entries(src.blocks || {}).forEach(([bid, block]) => {
-      const items = (block.items || []).reduce((acc, item) => {
-        if (item.parcela) {
-          const next = item.parcela.atual + 1;
-          if (next > item.parcela.total) return acc; // última parcela cumprida, não copia
-          acc.push({ ...item, tipo: getItemTipo(item), paid: false, paidAmount: 0, dueDate: advanceDateToCurrentMonth(item.dueDate), parcela: { atual: next, total: item.parcela.total } });
-        } else {
-          acc.push({ ...item, tipo: getItemTipo(item), paid: false, paidAmount: 0, dueDate: advanceDateToCurrentMonth(item.dueDate) });
-        }
-        return acc;
-      }, []);
-      newBlocks[bid] = { ...block, items };
-    });
-    return { blocks: newBlocks };
-  }
-
-  function copyEmployeePayments(src, current = {}) {
-    const result = JSON.parse(JSON.stringify(current));
-    Object.entries(src || {}).forEach(([eid, pd]) => {
-      if (!result[eid]) result[eid] = { receitas: [], descontos_list: [], folhaPaga: false };
-      if (isEmptyPayment(result[eid])) {
-        // copy only recorrente/parcela lines, not normal ones
-        const filterLines = lines => (lines || []).reduce((acc, line) => {
-          if (line.recorrente) { acc.push({ ...line, paid: false }); }
-          else if (line.parcela) {
-            const next = line.parcela.atual + 1;
-            if (next <= line.parcela.total) acc.push({ ...line, parcela: { atual: next, total: line.parcela.total } });
-          }
-          return acc;
-        }, []);
-        result[eid].receitas = filterLines(pd.receitas);
-        result[eid].descontos_list = filterLines(pd.descontos_list);
-        result[eid].folhaPaga = false;
-      }
-    });
-    return result;
-  }
 
   function seedEmployeePaymentsFromSalario() {
     const result = {};
@@ -2377,17 +2324,6 @@ function toggleParcelaField() {
   if (wrap) wrap.style.display = v === 'parcelado' ? '' : 'none';
 }
 
-async function ensureRecorrenteForward() {
-  if (!canWrite()) return;
-  for (const group of ['empresa', 'pessoal']) {
-    for (const [bid, block] of Object.entries(appData[group]?.blocks || {})) {
-      for (const item of (block.items || [])) {
-        if (item.recorrente) await propagateRecorrente(group, bid, item);
-      }
-    }
-  }
-}
-
 async function propagateParcela(group, bid, baseItem) {
   if (!canWrite()) return;
   const col = group;
@@ -2861,7 +2797,6 @@ let activeEmpTab = null;
 function buildPayrollReceitaRows() {
   const rows = [];
   (appData.employees.list || []).forEach(emp => {
-    if ((emp.name || '').trim().toLowerCase().includes('deyse')) return;
     const pd = (appData.employeePayments || {})[emp.id] || {};
     const receitas = (pd.receitas || [])
       .filter(r => (r.nome && r.nome.trim()) || (parseFloat(r.valor) || 0) > 0)
