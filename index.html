@@ -1169,6 +1169,24 @@ function updateMonthMenuState() {
   if (newCountEl) newCountEl.textContent = String(newCount);
 }
 
+function copyBlocks(src) {
+  const newBlocks = {};
+  Object.entries(src.blocks || {}).forEach(([bid, block]) => {
+    const items = (block.items || []).reduce((acc, item) => {
+      if (item.parcela) {
+        const next = item.parcela.atual + 1;
+        if (next > item.parcela.total) return acc;
+        acc.push({ ...item, tipo: getItemTipo(item), paid: false, paidAmount: 0, dueDate: advanceDateToCurrentMonth(item.dueDate), parcela: { atual: next, total: item.parcela.total } });
+      } else {
+        acc.push({ ...item, tipo: getItemTipo(item), paid: false, paidAmount: 0, dueDate: advanceDateToCurrentMonth(item.dueDate) });
+      }
+      return acc;
+    }, []);
+    newBlocks[bid] = { ...block, items };
+  });
+  return { blocks: newBlocks };
+}
+
 async function importBlockFromPrevMonth(group, bid) {
   if (!canWrite()) return;
   let pm = currentMonth - 1, py = currentYear;
