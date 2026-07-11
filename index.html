@@ -1475,13 +1475,14 @@ async function loadMonthData() {
   if (pm < 0) { pm = 11; py--; }
   const prevKey = `${py}-${String(pm + 1).padStart(2, '0')}`;
 
-  const [eDoc, pDoc, cfDoc, epDoc, esDoc, prevEsDoc] = await Promise.all([
+  const [eDoc, pDoc, cfDoc, epDoc, esDoc, prevEsDoc, dtDoc] = await Promise.all([
     db.collection('months').doc(key).collection('empresa').doc('data').get(),
     db.collection('months').doc(key).collection('pessoal').doc('data').get(),
     db.collection('months').doc(key).collection('cashflow').doc('data').get(),
     db.collection('months').doc(key).collection('employees').doc('payments').get(),
     db.collection('months').doc(key).collection('escala').doc('data').get(),
     db.collection('months').doc(prevKey).collection('escala').doc('data').get(),
+    db.collection('global').doc('decimoTerceiro').get(),
   ]);
 
   appData.empresa = eDoc.exists ? eDoc.data() : { blocks: {} };
@@ -1507,6 +1508,22 @@ async function loadMonthData() {
   if (!appData.employees.list) appData.employees.list = [];
 
   appData.employeePayments = epDoc.exists ? epDoc.data() : {};
+  appData.decimoTerceiro = dtDoc.exists ? dtDoc.data() : {};
+  // migrate: se global vazio mas mês atual tem dados, salva no global
+  if (!Object.keys(appData.decimoTerceiro).length) {
+    const monthly = epDoc.exists ? epDoc.data() : {};
+    Object.entries(monthly).forEach(([eid, pd]) => {
+      if (pd.decimoTerceiro && (pd.decimoTerceiro.valorTotal || (pd.decimoTerceiro.pagamentos||[]).length)) {
+        appData.decimoTerceiro[eid] = pd.decimoTerceiro;
+      }
+    });
+    if (Object.keys(appData.decimoTerceiro).length) saveDecimoTerceiro();
+  }
+  // mescla dados globais do 13º no employeePayments para renderização
+  Object.entries(appData.decimoTerceiro).forEach(([eid, dt]) => {
+    if (!appData.employeePayments[eid]) appData.employeePayments[eid] = {};
+    appData.employeePayments[eid].decimoTerceiro = dt;
+  });
 
   appData.escala = esDoc.exists ? esDoc.data() : { events: {} };
   if (!appData.escala.events) appData.escala.events = {};
@@ -1538,6 +1555,10 @@ async function saveEmployees() {
 async function saveEmployeePayments() {
   if (!canWrite()) return;
   await db.collection('months').doc(getMonthKey()).collection('employees').doc('payments').set(appData.employeePayments);
+}
+async function saveDecimoTerceiro() {
+  if (!canWrite()) return;
+  await db.collection('global').doc('decimoTerceiro').set(appData.decimoTerceiro || {});
 }
 async function saveEscala() {
   if (!canWrite()) return;
@@ -2369,27 +2390,31 @@ async function propagateRecorrente(group, bid, item) {
     const snap = await ref.get();
     const data = snap.exists ? snap.data() : { blocks: {} };
     if (!data.blocks) data.blocks = {};
-    // find matching block by name, fallback to same id
     const matchEntry = Object.entries(data.blocks).find(([,b]) => b.name === blockName);
     const blockId = matchEntry ? matchEntry[0] : bid;
     if (!data.blocks[blockId]) {
-      // create block structure only, no items seeded from current month
       const cur = appData[group].blocks[bid] || {};
       data.blocks[blockId] = { name: cur.name || blockName, items: [] };
     }
     if (!data.blocks[blockId].items) data.blocks[blockId].items = [];
-    const already = data.blocks[blockId].items.some(ci =>
-      ci.desc === item.desc && getItemTipo(ci) === getItemTipo(item) &&
-      Math.abs((parseFloat(ci.value)||0) - (parseFloat(item.value)||0)) < 0.01 && ci.recorrente
+    let dueDate = item.dueDate;
+    if (dueDate) {
+      const parts = dueDate.split('-');
+      if (parts.length === 3) dueDate = `${y}-${String(m+1).padStart(2,'0')}-${parts[2]}`;
+    }
+    const existingIdx = data.blocks[blockId].items.findIndex(ci =>
+      ci.desc === item.desc && getItemTipo(ci) === getItemTipo(item) && ci.recorrente
     );
-    if (!already) {
-      let dueDate = item.dueDate;
-      if (dueDate) {
-        const parts = dueDate.split('-');
-        if (parts.length === 3) dueDate = `${y}-${String(m+1).padStart(2,'0')}-${parts[2]}`;
-      }
+    if (existingIdx === -1) {
       data.blocks[blockId].items.push({ ...item, dueDate, paid: false, paidAmount: 0 });
-      await ref.set(data); // preserves all other blocks untouched since we read first
+      await ref.set(data);
+    } else {
+      const old = data.blocks[blockId].items[existingIdx];
+      const updated = { ...old, value: item.value, desc: item.desc, tipo: item.tipo, dueDate };
+      if (JSON.stringify(old) !== JSON.stringify(updated)) {
+        data.blocks[blockId].items[existingIdx] = updated;
+        await ref.set(data);
+      }
     }
   }
 }
@@ -3376,8 +3401,19 @@ function getDecimoLancado(dt) {
   return (dt.pagamentos || []).reduce((s, p) => s + (parseFloat(p.valor) || 0), 0);
 }
 
+function getEmpDT(eid) {
+  if (!appData.decimoTerceiro) appData.decimoTerceiro = {};
+  if (!appData.decimoTerceiro[eid]) appData.decimoTerceiro[eid] = {};
+  appData.decimoTerceiro[eid] = normalizeDecimoTerceiro(appData.decimoTerceiro[eid]);
+  // mantém referência sincronizada em employeePayments para renderização
+  if (!appData.employeePayments) appData.employeePayments = {};
+  if (!appData.employeePayments[eid]) appData.employeePayments[eid] = {};
+  appData.employeePayments[eid].decimoTerceiro = appData.decimoTerceiro[eid];
+  return appData.decimoTerceiro[eid];
+}
+
 function syncDecimoTotals(eid) {
-  const dt = appData.employeePayments?.[eid]?.decimoTerceiro;
+  const dt = appData.decimoTerceiro?.[eid];
   if (!dt) return;
   dt.valorPago = getDecimoPago(dt);
   const paid = dt.pagamentos?.filter(p => p.pago && p.dataPgto).sort((a, b) => (b.dataPgto || '').localeCompare(a.dataPgto || ''));
@@ -3388,7 +3424,7 @@ function syncDecimoTotals(eid) {
 }
 
 function updateDecimoTotalsInPlace(eid) {
-  const dt = normalizeDecimoTerceiro(appData.employeePayments?.[eid]?.decimoTerceiro || {});
+  const dt = normalizeDecimoTerceiro(appData.decimoTerceiro?.[eid] || {});
   const card = document.querySelector(`[data-empid="${eid}"]`);
   if (!card) return;
   const pago = getDecimoPago(dt);
@@ -3404,15 +3440,13 @@ function updateDecimoTotalsInPlace(eid) {
 
 function scheduleDecimoSave() {
   clearTimeout(window._dtTimer);
-  window._dtTimer = setTimeout(saveEmployeePayments, 1500);
+  window._dtTimer = setTimeout(saveDecimoTerceiro, 1500);
 }
 
 function updateDecimo(eid, field, val) {
   if (!canWrite()) return;
-  if (!appData.employeePayments) appData.employeePayments = {};
-  if (!appData.employeePayments[eid]) appData.employeePayments[eid] = {};
-  appData.employeePayments[eid].decimoTerceiro = normalizeDecimoTerceiro(appData.employeePayments[eid].decimoTerceiro);
-  appData.employeePayments[eid].decimoTerceiro[field] = field === 'valorTotal' ? (parseFloat(val) || 0) : val;
+  const dt = getEmpDT(eid);
+  dt[field] = field === 'valorTotal' ? (parseFloat(val) || 0) : val;
   syncDecimoTotals(eid);
   updateDecimoTotalsInPlace(eid);
   scheduleDecimoSave();
@@ -3420,16 +3454,14 @@ function updateDecimo(eid, field, val) {
 
 function addDecimoPagamento(eid) {
   if (!canWrite()) return;
-  if (!appData.employeePayments) appData.employeePayments = {};
-  if (!appData.employeePayments[eid]) appData.employeePayments[eid] = {};
-  appData.employeePayments[eid].decimoTerceiro = normalizeDecimoTerceiro(appData.employeePayments[eid].decimoTerceiro);
-  appData.employeePayments[eid].decimoTerceiro.pagamentos.push({ desc: '', valor: '', dataPgto: todayISO(), forma: '', pago: false });
-  saveEmployeePayments().then(() => renderEmployees());
+  const dt = getEmpDT(eid);
+  dt.pagamentos.push({ desc: '', valor: '', dataPgto: todayISO(), forma: '', pago: false });
+  saveDecimoTerceiro().then(() => renderEmployees());
 }
 
 function removeDecimoPagamento(eid, pi) {
   if (!canWrite()) return;
-  const dt = appData.employeePayments?.[eid]?.decimoTerceiro;
+  const dt = appData.decimoTerceiro?.[eid];
   if (!dt?.pagamentos) return;
   dt.pagamentos.splice(pi, 1);
   syncDecimoTotals(eid);
@@ -3439,7 +3471,7 @@ function removeDecimoPagamento(eid, pi) {
 
 function updateDecimoPagamento(eid, pi, field, val) {
   if (!canWrite()) return;
-  const pg = appData.employeePayments?.[eid]?.decimoTerceiro?.pagamentos?.[pi];
+  const pg = appData.decimoTerceiro?.[eid]?.pagamentos?.[pi];
   if (!pg) return;
   if (field === 'valor') pg[field] = parseFloat(val) || 0;
   else pg[field] = val;
@@ -3450,7 +3482,7 @@ function updateDecimoPagamento(eid, pi, field, val) {
 
 function toggleDecimoPagamento(eid, pi) {
   if (!canWrite()) return;
-  const pg = appData.employeePayments?.[eid]?.decimoTerceiro?.pagamentos?.[pi];
+  const pg = appData.decimoTerceiro?.[eid]?.pagamentos?.[pi];
   if (!pg) return;
   pg.pago = !pg.pago;
   syncDecimoTotals(eid);
