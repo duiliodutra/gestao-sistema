@@ -1536,6 +1536,16 @@ async function loadMonthData() {
   updateMonthMenuState();
   await updateNewItemsBanner();
   renderAll();
+  ensureAllBlocksNextMonth();
+}
+
+async function ensureAllBlocksNextMonth() {
+  if (!canWrite()) return;
+  for (const group of ['empresa', 'pessoal']) {
+    for (const bid of Object.keys(appData[group]?.blocks || {})) {
+      await propagateBlockToNextMonth(group, bid);
+    }
+  }
 }
 
 async function saveEmpresa() {
