@@ -2198,7 +2198,28 @@ function confirmAddBlock(group) {
   const bid = 'b' + Date.now();
   appData[group].blocks[bid] = { name, items: [] };
   activeBlockTab[group] = bid;
-  (group === 'empresa' ? saveEmpresa() : savePessoal()).then(() => { renderBlocks(group); renderDashboard(); updateCashflow(); closeModal(); });
+  (group === 'empresa' ? saveEmpresa() : savePessoal()).then(async () => {
+    await propagateBlockToNextMonth(group, bid);
+    renderBlocks(group); renderDashboard(); updateCashflow(); closeModal();
+  });
+}
+
+async function propagateBlockToNextMonth(group, bid) {
+  if (!canWrite()) return;
+  const block = appData[group].blocks[bid];
+  if (!block) return;
+  let m = currentMonth + 1, y = currentYear;
+  if (m > 11) { m -= 12; y++; }
+  const key = `${y}-${String(m + 1).padStart(2, '0')}`;
+  const ref = db.collection('months').doc(key).collection(group).doc('data');
+  const snap = await ref.get();
+  const data = snap.exists ? snap.data() : { blocks: {} };
+  if (!data.blocks) data.blocks = {};
+  const exists = Object.values(data.blocks).some(b => b.name === block.name);
+  if (!exists) {
+    data.blocks[bid] = { name: block.name, items: [] };
+    await ref.set(data);
+  }
 }
 
 function editBlockName(group, bid) {
