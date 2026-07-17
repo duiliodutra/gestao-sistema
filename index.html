@@ -1084,7 +1084,17 @@ function applyRoleVisibility() {
   }
 }
 
-function signOut() { auth.signOut(); }
+function flushPendingSaves() {
+  const pending = [];
+  if (window._epTimer) { clearTimeout(window._epTimer); window._epTimer = null; pending.push(saveEmployeePayments()); }
+  if (window._cfTimer) { clearTimeout(window._cfTimer); window._cfTimer = null; pending.push(saveCashflow()); }
+  if (window._dtTimer) { clearTimeout(window._dtTimer); window._dtTimer = null; pending.push(saveDecimoTerceiro()); }
+  if (window._vpTimer) { clearTimeout(window._vpTimer); window._vpTimer = null; pending.push(saveEmployees()); }
+  return Promise.all(pending);
+}
+window.addEventListener('beforeunload', () => { flushPendingSaves(); });
+
+async function signOut() { await flushPendingSaves(); auth.signOut(); }
 
 // =============================================
 // MONTH/YEAR SELECTORS
@@ -1107,7 +1117,8 @@ function syncCalendarToCurrentMonth() {
   calFeriasYear = currentYear;
 }
 
-function applyMonthYear() {
+async function applyMonthYear() {
+  await flushPendingSaves(); // garante que edicoes pendentes do mes atual sejam salvas nele, nao no mes novo
   currentMonth = parseInt(document.getElementById('month-select').value);
   currentYear = parseInt(document.getElementById('year-select').value);
   syncCalendarToCurrentMonth();
