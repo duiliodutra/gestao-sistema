@@ -972,6 +972,30 @@ async function checkUserRole() {
 
 function canWrite() { return isAdmin; }
 
+let _saveToastTimer = null;
+function showSavedToast(text = '✓ Alterações salvas') {
+  let el = document.getElementById('save-toast');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'save-toast';
+    el.style.cssText = 'position:fixed;bottom:20px;left:50%;transform:translateX(-50%) translateY(20px);' +
+      'background:var(--gray-900,#111827);color:#fff;padding:9px 18px;border-radius:20px;font-size:13px;' +
+      'font-weight:500;box-shadow:0 4px 16px rgba(0,0,0,0.25);z-index:9999;opacity:0;' +
+      'transition:opacity 0.2s ease,transform 0.2s ease;pointer-events:none;';
+    document.body.appendChild(el);
+  }
+  el.textContent = text;
+  clearTimeout(_saveToastTimer);
+  requestAnimationFrame(() => {
+    el.style.opacity = '1';
+    el.style.transform = 'translateX(-50%) translateY(0)';
+  });
+  _saveToastTimer = setTimeout(() => {
+    el.style.opacity = '0';
+    el.style.transform = 'translateX(-50%) translateY(20px)';
+  }, 1800);
+}
+
 function isEmployeeView() { return isEmployee && !isAdmin; }
 
 function showAuthScreen() {
@@ -1186,19 +1210,24 @@ function copyEmployeePayments(src, current = {}) {
   const result = JSON.parse(JSON.stringify(current));
   Object.entries(src || {}).forEach(([eid, pd]) => {
     if (!result[eid]) result[eid] = { receitas: [], descontos_list: [], folhaPaga: false };
-    if (isEmptyPayment(result[eid])) {
-      const filterLines = lines => (lines || []).reduce((acc, line) => {
-        if (line.recorrente) { acc.push({ ...line, paid: false }); }
-        else if (line.parcela) {
+    ['receitas', 'descontos_list'].forEach(tipo => {
+      if (!result[eid][tipo]) result[eid][tipo] = [];
+      (pd[tipo] || []).forEach(line => {
+        let nextLine = null;
+        if (line.recorrente) {
+          nextLine = { ...line, paid: false };
+        } else if (line.parcela) {
           const next = line.parcela.atual + 1;
-          if (next <= line.parcela.total) acc.push({ ...line, parcela: { atual: next, total: line.parcela.total } });
+          if (next <= line.parcela.total) nextLine = { ...line, parcela: { atual: next, total: line.parcela.total } };
         }
-        return acc;
-      }, []);
-      result[eid].receitas = filterLines(pd.receitas);
-      result[eid].descontos_list = filterLines(pd.descontos_list);
-      result[eid].folhaPaga = false;
-    }
+        if (!nextLine) return;
+        const exists = result[eid][tipo].some(l =>
+          l.nome === nextLine.nome &&
+          (nextLine.parcela ? l.parcela?.atual === nextLine.parcela.atual : !!l.recorrente)
+        );
+        if (!exists) result[eid][tipo].push(nextLine);
+      });
+    });
   });
   return result;
 }
@@ -1251,7 +1280,7 @@ async function mergeFromPrevMonth() {
       for (const item of (prevBlock.items || [])) {
         const exists = (curBlock.items || []).some(ci =>
           ci.desc === item.desc && getItemTipo(ci) === getItemTipo(item) &&
-          Math.abs((parseFloat(ci.value)||0) - (parseFloat(item.value)||0)) < 0.01
+          (item.parcela ? ci.parcela?.atual === item.parcela.atual : !!ci.recorrente)
         );
         if (!exists) { if (!curBlock.items) curBlock.items = []; curBlock.items.push(item); changed = true; }
       }
@@ -2393,18 +2422,20 @@ async function propagateParcela(group, bid, baseItem) {
     const blockId = matchEntry ? matchEntry[0] : bid;
     if (!data.blocks[blockId]) data.blocks[blockId] = { name: blockName, items: [] };
     if (!data.blocks[blockId].items) data.blocks[blockId].items = [];
-    const already = data.blocks[blockId].items.some(ci =>
+    const matchIdx = data.blocks[blockId].items.findIndex(ci =>
       ci.desc === baseItem.desc && getItemTipo(ci) === getItemTipo(baseItem) &&
-      Math.abs((parseFloat(ci.value) || 0) - (parseFloat(baseItem.value) || 0)) < 0.01 &&
       ci.parcela?.atual === i
     );
-    if (!already) {
+    if (matchIdx === -1) {
       let dueDate = baseItem.dueDate;
       if (dueDate) {
         const parts = dueDate.split('-');
         if (parts.length === 3) dueDate = `${y}-${String(m + 1).padStart(2, '0')}-${parts[2]}`;
       }
       data.blocks[blockId].items.push({ ...baseItem, dueDate, paid: false, paidAmount: 0, parcela: { atual: i, total } });
+      await ref.set(data);
+    } else if (data.blocks[blockId].items[matchIdx].parcela?.total !== total) {
+      data.blocks[blockId].items[matchIdx].parcela.total = total;
       await ref.set(data);
     }
   }
@@ -2413,9 +2444,11 @@ async function propagateParcela(group, bid, baseItem) {
 async function propagateRecorrente(group, bid, item) {
   const col = group === 'empresa' ? 'empresa' : 'pessoal';
   const blockName = appData[group]?.blocks[bid]?.name;
-  for (let i = 1; i <= 3; i++) {
+  const CREATE_BUFFER = 3;   // só cria o item em meses que ainda não têm nada dentro desse buffer
+  const SYNC_HORIZON = 24;   // mas sincroniza o valor em qualquer mês futuro que já tenha o item, até 2 anos
+  for (let i = 1; i <= SYNC_HORIZON; i++) {
     let m = currentMonth + i, y = currentYear;
-    if (m > 11) { m -= 12; y++; }
+    while (m > 11) { m -= 12; y++; }
     const key = `${y}-${String(m + 1).padStart(2, '0')}`;
     const ref = db.collection('months').doc(key).collection(col).doc('data');
     const snap = await ref.get();
@@ -2423,7 +2456,9 @@ async function propagateRecorrente(group, bid, item) {
     if (!data.blocks) data.blocks = {};
     const matchEntry = Object.entries(data.blocks).find(([,b]) => b.name === blockName);
     const blockId = matchEntry ? matchEntry[0] : bid;
-    if (!data.blocks[blockId]) {
+    const blockAlreadyExists = !!data.blocks[blockId];
+    if (!blockAlreadyExists) {
+      if (i > CREATE_BUFFER) continue;
       const cur = appData[group].blocks[bid] || {};
       data.blocks[blockId] = { name: cur.name || blockName, items: [] };
     }
@@ -2437,6 +2472,7 @@ async function propagateRecorrente(group, bid, item) {
       ci.desc === item.desc && getItemTipo(ci) === getItemTipo(item) && ci.recorrente
     );
     if (existingIdx === -1) {
+      if (i > CREATE_BUFFER) continue;
       data.blocks[blockId].items.push({ ...item, dueDate, paid: false, paidAmount: 0 });
       await ref.set(data);
     } else {
@@ -2842,7 +2878,7 @@ function updateCashflow() {
 
   appData.cashflow = { emConta, recebido, previsao };
   clearTimeout(window._cfTimer);
-  window._cfTimer = setTimeout(saveCashflow, 1500);
+  window._cfTimer = setTimeout(() => saveCashflow().then(showSavedToast), 1500);
 }
 
 // =============================================
@@ -3185,10 +3221,14 @@ async function importEmpFromPrevMonth(eid) {
       if (!line.recorrente && !line.parcela) continue;
       // skip if parcela is at last installment
       if (line.parcela && line.parcela.atual >= line.parcela.total) continue;
-      const exists = appData.employeePayments[eid][tipo].some(l => l.nome === line.nome);
+      const nextAtual = line.parcela ? line.parcela.atual + 1 : null;
+      const exists = appData.employeePayments[eid][tipo].some(l =>
+        l.nome === line.nome &&
+        (line.parcela ? l.parcela?.atual === nextAtual : !!l.recorrente)
+      );
       if (!exists) {
         const nextLine = { ...line };
-        if (nextLine.parcela) nextLine.parcela = { atual: nextLine.parcela.atual + 1, total: nextLine.parcela.total };
+        if (nextLine.parcela) nextLine.parcela = { atual: nextAtual, total: nextLine.parcela.total };
         appData.employeePayments[eid][tipo].push(nextLine);
         added++;
       }
@@ -3238,7 +3278,7 @@ function updateEmpLineParcelas(eid, tipo, idx, val) {
   const total = Math.max(line.parcela.atual, parseInt(val) || 2);
   line.parcela.total = total;
   saveEmployeePayments().then(() => {
-    propagateEmpParcela(eid, tipo, line);
+    if (line.parcela.atual === 1) propagateEmpParcela(eid, tipo, line);
     renderEmployees();
   });
 }
@@ -3255,13 +3295,15 @@ async function propagateEmpParcela(eid, tipo, baseLine) {
     const data = snap.exists ? snap.data() : {};
     if (!data[eid]) data[eid] = { receitas: [], descontos_list: [], folhaPaga: false };
     if (!data[eid][tipo]) data[eid][tipo] = [];
-    const already = data[eid][tipo].some(l =>
+    const matchIdx = data[eid][tipo].findIndex(l =>
       l.nome === baseLine.nome &&
-      Math.abs((parseFloat(l.valor)||0) - (parseFloat(baseLine.valor)||0)) < 0.01 &&
       l.parcela?.atual === i
     );
-    if (!already) {
+    if (matchIdx === -1) {
       data[eid][tipo].push({ ...baseLine, parcela: { atual: i, total } });
+      await ref.set(data);
+    } else if (data[eid][tipo][matchIdx].parcela?.total !== total) {
+      data[eid][tipo][matchIdx].parcela.total = total;
       await ref.set(data);
     }
   }
@@ -3269,21 +3311,30 @@ async function propagateEmpParcela(eid, tipo, baseLine) {
 
 async function propagateEmpLine(eid, tipo, line) {
   if (!canWrite()) return;
-  for (let i = 1; i <= 3; i++) {
+  const CREATE_BUFFER = 3;   // só cria a linha em meses que ainda não têm nada dentro desse buffer
+  const SYNC_HORIZON = 24;   // mas sincroniza o valor em qualquer mês futuro que já tenha a linha, até 2 anos
+  for (let i = 1; i <= SYNC_HORIZON; i++) {
     let m = currentMonth + i, y = currentYear;
-    if (m > 11) { m -= 12; y++; }
+    while (m > 11) { m -= 12; y++; }
     const key = `${y}-${String(m + 1).padStart(2, '0')}`;
     const ref = db.collection('months').doc(key).collection('employees').doc('payments');
     const snap = await ref.get();
+    if (!snap.exists && i > CREATE_BUFFER) continue;
     const data = snap.exists ? snap.data() : {};
     if (!data[eid]) data[eid] = { receitas: [], descontos_list: [], folhaPaga: false };
     if (!data[eid][tipo]) data[eid][tipo] = [];
-    const already = data[eid][tipo].some(l =>
-      l.nome === line.nome && Math.abs((parseFloat(l.valor)||0) - (parseFloat(line.valor)||0)) < 0.01 && l.recorrente
-    );
-    if (!already) {
-      data[eid][tipo].push({ ...line });
+    const matchIdx = data[eid][tipo].findIndex(l => l.nome === line.nome && l.recorrente);
+    if (matchIdx === -1) {
+      if (i > CREATE_BUFFER) continue;
+      data[eid][tipo].push({ ...line, paid: false });
       await ref.set(data);
+    } else {
+      const old = data[eid][tipo][matchIdx];
+      const updated = { ...old, valor: line.valor };
+      if (JSON.stringify(old) !== JSON.stringify(updated)) {
+        data[eid][tipo][matchIdx] = updated;
+        await ref.set(data);
+      }
     }
   }
 }
@@ -3292,11 +3343,17 @@ function updateEmpLine(eid, tipo, idx, field, val) {
   if (!appData.employeePayments) appData.employeePayments = {};
   if (!appData.employeePayments[eid]) appData.employeePayments[eid] = {};
   if (!appData.employeePayments[eid][tipo]) appData.employeePayments[eid][tipo] = [];
-  appData.employeePayments[eid][tipo][idx][field] = field === 'valor' ? (parseFloat(val)||0) : val;
+  const line = appData.employeePayments[eid][tipo][idx];
+  line[field] = field === 'valor' ? (parseFloat(val)||0) : val;
   // Update totals in place without re-rendering the whole card
   updateEmpTotalsInPlace(eid);
   clearTimeout(window._epTimer);
-  window._epTimer = setTimeout(()=>{ saveEmployeePayments(); renderDashboard(); updateCashflow(); }, 1500);
+  window._epTimer = setTimeout(()=>{
+    saveEmployeePayments().then(showSavedToast);
+    renderDashboard();
+    updateCashflow();
+    if (field === 'valor' && line.recorrente) propagateEmpLine(eid, tipo, line);
+  }, 1500);
 }
 
 function updateEmpTotalsInPlace(eid) {
@@ -3404,7 +3461,7 @@ function updateEmpPayment(eid, field, val) {
   if (!appData.employeePayments[eid]) appData.employeePayments[eid] = {};
   appData.employeePayments[eid][field] = parseFloat(val)||val;
   clearTimeout(window._epTimer);
-  window._epTimer = setTimeout(()=>{ saveEmployeePayments(); renderEmployees(); renderDashboard(); updateCashflow(); }, 800);
+  window._epTimer = setTimeout(()=>{ saveEmployeePayments().then(showSavedToast); renderEmployees(); renderDashboard(); updateCashflow(); }, 800);
 }
 
 function normalizeDecimoTerceiro(dt) {
@@ -3471,7 +3528,7 @@ function updateDecimoTotalsInPlace(eid) {
 
 function scheduleDecimoSave() {
   clearTimeout(window._dtTimer);
-  window._dtTimer = setTimeout(saveDecimoTerceiro, 1500);
+  window._dtTimer = setTimeout(() => saveDecimoTerceiro().then(showSavedToast), 1500);
 }
 
 function updateDecimo(eid, field, val) {
@@ -3650,7 +3707,7 @@ function buildVacationSection(emp, readOnly = false) {
 function scheduleVacSave() {
   clearTimeout(window._vpTimer);
   window._vpTimer = setTimeout(() => {
-    saveEmployees().then(() => { renderEmployees(); renderCalendar('ferias'); });
+    saveEmployees().then(() => { renderEmployees(); renderCalendar('ferias'); showSavedToast(); });
   }, 600);
 }
 
