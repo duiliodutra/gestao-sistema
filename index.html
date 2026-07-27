@@ -3842,7 +3842,23 @@ const SHIFT_TYPES = [
 
 const EMP_COLORS = ['#1e40af','#065f46','#92400e','#5b21b6','#9f1239','#0c4a6e'];
 
-function renderCalendar(type) {
+let escalaViewKey = null;
+let escalaViewEvents = null;
+
+// Escala e um documento por mes no Firestore. Se o widget estiver navegando pra
+// um mes diferente do selecionado no topo (currentMonth/currentYear), appData.escala
+// e do mes ERRADO — precisa buscar o doc real do mes exibido, so pra leitura.
+async function getEscalaEventsForView(month, year) {
+  if (month === currentMonth && year === currentYear) return appData.escala.events || {};
+  const key = `${year}-${String(month+1).padStart(2,'0')}`;
+  if (escalaViewKey === key) return escalaViewEvents || {};
+  const snap = await db.collection('months').doc(key).collection('escala').doc('data').get();
+  escalaViewKey = key;
+  escalaViewEvents = snap.exists ? (snap.data().events || {}) : {};
+  return escalaViewEvents;
+}
+
+async function renderCalendar(type) {
   const month = type === 'escala' ? calEscalaMonth : calFeriasMonth;
   const year  = type === 'escala' ? calEscalaYear  : calFeriasYear;
   const gridId = `cal-${type}-grid`;
@@ -3851,7 +3867,12 @@ function renderCalendar(type) {
   const titleEl = document.getElementById(titleId);
   if (!gridEl || !titleEl) return;
 
-  titleEl.textContent = `${MONTHS[month]} ${year}`;
+  const isOtherMonth = type === 'escala' && (month !== currentMonth || year !== currentYear);
+  const escalaEvents = type === 'escala' ? await getEscalaEventsForView(month, year) : null;
+  // a renderizacao e assincrona (pode ter trocado de mes de novo enquanto buscava); descarta se ficou obsoleta
+  if ((type === 'escala' ? calEscalaMonth : calFeriasMonth) !== month || (type === 'escala' ? calEscalaYear : calFeriasYear) !== year) return;
+
+  titleEl.textContent = `${MONTHS[month]} ${year}` + (isOtherMonth ? ' (somente visualização)' : '');
 
   const firstDay = new Date(year, month, 1).getDay();
   const daysInMonth = new Date(year, month+1, 0).getDate();
@@ -3872,7 +3893,7 @@ function renderCalendar(type) {
     let eventsHTML = '';
 
     if (type === 'escala') {
-      const dayEvents = (appData.escala.events||{})[dateStr] || [];
+      const dayEvents = (escalaEvents||{})[dateStr] || [];
       dayEvents.forEach(ev=>{
         const t = SHIFT_TYPES.find(s=>s.value===ev.type)||{cls:'',label:ev.type};
         const emp = (appData.employees.list||[]).find(e=>e.id===ev.empId);
@@ -3892,8 +3913,9 @@ function renderCalendar(type) {
       });
     }
 
-    const clickAttr = (type === 'escala' && canWrite()) ? `onclick="openShiftModal('${dateStr}')"` : '';
-    html += `<div class="cal-day ${isToday?'today':''}" ${clickAttr} style="${!canWrite() && type==='escala' ? 'cursor:default;' : ''}">
+    const canClick = type === 'escala' && canWrite() && !isOtherMonth;
+    const clickAttr = canClick ? `onclick="openShiftModal('${dateStr}')"` : '';
+    html += `<div class="cal-day ${isToday?'today':''}" ${clickAttr} style="${type==='escala' && !canClick ? 'cursor:default;' : ''}">
       <div class="cal-day-num">${d}</div>${eventsHTML}
     </div>`;
   }
@@ -3906,15 +3928,15 @@ function renderCalendar(type) {
   html += '</div>';
   gridEl.innerHTML = html;
 
-  if (type === 'escala') renderShiftSummary();
+  if (type === 'escala') renderShiftSummary(escalaEvents, isOtherMonth);
   if (type === 'ferias') renderFeriasLegend();
 }
 
-function renderShiftSummary() {
+function renderShiftSummary(events, isOtherMonth) {
   const container = document.getElementById('shift-summary');
   if (!container) return;
   const totals = {};
-  Object.values(appData.escala.events||{}).forEach(dayEvs=>{
+  Object.values(events || appData.escala.events || {}).forEach(dayEvs=>{
     dayEvs.forEach(ev=>{
       const t = SHIFT_TYPES.find(s=>s.value===ev.type);
       if (!t) return;
@@ -3965,6 +3987,9 @@ function nextCalMonth(type) {
 
 function openShiftModal(dateStr) {
   if (!canWrite()) return;
+  if (calEscalaMonth !== currentMonth || calEscalaYear !== currentYear) {
+    return alert('Este calendário está mostrando outro mês (somente visualização). Troque o mês no topo da página pra editar a escala dele.');
+  }
   const emps = appData.employees.list||[];
   if (emps.length === 0) return alert('Cadastre funcionários primeiro.');
   const existing = (appData.escala.events||{})[dateStr]||[];
