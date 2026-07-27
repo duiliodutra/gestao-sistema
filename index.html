@@ -3843,19 +3843,37 @@ const SHIFT_TYPES = [
 const EMP_COLORS = ['#1e40af','#065f46','#92400e','#5b21b6','#9f1239','#0c4a6e'];
 
 let escalaViewKey = null;
-let escalaViewEvents = null;
+let escalaViewDoc = null; // doc completo (nao so events) do mes que o widget esta exibindo, quando != mes global
 
-// Escala e um documento por mes no Firestore. Se o widget estiver navegando pra
-// um mes diferente do selecionado no topo (currentMonth/currentYear), appData.escala
-// e do mes ERRADO — precisa buscar o doc real do mes exibido, so pra leitura.
-async function getEscalaEventsForView(month, year) {
-  if (month === currentMonth && year === currentYear) return appData.escala.events || {};
-  const key = `${year}-${String(month+1).padStart(2,'0')}`;
-  if (escalaViewKey === key) return escalaViewEvents || {};
+function escalaKeyFor(month, year) { return `${year}-${String(month+1).padStart(2,'0')}`; }
+
+// Escala e um documento por mes no Firestore. O widget de Escala navega (Anterior/
+// Proximo) de forma independente do seletor de mes do topo — entao o mes exibido
+// pode ser diferente de appData.escala (que e sempre o mes global). Busca/cacheia
+// o doc real do mes exibido pra ler E gravar no lugar certo.
+async function loadEscalaViewDoc(month, year) {
+  const key = escalaKeyFor(month, year);
+  if (escalaViewKey === key) return escalaViewDoc;
   const snap = await db.collection('months').doc(key).collection('escala').doc('data').get();
   escalaViewKey = key;
-  escalaViewEvents = snap.exists ? (snap.data().events || {}) : {};
-  return escalaViewEvents;
+  escalaViewDoc = snap.exists ? snap.data() : { events: {} };
+  if (!escalaViewDoc.events) escalaViewDoc.events = {};
+  return escalaViewDoc;
+}
+
+// Retorna { events, save } apontando pro mes que o calendario de Escala esta exibindo
+// agora (calEscalaMonth/Year), seja o mes global (appData.escala) ou outro (Firestore direto).
+async function getEscalaTarget() {
+  if (calEscalaMonth === currentMonth && calEscalaYear === currentYear) {
+    if (!appData.escala.events) appData.escala.events = {};
+    return { events: appData.escala.events, save: saveEscala };
+  }
+  const doc = await loadEscalaViewDoc(calEscalaMonth, calEscalaYear);
+  const key = escalaKeyFor(calEscalaMonth, calEscalaYear);
+  return {
+    events: doc.events,
+    save: () => db.collection('months').doc(key).collection('escala').doc('data').set(doc)
+  };
 }
 
 async function renderCalendar(type) {
@@ -3867,12 +3885,11 @@ async function renderCalendar(type) {
   const titleEl = document.getElementById(titleId);
   if (!gridEl || !titleEl) return;
 
-  const isOtherMonth = type === 'escala' && (month !== currentMonth || year !== currentYear);
-  const escalaEvents = type === 'escala' ? await getEscalaEventsForView(month, year) : null;
+  const escalaEvents = type === 'escala' ? (await getEscalaTarget()).events : null;
   // a renderizacao e assincrona (pode ter trocado de mes de novo enquanto buscava); descarta se ficou obsoleta
   if ((type === 'escala' ? calEscalaMonth : calFeriasMonth) !== month || (type === 'escala' ? calEscalaYear : calFeriasYear) !== year) return;
 
-  titleEl.textContent = `${MONTHS[month]} ${year}` + (isOtherMonth ? ' (somente visualização)' : '');
+  titleEl.textContent = `${MONTHS[month]} ${year}`;
 
   const firstDay = new Date(year, month, 1).getDay();
   const daysInMonth = new Date(year, month+1, 0).getDate();
@@ -3913,7 +3930,7 @@ async function renderCalendar(type) {
       });
     }
 
-    const canClick = type === 'escala' && canWrite() && !isOtherMonth;
+    const canClick = type === 'escala' && canWrite();
     const clickAttr = canClick ? `onclick="openShiftModal('${dateStr}')"` : '';
     html += `<div class="cal-day ${isToday?'today':''}" ${clickAttr} style="${type==='escala' && !canClick ? 'cursor:default;' : ''}">
       <div class="cal-day-num">${d}</div>${eventsHTML}
@@ -3928,11 +3945,11 @@ async function renderCalendar(type) {
   html += '</div>';
   gridEl.innerHTML = html;
 
-  if (type === 'escala') renderShiftSummary(escalaEvents, isOtherMonth);
+  if (type === 'escala') renderShiftSummary(escalaEvents);
   if (type === 'ferias') renderFeriasLegend();
 }
 
-function renderShiftSummary(events, isOtherMonth) {
+function renderShiftSummary(events) {
   const container = document.getElementById('shift-summary');
   if (!container) return;
   const totals = {};
@@ -3985,14 +4002,12 @@ function nextCalMonth(type) {
   renderCalendar(type);
 }
 
-function openShiftModal(dateStr) {
+async function openShiftModal(dateStr) {
   if (!canWrite()) return;
-  if (calEscalaMonth !== currentMonth || calEscalaYear !== currentYear) {
-    return alert('Este calendário está mostrando outro mês (somente visualização). Troque o mês no topo da página pra editar a escala dele.');
-  }
   const emps = appData.employees.list||[];
   if (emps.length === 0) return alert('Cadastre funcionários primeiro.');
-  const existing = (appData.escala.events||{})[dateStr]||[];
+  const target = await getEscalaTarget();
+  const existing = (target.events||{})[dateStr]||[];
 
   const existingRows = existing.map((ev,idx)=>{
     const t = SHIFT_TYPES.find(s=>s.value===ev.type)||SHIFT_TYPES[0];
@@ -4026,22 +4041,23 @@ function openShiftModal(dateStr) {
     </div>`);
 }
 
-function confirmAddShift(dateStr) {
+async function confirmAddShift(dateStr) {
   if (!canWrite()) return;
   const empId = document.getElementById('m-shift-emp').value;
   const type = document.getElementById('m-shift-type').value;
-  if (!appData.escala.events) appData.escala.events = {};
-  if (!appData.escala.events[dateStr]) appData.escala.events[dateStr] = [];
-  appData.escala.events[dateStr].push({ empId, type });
+  const target = await getEscalaTarget();
+  if (!target.events[dateStr]) target.events[dateStr] = [];
+  target.events[dateStr].push({ empId, type });
   // Reopen modal with updated list instead of closing
-  saveEscala().then(()=>{ renderCalendar('escala'); openShiftModal(dateStr); });
+  target.save().then(()=>{ renderCalendar('escala'); openShiftModal(dateStr); });
 }
 
-function removeShiftEvent(dateStr, idx) {
+async function removeShiftEvent(dateStr, idx) {
   if (!canWrite()) return;
-  appData.escala.events[dateStr].splice(idx, 1);
-  if (appData.escala.events[dateStr].length === 0) delete appData.escala.events[dateStr];
-  saveEscala().then(()=>{ renderCalendar('escala'); openShiftModal(dateStr); });
+  const target = await getEscalaTarget();
+  target.events[dateStr].splice(idx, 1);
+  if (target.events[dateStr].length === 0) delete target.events[dateStr];
+  target.save().then(()=>{ renderCalendar('escala'); openShiftModal(dateStr); });
 }
 
 // =============================================
