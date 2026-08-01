@@ -3000,6 +3000,22 @@ function buildEmployeeResumoRow(emp, pd, shiftPay) {
   };
 }
 
+// calcEmpShiftPay soma o valor dos plantoes do MES ANTERIOR (appData.prevEscala) —
+// a folha paga neste mes remunera os plantoes batidos no mes passado. O detalhe
+// precisa vir da mesma fonte, senao a lista nao bate com o total de Plantao/Dobra.
+function buildEmpShiftRows(empId) {
+  const events = appData.prevEscala?.events || {};
+  const rows = [];
+  Object.keys(events).sort().forEach(dateStr => {
+    (events[dateStr] || []).forEach(ev => {
+      if (ev.empId !== empId) return;
+      const t = SHIFT_TYPES.find(s => s.value === ev.type) || { label: ev.type, pay: 0 };
+      rows.push([fmtDate(dateStr), t.label, t.pay]);
+    });
+  });
+  return rows;
+}
+
 // Monta a planilha de um funcionario como array-de-linhas (aoa), espelhando o
 // card da tela: Receitas em cima, Descontos embaixo, totais e liquido no fim.
 function buildEmployeeSheetRows(emp, pd, shiftPay) {
@@ -3029,6 +3045,14 @@ function buildEmployeeSheetRows(emp, pd, shiftPay) {
   if (receitas.length === 0 && shiftPay.plantao === 0 && shiftPay.dobra === 0) rows.push(['Nenhuma receita lançada', '', '']);
   rows.push(['Total Receitas', '', totalReceitas]);
   rows.push([]);
+
+  const shiftRows = buildEmpShiftRows(emp.id);
+  if (shiftRows.length) {
+    sectionHeader('PLANTÕES (mês anterior, pagos neste mês)');
+    rows.push(['Data', 'Tipo', 'Valor']);
+    shiftRows.forEach(r => rows.push(r));
+    rows.push([]);
+  }
 
   sectionHeader('DESCONTOS');
   rows.push(['Descrição', 'Tipo', 'Valor']);
