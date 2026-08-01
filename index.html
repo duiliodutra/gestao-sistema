@@ -2979,39 +2979,82 @@ function exportPayrollReceitas() {
   URL.revokeObjectURL(url);
 }
 
-function buildPayrollExportData() {
-  const resumo = [];
-  const receitasRows = [];
-  const descontosRows = [];
-  (appData.employees.list || []).forEach(emp => {
-    const pd = (appData.employeePayments || {})[emp.id] || {};
-    const receitas = (pd.receitas || []).filter(r => (r.nome && r.nome.trim()) || (parseFloat(r.valor) || 0) > 0);
-    const descontos = (pd.descontos_list || []).filter(d => (d.nome && d.nome.trim()) || (parseFloat(d.valor) || 0) > 0);
-    const shiftPay = calcEmpShiftPay(emp.id);
-    const totalReceitas = receitas.reduce((s, r) => s + (parseFloat(r.valor) || 0), 0) + shiftPay.plantao + shiftPay.dobra;
-    const totalDescontos = descontos.reduce((s, d) => s + (parseFloat(d.valor) || 0), 0);
+function lineTipoLabel(line) {
+  if (line.recorrente) return 'Recorrente';
+  if (line.parcela) return `Parcelado ${line.parcela.atual}/${line.parcela.total}`;
+  return 'Normal';
+}
 
-    receitas.forEach(r => receitasRows.push({
-      'Funcionário': emp.name || '', 'Cargo': emp.cargo || '',
-      'Descrição': r.nome || 'Receita', 'Valor': parseFloat(r.valor) || 0,
-    }));
-    if (shiftPay.plantao > 0) receitasRows.push({ 'Funcionário': emp.name || '', 'Cargo': emp.cargo || '', 'Descrição': 'Plantão (escala)', 'Valor': shiftPay.plantao });
-    if (shiftPay.dobra > 0) receitasRows.push({ 'Funcionário': emp.name || '', 'Cargo': emp.cargo || '', 'Descrição': 'Dobra (escala)', 'Valor': shiftPay.dobra });
-    descontos.forEach(d => descontosRows.push({
-      'Funcionário': emp.name || '', 'Cargo': emp.cargo || '',
-      'Descrição': d.nome || 'Desconto', 'Valor': parseFloat(d.valor) || 0,
-    }));
+function buildEmployeeResumoRow(emp, pd, shiftPay) {
+  const receitas = (pd.receitas || []).filter(r => (r.nome && r.nome.trim()) || (parseFloat(r.valor) || 0) > 0);
+  const descontos = (pd.descontos_list || []).filter(d => (d.nome && d.nome.trim()) || (parseFloat(d.valor) || 0) > 0);
+  const totalReceitas = receitas.reduce((s, r) => s + (parseFloat(r.valor) || 0), 0) + shiftPay.plantao + shiftPay.dobra;
+  const totalDescontos = descontos.reduce((s, d) => s + (parseFloat(d.valor) || 0), 0);
+  return {
+    'Funcionário': emp.name || '',
+    'Cargo': emp.cargo || '',
+    'Total Receitas': totalReceitas,
+    'Total Descontos': totalDescontos,
+    'Líquido a Pagar': totalReceitas - totalDescontos,
+    'Folha Paga': pd.folhaPaga ? 'Sim' : 'Não',
+  };
+}
 
-    resumo.push({
-      'Funcionário': emp.name || '',
-      'Cargo': emp.cargo || '',
-      'Total Receitas': totalReceitas,
-      'Total Descontos': totalDescontos,
-      'Líquido a Pagar': totalReceitas - totalDescontos,
-      'Folha Paga': pd.folhaPaga ? 'Sim' : 'Não',
-    });
+// Monta a planilha de um funcionario como array-de-linhas (aoa), espelhando o
+// card da tela: Receitas em cima, Descontos embaixo, totais e liquido no fim.
+function buildEmployeeSheetRows(emp, pd, shiftPay) {
+  const rows = [];
+  const merges = [];
+  const sectionHeader = label => {
+    rows.push([label]);
+    merges.push({ s: { r: rows.length - 1, c: 0 }, e: { r: rows.length - 1, c: 2 } });
+  };
+
+  rows.push(['Funcionário', emp.name || '']);
+  rows.push(['Cargo', emp.cargo || '']);
+  rows.push(['Período', `${MONTHS[currentMonth]}/${currentYear}`]);
+  rows.push([]);
+
+  sectionHeader('RECEITAS');
+  rows.push(['Descrição', 'Tipo', 'Valor']);
+  const receitas = (pd.receitas || []).filter(r => (r.nome && r.nome.trim()) || (parseFloat(r.valor) || 0) > 0);
+  let totalReceitas = 0;
+  receitas.forEach(r => {
+    const v = parseFloat(r.valor) || 0;
+    totalReceitas += v;
+    rows.push([r.nome || 'Receita', lineTipoLabel(r), v]);
   });
-  return { resumo, receitasRows, descontosRows };
+  if (shiftPay.plantao > 0) { rows.push(['Plantão (escala)', 'Automático', shiftPay.plantao]); totalReceitas += shiftPay.plantao; }
+  if (shiftPay.dobra > 0) { rows.push(['Dobra (escala)', 'Automático', shiftPay.dobra]); totalReceitas += shiftPay.dobra; }
+  if (receitas.length === 0 && shiftPay.plantao === 0 && shiftPay.dobra === 0) rows.push(['Nenhuma receita lançada', '', '']);
+  rows.push(['Total Receitas', '', totalReceitas]);
+  rows.push([]);
+
+  sectionHeader('DESCONTOS');
+  rows.push(['Descrição', 'Tipo', 'Valor']);
+  const descontos = (pd.descontos_list || []).filter(d => (d.nome && d.nome.trim()) || (parseFloat(d.valor) || 0) > 0);
+  let totalDescontos = 0;
+  descontos.forEach(d => {
+    const v = parseFloat(d.valor) || 0;
+    totalDescontos += v;
+    rows.push([d.nome || 'Desconto', lineTipoLabel(d), v]);
+  });
+  if (descontos.length === 0) rows.push(['Nenhum desconto lançado', '', '']);
+  rows.push(['Total Descontos', '', totalDescontos]);
+  rows.push([]);
+
+  rows.push(['Líquido a Pagar', '', totalReceitas - totalDescontos]);
+  rows.push(['Folha Paga', pd.folhaPaga ? 'Sim' : 'Não']);
+
+  return { rows, merges };
+}
+
+function uniqueSheetName(name, used) {
+  let base = (name || 'Funcionário').replace(/[\\/?*[\]:]/g, ' ').trim().slice(0, 31) || 'Funcionário';
+  let candidate = base, n = 2;
+  while (used.has(candidate)) { candidate = `${base.slice(0, 28)} ${n}`; n++; }
+  used.add(candidate);
+  return candidate;
 }
 
 function exportPayrollExcel() {
@@ -3019,24 +3062,28 @@ function exportPayrollExcel() {
     alert('Não foi possível carregar o gerador de Excel (verifique sua conexão com a internet e tente novamente).');
     return;
   }
-  const { resumo, receitasRows, descontosRows } = buildPayrollExportData();
-  if (!resumo.length) { alert('Nenhum funcionário cadastrado.'); return; }
+  const list = appData.employees.list || [];
+  if (!list.length) { alert('Nenhum funcionário cadastrado.'); return; }
 
   const wb = XLSX.utils.book_new();
+  const usedNames = new Set();
 
+  const resumo = list.map(emp => buildEmployeeResumoRow(emp, (appData.employeePayments || {})[emp.id] || {}, calcEmpShiftPay(emp.id)));
   const wsResumo = XLSX.utils.json_to_sheet(resumo);
   wsResumo['!cols'] = [{ wch: 24 }, { wch: 18 }, { wch: 16 }, { wch: 16 }, { wch: 16 }, { wch: 12 }];
-  XLSX.utils.book_append_sheet(wb, wsResumo, 'Resumo');
+  XLSX.utils.book_append_sheet(wb, wsResumo, uniqueSheetName('Resumo', usedNames));
 
-  const wsReceitas = XLSX.utils.json_to_sheet(receitasRows.length ? receitasRows : [{ 'Funcionário': '', 'Cargo': '', 'Descrição': '', 'Valor': '' }]);
-  wsReceitas['!cols'] = [{ wch: 24 }, { wch: 18 }, { wch: 30 }, { wch: 14 }];
-  XLSX.utils.book_append_sheet(wb, wsReceitas, 'Receitas');
+  list.forEach(emp => {
+    const pd = (appData.employeePayments || {})[emp.id] || {};
+    const shiftPay = calcEmpShiftPay(emp.id);
+    const { rows, merges } = buildEmployeeSheetRows(emp, pd, shiftPay);
+    const ws = XLSX.utils.aoa_to_sheet(rows);
+    ws['!cols'] = [{ wch: 30 }, { wch: 22 }, { wch: 14 }];
+    if (merges.length) ws['!merges'] = merges;
+    XLSX.utils.book_append_sheet(wb, ws, uniqueSheetName(emp.name, usedNames));
+  });
 
-  const wsDescontos = XLSX.utils.json_to_sheet(descontosRows.length ? descontosRows : [{ 'Funcionário': '', 'Cargo': '', 'Descrição': '', 'Valor': '' }]);
-  wsDescontos['!cols'] = [{ wch: 24 }, { wch: 18 }, { wch: 30 }, { wch: 14 }];
-  XLSX.utils.book_append_sheet(wb, wsDescontos, 'Descontos');
-
-  XLSX.writeFile(wb, `salarios-${currentYear}-${String(currentMonth + 1).padStart(2, '0')}.xlsx`);
+  XLSX.writeFile(wb, `salarios-por-funcionario-${currentYear}-${String(currentMonth + 1).padStart(2, '0')}.xlsx`);
 }
 
 function renderEmployees() {
