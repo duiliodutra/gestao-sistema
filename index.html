@@ -831,7 +831,8 @@ window.addEventListener('unhandledrejection', function(e) {
           <div class="section-desc">Controle de pagamentos, férias e 13º</div>
         </div>
         <div id="func-admin-controls">
-          <button class="btn btn-success" onclick="exportPayrollReceitas()">Exportar Salários</button>
+          <button class="btn btn-success" onclick="exportPayrollReceitas()">Exportar Salários (CSV)</button>
+          <button class="btn btn-success" onclick="exportPayrollExcel()">Exportar Salários (Excel)</button>
           <button class="btn btn-primary" onclick="addEmployee()">+ Novo Funcionário</button>
         </div>
       </div>
@@ -891,6 +892,7 @@ window.addEventListener('unhandledrejection', function(e) {
 <script src="https://cdn.jsdelivr.net/npm/firebase@10.12.0/firebase-app-compat.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/firebase@10.12.0/firebase-auth-compat.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/firebase@10.12.0/firebase-firestore-compat.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 
 <script>
 // =============================================
@@ -2976,6 +2978,67 @@ function exportPayrollReceitas() {
   a.remove();
   URL.revokeObjectURL(url);
 }
+
+function buildPayrollExportData() {
+  const resumo = [];
+  const receitasRows = [];
+  const descontosRows = [];
+  (appData.employees.list || []).forEach(emp => {
+    const pd = (appData.employeePayments || {})[emp.id] || {};
+    const receitas = (pd.receitas || []).filter(r => (r.nome && r.nome.trim()) || (parseFloat(r.valor) || 0) > 0);
+    const descontos = (pd.descontos_list || []).filter(d => (d.nome && d.nome.trim()) || (parseFloat(d.valor) || 0) > 0);
+    const shiftPay = calcEmpShiftPay(emp.id);
+    const totalReceitas = receitas.reduce((s, r) => s + (parseFloat(r.valor) || 0), 0) + shiftPay.plantao + shiftPay.dobra;
+    const totalDescontos = descontos.reduce((s, d) => s + (parseFloat(d.valor) || 0), 0);
+
+    receitas.forEach(r => receitasRows.push({
+      'Funcionário': emp.name || '', 'Cargo': emp.cargo || '',
+      'Descrição': r.nome || 'Receita', 'Valor': parseFloat(r.valor) || 0,
+    }));
+    if (shiftPay.plantao > 0) receitasRows.push({ 'Funcionário': emp.name || '', 'Cargo': emp.cargo || '', 'Descrição': 'Plantão (escala)', 'Valor': shiftPay.plantao });
+    if (shiftPay.dobra > 0) receitasRows.push({ 'Funcionário': emp.name || '', 'Cargo': emp.cargo || '', 'Descrição': 'Dobra (escala)', 'Valor': shiftPay.dobra });
+    descontos.forEach(d => descontosRows.push({
+      'Funcionário': emp.name || '', 'Cargo': emp.cargo || '',
+      'Descrição': d.nome || 'Desconto', 'Valor': parseFloat(d.valor) || 0,
+    }));
+
+    resumo.push({
+      'Funcionário': emp.name || '',
+      'Cargo': emp.cargo || '',
+      'Total Receitas': totalReceitas,
+      'Total Descontos': totalDescontos,
+      'Líquido a Pagar': totalReceitas - totalDescontos,
+      'Folha Paga': pd.folhaPaga ? 'Sim' : 'Não',
+    });
+  });
+  return { resumo, receitasRows, descontosRows };
+}
+
+function exportPayrollExcel() {
+  if (typeof XLSX === 'undefined') {
+    alert('Não foi possível carregar o gerador de Excel (verifique sua conexão com a internet e tente novamente).');
+    return;
+  }
+  const { resumo, receitasRows, descontosRows } = buildPayrollExportData();
+  if (!resumo.length) { alert('Nenhum funcionário cadastrado.'); return; }
+
+  const wb = XLSX.utils.book_new();
+
+  const wsResumo = XLSX.utils.json_to_sheet(resumo);
+  wsResumo['!cols'] = [{ wch: 24 }, { wch: 18 }, { wch: 16 }, { wch: 16 }, { wch: 16 }, { wch: 12 }];
+  XLSX.utils.book_append_sheet(wb, wsResumo, 'Resumo');
+
+  const wsReceitas = XLSX.utils.json_to_sheet(receitasRows.length ? receitasRows : [{ 'Funcionário': '', 'Cargo': '', 'Descrição': '', 'Valor': '' }]);
+  wsReceitas['!cols'] = [{ wch: 24 }, { wch: 18 }, { wch: 30 }, { wch: 14 }];
+  XLSX.utils.book_append_sheet(wb, wsReceitas, 'Receitas');
+
+  const wsDescontos = XLSX.utils.json_to_sheet(descontosRows.length ? descontosRows : [{ 'Funcionário': '', 'Cargo': '', 'Descrição': '', 'Valor': '' }]);
+  wsDescontos['!cols'] = [{ wch: 24 }, { wch: 18 }, { wch: 30 }, { wch: 14 }];
+  XLSX.utils.book_append_sheet(wb, wsDescontos, 'Descontos');
+
+  XLSX.writeFile(wb, `salarios-${currentYear}-${String(currentMonth + 1).padStart(2, '0')}.xlsx`);
+}
+
 function renderEmployees() {
   const subtabs = document.getElementById('emp-subtabs');
   const container = document.getElementById('employees-container');
