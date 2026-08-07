@@ -1689,9 +1689,14 @@ async function readMonthPayments(monthKey) {
     if (!employeeOwnId) return {};
     const own = await paymentsCol(monthKey).doc(employeeOwnId).get();
     if (own.exists) return { [employeeOwnId]: stripOwnerTag(own.data()) };
-    const legacy = await legacyPaymentsDoc(monthKey).get();   // pre-migracao
-    const all = legacy.exists ? legacy.data() : {};
-    return all[employeeOwnId] ? { [employeeOwnId]: all[employeeOwnId] } : {};
+    // Fallback pre-migracao. Depois que as regras novas entram, este doc e
+    // admin-only e o get abaixo falha — o que e esperado, nao um erro: sem o
+    // catch, a recusa derrubaria o carregamento do mes inteiro pro funcionario.
+    try {
+      const legacy = await legacyPaymentsDoc(monthKey).get();
+      const all = legacy.exists ? legacy.data() : {};
+      return all[employeeOwnId] ? { [employeeOwnId]: all[employeeOwnId] } : {};
+    } catch (e) { return {}; }
   }
   const snap = await paymentsCol(monthKey).get();
   if (!snap.empty) {
@@ -1794,9 +1799,11 @@ async function readDecimoTerceiro() {
     if (!employeeOwnId) return {};
     const own = await db.collection('decimoTerceiro').doc(employeeOwnId).get();
     if (own.exists) return { [employeeOwnId]: stripOwnerTag(own.data()) };
-    const legacy = await db.collection('global').doc('decimoTerceiro').get();
-    const all = legacy.exists ? legacy.data() : {};
-    return all[employeeOwnId] ? { [employeeOwnId]: all[employeeOwnId] } : {};
+    try { // ver comentario em readMonthPayments
+      const legacy = await db.collection('global').doc('decimoTerceiro').get();
+      const all = legacy.exists ? legacy.data() : {};
+      return all[employeeOwnId] ? { [employeeOwnId]: all[employeeOwnId] } : {};
+    } catch (e) { return {}; }
   }
   const snap = await db.collection('decimoTerceiro').get();
   if (!snap.empty) {

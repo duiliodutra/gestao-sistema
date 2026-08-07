@@ -58,8 +58,12 @@ service cloud.firestore {
     // ---------------------------------------------------------------
     // 13o SALARIO — um documento por funcionario
     // ---------------------------------------------------------------
+    // "resource == null" libera a LEITURA DE DOCUMENTO INEXISTENTE. Sem isso, um
+    // funcionario que ainda nao tem 13o lancado receberia "permission denied" em
+    // vez de "nao existe", e o carregamento do mes inteiro quebraria pra ele.
+    // Nao vaza nada: nao ha documento pra ler.
     match /decimoTerceiro/{empId} {
-      allow get: if isAdmin() || isOwner();
+      allow get: if isAdmin() || (isSignedIn() && (resource == null || isOwner()));
       allow list: if isAdmin();
       allow write: if isAdmin();
     }
@@ -69,8 +73,9 @@ service cloud.firestore {
     // ---------------------------------------------------------------
 
     // Folha: cada funcionario le apenas o proprio documento.
+    // Sobre "resource == null", ver o comentario em /decimoTerceiro acima.
     match /months/{monthId}/payments/{empId} {
-      allow get: if isAdmin() || isOwner();
+      allow get: if isAdmin() || (isSignedIn() && (resource == null || isOwner()));
       allow list: if isAdmin();
       allow write: if isAdmin();
     }
