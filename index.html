@@ -689,6 +689,8 @@ window.addEventListener('unhandledrejection', function(e) {
           <button class="month-menu-item" type="button" onclick="mergeFromPrevMonth()">Mesclar do mês anterior</button>
           <button class="month-menu-item" type="button" id="month-menu-copy-new" style="display:none;" onclick="openCopyNewItemsModal()">Copiar novos boletos (<span id="month-menu-new-count">0</span>)</button>
           <div class="month-menu-divider"></div>
+          <button class="month-menu-item" type="button" onclick="runPayrollMigration()">🔒 Migrar folha (privacidade)</button>
+          <div class="month-menu-divider"></div>
           <button class="month-menu-item danger" type="button" onclick="openResetMonthModal()">Zerar dados deste mês</button>
         </div>
       </div>
@@ -1326,10 +1328,10 @@ async function mergeFromPrevMonth() {
   let pm = currentMonth - 1, py = currentYear;
   if (pm < 0) { pm = 11; py--; }
   const prevKey = `${py}-${String(pm + 1).padStart(2, '0')}`;
-  const [prevEDoc, prevPDoc, prevEpDoc] = await Promise.all([
+  const [prevEDoc, prevPDoc, prevEpMap] = await Promise.all([
     db.collection('months').doc(prevKey).collection('empresa').doc('data').get(),
     db.collection('months').doc(prevKey).collection('pessoal').doc('data').get(),
-    db.collection('months').doc(prevKey).collection('employees').doc('payments').get(),
+    readMonthPayments(prevKey),
   ]);
   let changed = false;
   // Merge blocks: add items from prev month that don't exist in current month
@@ -1349,8 +1351,8 @@ async function mergeFromPrevMonth() {
     }
   }
   // Merge employee payments
-  if (prevEpDoc.exists) {
-    const merged = copyEmployeePayments(prevEpDoc.data(), appData.employeePayments);
+  if (Object.keys(prevEpMap || {}).length) {
+    const merged = copyEmployeePayments(prevEpMap, appData.employeePayments);
     const before = JSON.stringify(appData.employeePayments);
     if (JSON.stringify(merged) !== before) { appData.employeePayments = merged; changed = true; }
   }
@@ -1437,6 +1439,9 @@ async function resetMonthData() {
     saveEmpresa(),
     savePessoal(),
     saveEmployeePayments(),
+    // zera tambem o doc antigo, senao readMonthPayments cairia no fallback e
+    // ressuscitaria a folha que acabou de ser apagada
+    legacyPaymentsDoc(getMonthKey()).set({}),
     saveEscala(),
     saveCashflow()
   ]);
@@ -1566,14 +1571,18 @@ async function loadMonthData() {
   if (pm < 0) { pm = 11; py--; }
   const prevKey = `${py}-${String(pm + 1).padStart(2, '0')}`;
 
-  const [eDoc, pDoc, cfDoc, epDoc, esDoc, prevEsDoc, dtDoc] = await Promise.all([
-    db.collection('months').doc(key).collection('empresa').doc('data').get(),
-    db.collection('months').doc(key).collection('pessoal').doc('data').get(),
-    db.collection('months').doc(key).collection('cashflow').doc('data').get(),
-    db.collection('months').doc(key).collection('employees').doc('payments').get(),
+  // Contas da empresa, contas pessoais e fluxo de caixa sao exclusivos do admin —
+  // funcionario nem chega a pedir esses documentos (a regra do Firestore recusa).
+  const admin = canWrite();
+  const blank = { exists: false, data: () => ({}) };
+  const [eDoc, pDoc, cfDoc, epMap, esDoc, prevEsDoc, dtMap] = await Promise.all([
+    admin ? db.collection('months').doc(key).collection('empresa').doc('data').get() : blank,
+    admin ? db.collection('months').doc(key).collection('pessoal').doc('data').get() : blank,
+    admin ? db.collection('months').doc(key).collection('cashflow').doc('data').get() : blank,
+    readMonthPayments(key),
     db.collection('months').doc(key).collection('escala').doc('data').get(),
     db.collection('months').doc(prevKey).collection('escala').doc('data').get(),
-    db.collection('global').doc('decimoTerceiro').get(),
+    readDecimoTerceiro(),
   ]);
 
   appData.empresa = eDoc.exists ? eDoc.data() : { blocks: {} };
@@ -1598,11 +1607,11 @@ async function loadMonthData() {
   appData.employees = empDoc.exists ? empDoc.data() : { list: [] };
   if (!appData.employees.list) appData.employees.list = [];
 
-  appData.employeePayments = epDoc.exists ? epDoc.data() : {};
-  appData.decimoTerceiro = dtDoc.exists ? dtDoc.data() : {};
+  appData.employeePayments = epMap || {};
+  appData.decimoTerceiro = dtMap || {};
   // migrate: se global vazio mas mês atual tem dados, salva no global
   if (!Object.keys(appData.decimoTerceiro).length) {
-    const monthly = epDoc.exists ? epDoc.data() : {};
+    const monthly = appData.employeePayments;
     Object.entries(monthly).forEach(([eid, pd]) => {
       if (pd.decimoTerceiro && (pd.decimoTerceiro.valorTotal || (pd.decimoTerceiro.pagamentos||[]).length)) {
         appData.decimoTerceiro[eid] = pd.decimoTerceiro;
@@ -1653,13 +1662,163 @@ async function saveEmployees() {
   if (!canWrite()) return;
   await db.collection('global').doc('employees').set(appData.employees);
 }
+// =============================================
+// FOLHA E 13o: UM DOCUMENTO POR FUNCIONARIO
+// =============================================
+// Regra do Firestore e tudo-ou-nada por documento — nao da pra esconder campo.
+// Enquanto a folha do mes inteiro vivia num unico doc (months/{mes}/employees/
+// payments), qualquer funcionario logado conseguia ler o salario e os descontos
+// de todos. Agora e um doc por pessoa, com o e-mail dono gravado em _email, o que
+// permite a regra "so o admin ou o proprio dono le". Mesma coisa pro 13o.
+// O formato antigo continua sendo lido como fallback ate a migracao rodar.
+function paymentsCol(monthKey) {
+  return db.collection('months').doc(monthKey).collection('payments');
+}
+function legacyPaymentsDoc(monthKey) {
+  return db.collection('months').doc(monthKey).collection('employees').doc('payments');
+}
+function empEmailById(eid) {
+  const e = (appData.employees.list || []).find(x => x.id === eid);
+  return (e && e.email) ? e.email.toLowerCase() : '';
+}
+function stripOwnerTag(data) { const v = { ...data }; delete v._email; return v; }
+
+async function readMonthPayments(monthKey) {
+  // Funcionario nao pode listar a colecao (a regra so libera o proprio doc).
+  if (isEmployeeView()) {
+    if (!employeeOwnId) return {};
+    const own = await paymentsCol(monthKey).doc(employeeOwnId).get();
+    if (own.exists) return { [employeeOwnId]: stripOwnerTag(own.data()) };
+    const legacy = await legacyPaymentsDoc(monthKey).get();   // pre-migracao
+    const all = legacy.exists ? legacy.data() : {};
+    return all[employeeOwnId] ? { [employeeOwnId]: all[employeeOwnId] } : {};
+  }
+  const snap = await paymentsCol(monthKey).get();
+  if (!snap.empty) {
+    const out = {};
+    snap.forEach(d => { out[d.id] = stripOwnerTag(d.data()); });
+    return out;
+  }
+  const legacy = await legacyPaymentsDoc(monthKey).get();
+  return legacy.exists ? legacy.data() : {};
+}
+
+// Grava o mes inteiro. Precisa apagar os docs que sumiram do mapa, senao "Zerar
+// mes" (que manda um mapa vazio) deixaria a folha antiga viva na colecao.
+async function writeMonthPayments(monthKey, map) {
+  const col = paymentsCol(monthKey);
+  const keep = new Set(Object.keys(map || {}));
+  const existing = await col.get();
+  const batch = db.batch();
+  existing.forEach(d => { if (!keep.has(d.id)) batch.delete(d.ref); });
+  Object.entries(map || {}).forEach(([eid, pd]) => {
+    batch.set(col.doc(eid), { ...pd, _email: empEmailById(eid) });
+  });
+  await batch.commit();
+}
+
+// Migracao unica: quebra o doc unico de folha de cada mes em um doc por
+// funcionario, e o mapa global do 13o em um doc por funcionario. Os documentos
+// antigos NAO sao apagados — servem de backup ate voce confirmar que esta tudo
+// certo. Rodar ANTES de aplicar as novas regras do Firestore.
+async function runPayrollMigration() {
+  closeMonthMenu();
+  if (!canWrite()) return alert('Apenas o administrador pode migrar.');
+  if (!confirm('Migrar a folha para um documento por funcionário?\n\nIsso copia os dados (nada é apagado) e é seguro rodar mais de uma vez.')) return;
+
+  let meses = 0, docs = 0;
+  const erros = [];
+  for (let y = 2023; y <= 2030; y++) {
+    for (let m = 1; m <= 12; m++) {
+      const key = `${y}-${String(m).padStart(2, '0')}`;
+      try {
+        const legacy = await legacyPaymentsDoc(key).get();
+        if (!legacy.exists) continue;
+        const map = legacy.data() || {};
+        const entries = Object.entries(map).filter(([eid]) => eid && !eid.startsWith('_'));
+        if (!entries.length) continue;
+        const batch = db.batch();
+        entries.forEach(([eid, pd]) => {
+          batch.set(paymentsCol(key).doc(eid), { ...pd, _email: empEmailById(eid) });
+          docs++;
+        });
+        await batch.commit();
+        meses++;
+      } catch (e) {
+        erros.push(`${key}: ${e.message}`);
+      }
+    }
+  }
+
+  let dt = 0;
+  try {
+    const legacyDt = await db.collection('global').doc('decimoTerceiro').get();
+    if (legacyDt.exists) {
+      const map = legacyDt.data() || {};
+      const batch = db.batch();
+      Object.entries(map).forEach(([eid, val]) => {
+        if (!eid || eid.startsWith('_')) return;
+        batch.set(db.collection('decimoTerceiro').doc(eid), { ...val, _email: empEmailById(eid) });
+        dt++;
+      });
+      if (dt) await batch.commit();
+    }
+  } catch (e) {
+    erros.push(`13º: ${e.message}`);
+  }
+
+  alert(
+    `Migração concluída.\n\n` +
+    `• ${meses} meses processados\n` +
+    `• ${docs} documentos de folha criados\n` +
+    `• ${dt} registros de 13º criados\n\n` +
+    (erros.length ? `Erros:\n${erros.slice(0, 5).join('\n')}` : 'Sem erros.') +
+    `\n\nOs dados antigos continuam salvos como backup.`
+  );
+}
+
+// Le a folha de UM funcionario num mes. Retorna null se nao existir em lugar nenhum.
+async function readEmpPayment(monthKey, eid) {
+  const d = await paymentsCol(monthKey).doc(eid).get();
+  if (d.exists) return stripOwnerTag(d.data());
+  const legacy = await legacyPaymentsDoc(monthKey).get();
+  const all = legacy.exists ? legacy.data() : {};
+  return all[eid] ? { ...all[eid] } : null;
+}
+async function writeEmpPayment(monthKey, eid, pd) {
+  await paymentsCol(monthKey).doc(eid).set({ ...pd, _email: empEmailById(eid) });
+}
+
+async function readDecimoTerceiro() {
+  if (isEmployeeView()) {
+    if (!employeeOwnId) return {};
+    const own = await db.collection('decimoTerceiro').doc(employeeOwnId).get();
+    if (own.exists) return { [employeeOwnId]: stripOwnerTag(own.data()) };
+    const legacy = await db.collection('global').doc('decimoTerceiro').get();
+    const all = legacy.exists ? legacy.data() : {};
+    return all[employeeOwnId] ? { [employeeOwnId]: all[employeeOwnId] } : {};
+  }
+  const snap = await db.collection('decimoTerceiro').get();
+  if (!snap.empty) {
+    const out = {};
+    snap.forEach(d => { out[d.id] = stripOwnerTag(d.data()); });
+    return out;
+  }
+  const legacy = await db.collection('global').doc('decimoTerceiro').get();
+  return legacy.exists ? legacy.data() : {};
+}
+
 async function saveEmployeePayments() {
   if (!canWrite()) return;
-  await db.collection('months').doc(getMonthKey()).collection('employees').doc('payments').set(appData.employeePayments);
+  await writeMonthPayments(getMonthKey(), appData.employeePayments);
 }
 async function saveDecimoTerceiro() {
   if (!canWrite()) return;
-  await db.collection('global').doc('decimoTerceiro').set(appData.decimoTerceiro || {});
+  const batch = db.batch();
+  Object.entries(appData.decimoTerceiro || {}).forEach(([eid, dt]) => {
+    batch.set(db.collection('decimoTerceiro').doc(eid), { ...dt, _email: empEmailById(eid) });
+  });
+  await batch.commit();
 }
 async function saveEscala() {
   if (!canWrite()) return;
@@ -1679,10 +1838,10 @@ async function copyFromPreviousMonth() {
   if (pm < 0) { pm = 11; py--; }
   const prevKey = `${py}-${String(pm+1).padStart(2,'0')}`;
 
-  const [eDoc, pDoc, epDoc, esDoc, cfDoc] = await Promise.all([
+  const [eDoc, pDoc, epMap, esDoc, cfDoc] = await Promise.all([
     db.collection('months').doc(prevKey).collection('empresa').doc('data').get(),
     db.collection('months').doc(prevKey).collection('pessoal').doc('data').get(),
-    db.collection('months').doc(prevKey).collection('employees').doc('payments').get(),
+    readMonthPayments(prevKey),
     db.collection('months').doc(prevKey).collection('escala').doc('data').get(),
     db.collection('months').doc(prevKey).collection('cashflow').doc('data').get()
   ]);
@@ -1728,8 +1887,8 @@ async function copyFromPreviousMonth() {
 
   if (needsEmployeePayments()) {
     const before = JSON.stringify(appData.employeePayments || {});
-    if (epDoc.exists) {
-      appData.employeePayments = copyEmployeePayments(epDoc.data(), appData.employeePayments);
+    if (Object.keys(epMap || {}).length) {
+      appData.employeePayments = copyEmployeePayments(epMap, appData.employeePayments);
     }
     const seeded = seedEmployeePaymentsFromSalario();
     if (Object.keys(seeded).length > 0) {
@@ -3403,9 +3562,9 @@ async function importEmpFromPrevMonth(eid) {
   let pm = currentMonth - 1, py = currentYear;
   if (pm < 0) { pm = 11; py--; }
   const prevKey = `${py}-${String(pm + 1).padStart(2, '0')}`;
-  const snap = await db.collection('months').doc(prevKey).collection('employees').doc('payments').get();
-  if (!snap.exists || !snap.data()[eid]) { alert('Nenhum dado do mês anterior para este funcionário.'); return; }
-  const prev = snap.data()[eid];
+  const prevMap = await readMonthPayments(prevKey);
+  if (!prevMap[eid]) { alert('Nenhum dado do mês anterior para este funcionário.'); return; }
+  const prev = prevMap[eid];
   if (!appData.employeePayments[eid]) appData.employeePayments[eid] = { receitas: [], descontos_list: [], folhaPaga: false };
   let added = 0;
   for (const tipo of ['receitas', 'descontos_list']) {
@@ -3484,21 +3643,18 @@ async function propagateEmpParcela(eid, tipo, baseLine) {
     let m = currentMonth + (i - 1), y = currentYear;
     while (m > 11) { m -= 12; y++; }
     const key = `${y}-${String(m + 1).padStart(2, '0')}`;
-    const ref = db.collection('months').doc(key).collection('employees').doc('payments');
-    const snap = await ref.get();
-    const data = snap.exists ? snap.data() : {};
-    if (!data[eid]) data[eid] = { receitas: [], descontos_list: [], folhaPaga: false };
-    if (!data[eid][tipo]) data[eid][tipo] = [];
-    const matchIdx = data[eid][tipo].findIndex(l =>
+    const pd = (await readEmpPayment(key, eid)) || { receitas: [], descontos_list: [], folhaPaga: false };
+    if (!pd[tipo]) pd[tipo] = [];
+    const matchIdx = pd[tipo].findIndex(l =>
       l.nome === baseLine.nome &&
       l.parcela?.atual === i
     );
     if (matchIdx === -1) {
-      data[eid][tipo].push({ ...baseLine, parcela: { atual: i, total } });
-      await ref.set(data);
-    } else if (data[eid][tipo][matchIdx].parcela?.total !== total) {
-      data[eid][tipo][matchIdx].parcela.total = total;
-      await ref.set(data);
+      pd[tipo].push({ ...baseLine, parcela: { atual: i, total } });
+      await writeEmpPayment(key, eid, pd);
+    } else if (pd[tipo][matchIdx].parcela?.total !== total) {
+      pd[tipo][matchIdx].parcela.total = total;
+      await writeEmpPayment(key, eid, pd);
     }
   }
 }
@@ -3511,23 +3667,21 @@ async function propagateEmpLine(eid, tipo, line) {
     let m = currentMonth + i, y = currentYear;
     while (m > 11) { m -= 12; y++; }
     const key = `${y}-${String(m + 1).padStart(2, '0')}`;
-    const ref = db.collection('months').doc(key).collection('employees').doc('payments');
-    const snap = await ref.get();
-    if (!snap.exists && i > CREATE_BUFFER) continue;
-    const data = snap.exists ? snap.data() : {};
-    if (!data[eid]) data[eid] = { receitas: [], descontos_list: [], folhaPaga: false };
-    if (!data[eid][tipo]) data[eid][tipo] = [];
-    const matchIdx = data[eid][tipo].findIndex(l => l.nome === line.nome && l.recorrente);
+    const existing = await readEmpPayment(key, eid);
+    if (!existing && i > CREATE_BUFFER) continue;
+    const pd = existing || { receitas: [], descontos_list: [], folhaPaga: false };
+    if (!pd[tipo]) pd[tipo] = [];
+    const matchIdx = pd[tipo].findIndex(l => l.nome === line.nome && l.recorrente);
     if (matchIdx === -1) {
       if (i > CREATE_BUFFER) continue;
-      data[eid][tipo].push({ ...line, paid: false });
-      await ref.set(data);
+      pd[tipo].push({ ...line, paid: false });
+      await writeEmpPayment(key, eid, pd);
     } else {
-      const old = data[eid][tipo][matchIdx];
+      const old = pd[tipo][matchIdx];
       const updated = { ...old, valor: line.valor };
       if (JSON.stringify(old) !== JSON.stringify(updated)) {
-        data[eid][tipo][matchIdx] = updated;
-        await ref.set(data);
+        pd[tipo][matchIdx] = updated;
+        await writeEmpPayment(key, eid, pd);
       }
     }
   }

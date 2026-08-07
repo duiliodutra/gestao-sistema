@@ -1,7 +1,18 @@
 rules_version = '2';
 
+// Regra do Firestore e tudo-ou-nada por documento: nao existe "esconder campo".
+// Por isso a folha e o 13o foram quebrados em um documento por funcionario, cada
+// um carregando o e-mail do dono em _email. Assim da pra liberar so o proprio.
+//
+// ORDEM DE APLICACAO (importante):
+//   1. Publicar o codigo do app (ja feito pelo push)
+//   2. Rodar "Mes > Migrar folha (privacidade)" logado como admin
+//   3. So entao colar estas regras no Firebase Console
+// Invertido, os funcionarios ficam sem ver a propria folha.
+
 service cloud.firestore {
   match /databases/{database}/documents {
+
     function isSignedIn() {
       return request.auth != null;
     }
@@ -10,14 +21,87 @@ service cloud.firestore {
       return isSignedIn() && request.auth.token.email == 'duiliodudu@gmail.com';
     }
 
+    // e-mail do usuario logado, normalizado
+    function myEmail() {
+      return request.auth.token.email.lower();
+    }
+
+    // dono do documento (campo _email gravado pelo app)
+    function isOwner() {
+      return isSignedIn()
+        && resource.data.keys().hasAny(['_email'])
+        && resource.data._email == myEmail();
+    }
+
+    // ---------------------------------------------------------------
+    // CADASTRO DE FUNCIONARIOS
+    // Ainda legivel por qualquer logado: o app usa pra descobrir o proprio
+    // empId e pra mostrar o nome dos colegas na escala de fim de semana.
+    // ATENCAO: este documento ainda expoe e-mail, salario base e ferias de
+    // todos. Fechar isso e a Fase 4 (separar publico x completo).
+    // ---------------------------------------------------------------
     match /global/employees {
       allow read: if isSignedIn();
       allow write: if isAdmin();
     }
 
-    match /months/{monthId}/{collection}/{docId} {
+    // 13o no formato antigo (mapa com todo mundo) — mantido so como backup
+    match /global/decimoTerceiro {
+      allow read, write: if isAdmin();
+    }
+
+    // qualquer outro doc em /global fica restrito ao admin
+    match /global/{docId} {
+      allow read, write: if isAdmin();
+    }
+
+    // ---------------------------------------------------------------
+    // 13o SALARIO — um documento por funcionario
+    // ---------------------------------------------------------------
+    match /decimoTerceiro/{empId} {
+      allow get: if isAdmin() || isOwner();
+      allow list: if isAdmin();
+      allow write: if isAdmin();
+    }
+
+    // ---------------------------------------------------------------
+    // DADOS MENSAIS
+    // ---------------------------------------------------------------
+
+    // Folha: cada funcionario le apenas o proprio documento.
+    match /months/{monthId}/payments/{empId} {
+      allow get: if isAdmin() || isOwner();
+      allow list: if isAdmin();
+      allow write: if isAdmin();
+    }
+
+    // Folha no formato antigo (um doc com todo mundo) — backup, so admin.
+    match /months/{monthId}/employees/{docId} {
+      allow read, write: if isAdmin();
+    }
+
+    // Escala: legivel por todos os logados. A regra de "dia util so o proprio"
+    // e aplicada na interface; para virar bloqueio real e preciso separar os
+    // dias uteis em documentos por funcionario (Fase 3).
+    match /months/{monthId}/escala/{docId} {
       allow read: if isSignedIn();
       allow write: if isAdmin();
+    }
+
+    // Contas da empresa, contas pessoais e fluxo de caixa: exclusivos do admin.
+    match /months/{monthId}/empresa/{docId} {
+      allow read, write: if isAdmin();
+    }
+    match /months/{monthId}/pessoal/{docId} {
+      allow read, write: if isAdmin();
+    }
+    match /months/{monthId}/cashflow/{docId} {
+      allow read, write: if isAdmin();
+    }
+
+    // Qualquer subcolecao nova em /months nasce restrita ao admin.
+    match /months/{monthId}/{collection}/{docId} {
+      allow read, write: if isAdmin();
     }
   }
 }
