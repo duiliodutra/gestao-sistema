@@ -1050,7 +1050,7 @@ function updateEmployeeTabLabels() {
   const escalaDesc = document.getElementById('escala-desc');
   const feriasDesc = document.getElementById('ferias-desc');
   if (isEmployeeView()) {
-    if (escalaDesc) escalaDesc.textContent = 'Visualize a escala de todos os colegas (somente leitura)';
+    if (escalaDesc) escalaDesc.textContent = 'Sábados, domingos e feriados: escala de toda a equipe. Dias de semana: somente a sua.';
     if (feriasDesc) feriasDesc.textContent = 'Visualize as férias de todos os colegas (somente leitura)';
   } else {
     if (escalaDesc) escalaDesc.textContent = 'Gerencie a escala de trabalho dos funcionários';
@@ -4010,6 +4010,62 @@ async function getEscalaTarget() {
   };
 }
 
+// =============================================
+// FERIADOS / VISIBILIDADE DA ESCALA
+// =============================================
+// Domingo de Pascoa (algoritmo gregoriano anonimo) — base dos feriados moveis.
+function easterSunday(year) {
+  const a = year % 19, b = Math.floor(year / 100), c = year % 100;
+  const d = Math.floor(b / 4), e = b % 4, f = Math.floor((b + 8) / 25);
+  const g = Math.floor((b - f + 1) / 3), h = (19 * a + b - d - g + 15) % 30;
+  const i = Math.floor(c / 4), k = c % 4;
+  const l = (32 + 2 * e + 2 * i - h - k) % 7;
+  const m = Math.floor((a + 11 * h + 22 * l) / 451);
+  const month = Math.floor((h + l - 7 * m + 114) / 31);
+  const day = ((h + l - 7 * m + 114) % 31) + 1;
+  return new Date(year, month - 1, day);
+}
+
+const _holidayCache = {};
+// Feriados nacionais + DF (onde fica a empresa). Pra incluir um feriado local/
+// pontual, basta adicionar a data no formato 'AAAA-MM-DD' em EXTRA_HOLIDAYS.
+const EXTRA_HOLIDAYS = [];
+function holidaysFor(year) {
+  if (_holidayCache[year]) return _holidayCache[year];
+  const iso = dt => `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`;
+  const shift = (base, days) => { const d = new Date(base); d.setDate(d.getDate() + days); return d; };
+  const easter = easterSunday(year);
+  _holidayCache[year] = new Set([
+    `${year}-01-01`,          // Confraternização Universal
+    `${year}-04-21`,          // Tiradentes / Fundação de Brasília
+    `${year}-05-01`,          // Dia do Trabalho
+    `${year}-09-07`,          // Independência
+    `${year}-10-12`,          // N. Sra. Aparecida
+    `${year}-11-02`,          // Finados
+    `${year}-11-15`,          // Proclamação da República
+    `${year}-11-20`,          // Consciência Negra
+    `${year}-11-30`,          // Dia do Evangélico (DF)
+    `${year}-12-25`,          // Natal
+    iso(shift(easter, -48)),  // Carnaval (segunda)
+    iso(shift(easter, -47)),  // Carnaval (terça)
+    iso(shift(easter, -2)),   // Sexta-feira Santa
+    iso(shift(easter, 60)),   // Corpus Christi
+    ...EXTRA_HOLIDAYS.filter(d => d.startsWith(String(year))),
+  ]);
+  return _holidayCache[year];
+}
+
+function isHoliday(dateStr) {
+  return holidaysFor(parseInt(dateStr.slice(0, 4), 10)).has(dateStr);
+}
+
+// Sabado, domingo e feriado: escala publica pra todos os funcionarios.
+// Dia util: cada funcionario enxerga apenas os proprios plantoes.
+function isPublicShiftDay(dateStr) {
+  const dow = new Date(dateStr + 'T00:00:00').getDay();
+  return dow === 0 || dow === 6 || isHoliday(dateStr);
+}
+
 async function renderCalendar(type) {
   const month = type === 'escala' ? calEscalaMonth : calFeriasMonth;
   const year  = type === 'escala' ? calEscalaYear  : calFeriasYear;
@@ -4044,7 +4100,11 @@ async function renderCalendar(type) {
     let eventsHTML = '';
 
     if (type === 'escala') {
-      const dayEvents = (escalaEvents||{})[dateStr] || [];
+      let dayEvents = (escalaEvents||{})[dateStr] || [];
+      // Dia util: funcionario ve so a propria escala. Fim de semana/feriado: ve a de todos.
+      if (isEmployeeView() && !isPublicShiftDay(dateStr)) {
+        dayEvents = dayEvents.filter(ev => ev.empId === employeeOwnId);
+      }
       dayEvents.forEach(ev=>{
         const t = SHIFT_TYPES.find(s=>s.value===ev.type)||{cls:'',label:ev.type};
         const emp = (appData.employees.list||[]).find(e=>e.id===ev.empId);
@@ -4066,8 +4126,10 @@ async function renderCalendar(type) {
 
     const canClick = type === 'escala' && canWrite();
     const clickAttr = canClick ? `onclick="openShiftModal('${dateStr}')"` : '';
+    const holidayTag = (type === 'escala' && isHoliday(dateStr))
+      ? '<span style="font-size:9px;background:#fef3c7;color:#92400e;padding:1px 5px;border-radius:8px;margin-left:4px;vertical-align:middle;">feriado</span>' : '';
     html += `<div class="cal-day ${isToday?'today':''}" ${clickAttr} style="${type==='escala' && !canClick ? 'cursor:default;' : ''}">
-      <div class="cal-day-num">${d}</div>${eventsHTML}
+      <div class="cal-day-num">${d}${holidayTag}</div>${eventsHTML}
     </div>`;
   }
 
@@ -4096,7 +4158,8 @@ function renderShiftSummary(events) {
       totals[ev.empId].pay += t.pay;
     });
   });
-  const emps = appData.employees.list||[];
+  // Valores de extras sao privados: funcionario ve apenas o proprio resumo.
+  const emps = (appData.employees.list||[]).filter(e => !isEmployeeView() || e.id === employeeOwnId);
   if (emps.length === 0) { container.innerHTML = '<div class="text-gray text-sm">Nenhum funcionário.</div>'; return; }
   container.innerHTML = emps.map(e=>{
     const t = totals[e.id] || { pay: 0 };
