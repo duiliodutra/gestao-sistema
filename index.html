@@ -438,17 +438,25 @@
 
   /* CALENDAR */
   .calendar-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
-  .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; }
+  /* minmax(0,...) e min-width:0 sao necessarios: com 1fr puro o minimo da coluna e
+     o min-content do conteudo, e como .cal-event usa nowrap a grade nao encolhe e
+     estoura a largura da tela no celular (o ellipsis nunca chega a agir). */
+  .cal-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 2px; }
   .cal-header-day { text-align: center; font-size: 11px; font-weight: 600; color: var(--gray-400); padding: 6px 0; text-transform: uppercase; }
   .cal-day {
-    min-height: 80px; padding: 4px; border: 1px solid var(--gray-100);
+    min-height: 80px; min-width: 0; padding: 4px; border: 1px solid var(--gray-100);
     border-radius: 4px; font-size: 11px; cursor: pointer; background: white;
     transition: background 0.15s;
   }
   .cal-day:hover { background: var(--primary-light); }
   .cal-day.other-month { background: var(--gray-50); color: var(--gray-300); }
+  .cal-day.holiday { background: #fffbeb; }
   .cal-day.today { border-color: var(--primary); background: var(--primary-light); }
   .cal-day-num { font-weight: 600; font-size: 12px; color: var(--gray-700); margin-bottom: 3px; }
+  .holiday-tag {
+    font-size: 9px; background: #fef3c7; color: #92400e; padding: 1px 5px;
+    border-radius: 8px; margin-left: 4px; vertical-align: middle; white-space: nowrap;
+  }
   .cal-day.other-month .cal-day-num { color: var(--gray-300); }
   .cal-event {
     font-size: 9px; padding: 1px 4px; border-radius: 3px; margin-bottom: 1px;
@@ -580,7 +588,12 @@
     .form-row { grid-template-columns: 1fr; }
     .cf-line { font-size: 12px; }
     .employee-header { flex-direction: column; align-items: flex-start; gap: 8px; }
-    .cal-day { min-height: 52px; font-size: 9px; }
+    .cal-day { min-height: 52px; font-size: 9px; padding: 2px; }
+    .cal-header-day { font-size: 9px; padding: 4px 0; }
+    .cal-day-num { font-size: 10px; margin-bottom: 2px; }
+    .cal-event { font-size: 8px; padding: 1px 3px; }
+    /* o selo de texto nao cabe em 7 colunas no celular; o fundo amarelo do dia ja marca o feriado */
+    .holiday-tag { display: none; }
     .flex[style*="justify-content:space-between"] {
       flex-direction: column; align-items: stretch !important; gap: 10px;
     }
@@ -939,6 +952,32 @@ const blockItemSelection = {};
 // =============================================
 // INIT
 // =============================================
+// =============================================
+// EXPIRACAO DE SESSAO
+// =============================================
+// O Firebase Auth renova o token sozinho e mantem o login pra sempre. Pra forcar
+// um novo login a cada 7 dias, guardamos o inicio da sessao e deslogamos quando
+// passa do prazo. E controle de conveniencia no cliente (nao e barreira de
+// seguranca): quem tiver o refresh token do Firebase ainda pode renova-lo por
+// fora. O bloqueio real de dados fica nas regras do Firestore.
+const SESSION_MAX_DAYS = 7;
+const SESSION_KEY = 'gestao_session_start';
+
+function readSession() {
+  try { return JSON.parse(localStorage.getItem(SESSION_KEY) || 'null'); } catch (e) { return null; }
+}
+function markSessionStart(uid) {
+  try { localStorage.setItem(SESSION_KEY, JSON.stringify({ uid, at: Date.now() })); } catch (e) {}
+}
+function clearSessionStart() {
+  try { localStorage.removeItem(SESSION_KEY); } catch (e) {}
+}
+function sessionAgeDays(uid) {
+  const info = readSession();
+  if (!info || info.uid !== uid) return null; // sessao ainda nao marcada
+  return (Date.now() - info.at) / 86400000;
+}
+
 function init() {
   populateMonthYear();
   document.addEventListener('click', e => {
@@ -949,6 +988,16 @@ function init() {
   auth.onAuthStateChanged(async user => {
     clearTimeout(authTimeout);
     if (user) {
+      const age = sessionAgeDays(user.uid);
+      if (age !== null && age > SESSION_MAX_DAYS) {
+        clearSessionStart();
+        await auth.signOut();
+        showAuthScreen();
+        const el = document.getElementById('auth-error');
+        if (el) el.textContent = `Sua sessão expirou após ${SESSION_MAX_DAYS} dias. Entre novamente.`;
+        return;
+      }
+      if (age === null) markSessionStart(user.uid); // primeiro login (ou troca de conta)
       currentUser = user;
       await checkUserRole();
       loadApp();
@@ -1096,7 +1145,7 @@ function flushPendingSaves() {
 }
 window.addEventListener('beforeunload', () => { flushPendingSaves(); });
 
-async function signOut() { await flushPendingSaves(); auth.signOut(); }
+async function signOut() { await flushPendingSaves(); clearSessionStart(); auth.signOut(); }
 
 // =============================================
 // MONTH/YEAR SELECTORS
@@ -4126,9 +4175,9 @@ async function renderCalendar(type) {
 
     const canClick = type === 'escala' && canWrite();
     const clickAttr = canClick ? `onclick="openShiftModal('${dateStr}')"` : '';
-    const holidayTag = (type === 'escala' && isHoliday(dateStr))
-      ? '<span style="font-size:9px;background:#fef3c7;color:#92400e;padding:1px 5px;border-radius:8px;margin-left:4px;vertical-align:middle;">feriado</span>' : '';
-    html += `<div class="cal-day ${isToday?'today':''}" ${clickAttr} style="${type==='escala' && !canClick ? 'cursor:default;' : ''}">
+    const isHol = type === 'escala' && isHoliday(dateStr);
+    const holidayTag = isHol ? '<span class="holiday-tag">feriado</span>' : '';
+    html += `<div class="cal-day ${isToday?'today':''} ${isHol?'holiday':''}" ${clickAttr} style="${type==='escala' && !canClick ? 'cursor:default;' : ''}">
       <div class="cal-day-num">${d}${holidayTag}</div>${eventsHTML}
     </div>`;
   }
