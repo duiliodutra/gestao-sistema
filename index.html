@@ -1683,29 +1683,36 @@ function empEmailById(eid) {
 }
 function stripOwnerTag(data) { const v = { ...data }; delete v._email; return v; }
 
+// IMPORTANTE: todo acesso aqui e tolerante a falha de permissao. Formato novo e
+// formato antigo tem regras diferentes, e durante a transicao um dos dois SEMPRE
+// esta negado — o que e esperado, nao erro. Sem esses try/catch, a recusa vira
+// excecao e derruba o loadMonthData inteiro (foi o que quebrou o app em produção).
 async function readMonthPayments(monthKey) {
   // Funcionario nao pode listar a colecao (a regra so libera o proprio doc).
   if (isEmployeeView()) {
     if (!employeeOwnId) return {};
-    const own = await paymentsCol(monthKey).doc(employeeOwnId).get();
-    if (own.exists) return { [employeeOwnId]: stripOwnerTag(own.data()) };
-    // Fallback pre-migracao. Depois que as regras novas entram, este doc e
-    // admin-only e o get abaixo falha — o que e esperado, nao um erro: sem o
-    // catch, a recusa derrubaria o carregamento do mes inteiro pro funcionario.
+    try {
+      const own = await paymentsCol(monthKey).doc(employeeOwnId).get();
+      if (own.exists) return { [employeeOwnId]: stripOwnerTag(own.data()) };
+    } catch (e) { /* formato novo ainda sem regra publicada */ }
     try {
       const legacy = await legacyPaymentsDoc(monthKey).get();
       const all = legacy.exists ? legacy.data() : {};
       return all[employeeOwnId] ? { [employeeOwnId]: all[employeeOwnId] } : {};
     } catch (e) { return {}; }
   }
-  const snap = await paymentsCol(monthKey).get();
-  if (!snap.empty) {
-    const out = {};
-    snap.forEach(d => { out[d.id] = stripOwnerTag(d.data()); });
-    return out;
-  }
-  const legacy = await legacyPaymentsDoc(monthKey).get();
-  return legacy.exists ? legacy.data() : {};
+  try {
+    const snap = await paymentsCol(monthKey).get();
+    if (!snap.empty) {
+      const out = {};
+      snap.forEach(d => { out[d.id] = stripOwnerTag(d.data()); });
+      return out;
+    }
+  } catch (e) { /* idem */ }
+  try {
+    const legacy = await legacyPaymentsDoc(monthKey).get();
+    return legacy.exists ? legacy.data() : {};
+  } catch (e) { return {}; }
 }
 
 // Grava o mes inteiro. Precisa apagar os docs que sumiram do mapa, senao "Zerar
@@ -1784,35 +1791,46 @@ async function runPayrollMigration() {
 
 // Le a folha de UM funcionario num mes. Retorna null se nao existir em lugar nenhum.
 async function readEmpPayment(monthKey, eid) {
-  const d = await paymentsCol(monthKey).doc(eid).get();
-  if (d.exists) return stripOwnerTag(d.data());
-  const legacy = await legacyPaymentsDoc(monthKey).get();
-  const all = legacy.exists ? legacy.data() : {};
-  return all[eid] ? { ...all[eid] } : null;
+  try {
+    const d = await paymentsCol(monthKey).doc(eid).get();
+    if (d.exists) return stripOwnerTag(d.data());
+  } catch (e) { /* ver comentario em readMonthPayments */ }
+  try {
+    const legacy = await legacyPaymentsDoc(monthKey).get();
+    const all = legacy.exists ? legacy.data() : {};
+    return all[eid] ? { ...all[eid] } : null;
+  } catch (e) { return null; }
 }
 async function writeEmpPayment(monthKey, eid, pd) {
   await paymentsCol(monthKey).doc(eid).set({ ...pd, _email: empEmailById(eid) });
 }
 
+// Mesma tolerancia a falha do readMonthPayments — ver comentario la em cima.
 async function readDecimoTerceiro() {
   if (isEmployeeView()) {
     if (!employeeOwnId) return {};
-    const own = await db.collection('decimoTerceiro').doc(employeeOwnId).get();
-    if (own.exists) return { [employeeOwnId]: stripOwnerTag(own.data()) };
-    try { // ver comentario em readMonthPayments
+    try {
+      const own = await db.collection('decimoTerceiro').doc(employeeOwnId).get();
+      if (own.exists) return { [employeeOwnId]: stripOwnerTag(own.data()) };
+    } catch (e) { /* colecao nova ainda sem regra publicada */ }
+    try {
       const legacy = await db.collection('global').doc('decimoTerceiro').get();
       const all = legacy.exists ? legacy.data() : {};
       return all[employeeOwnId] ? { [employeeOwnId]: all[employeeOwnId] } : {};
     } catch (e) { return {}; }
   }
-  const snap = await db.collection('decimoTerceiro').get();
-  if (!snap.empty) {
-    const out = {};
-    snap.forEach(d => { out[d.id] = stripOwnerTag(d.data()); });
-    return out;
-  }
-  const legacy = await db.collection('global').doc('decimoTerceiro').get();
-  return legacy.exists ? legacy.data() : {};
+  try {
+    const snap = await db.collection('decimoTerceiro').get();
+    if (!snap.empty) {
+      const out = {};
+      snap.forEach(d => { out[d.id] = stripOwnerTag(d.data()); });
+      return out;
+    }
+  } catch (e) { /* idem */ }
+  try {
+    const legacy = await db.collection('global').doc('decimoTerceiro').get();
+    return legacy.exists ? legacy.data() : {};
+  } catch (e) { return {}; }
 }
 
 async function saveEmployeePayments() {
