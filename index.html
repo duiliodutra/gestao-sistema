@@ -716,6 +716,11 @@ window.addEventListener('unhandledrejection', function(e) {
           <button class="month-menu-item" type="button" onclick="runPayrollMigration()">🔒 Migrar folha (privacidade)</button>
           <div class="month-menu-divider"></div>
           <button class="month-menu-item danger" type="button" onclick="openResetMonthModal()">Zerar dados deste mês</button>
+          <div class="month-menu-divider"></div>
+          <div style="padding:6px 12px;font-size:11px;color:var(--gray-400);display:flex;justify-content:space-between;gap:8px;">
+            <span>versão <span id="app-version-label"></span></span>
+            <a href="#" onclick="aplicarNovaVersao();return false;" style="color:var(--primary);text-decoration:none;">recarregar</a>
+          </div>
         </div>
       </div>
       <div class="user-badge">
@@ -976,6 +981,52 @@ let pendingNewItems = [];
 const blockItemSelection = {};
 
 // =============================================
+// AVISO DE NOVA VERSAO
+// =============================================
+// O GitHub Pages serve o index.html com Cache-Control: max-age=600 e o app
+// inteiro e esse unico arquivo. Resultado: depois de um deploy o navegador pode
+// seguir rodando a versao antiga por ate 10 minutos — as vezes ate com F5 — e a
+// pessoa fica olhando pra uma correcao que "nao funcionou" mas nem chegou nela.
+// Aqui a gente busca o arquivo publicado ignorando o cache e compara a versao.
+// IMPORTANTE: subir APP_VERSION a cada deploy, senao o aviso nunca dispara.
+const APP_VERSION = '2026-08-10.2';
+let _ultimaChecagem = 0;
+
+async function checarNovaVersao() {
+  if (Date.now() - _ultimaChecagem < 60000) return;  // no maximo 1x por minuto
+  _ultimaChecagem = Date.now();
+  try {
+    const resp = await fetch(location.pathname + '?_ck=' + Date.now(), { cache: 'no-store' });
+    if (!resp.ok) return;
+    // [\d.-]+ (e nao [^']+) pra regex nao casar com ela mesma dentro do arquivo
+    const m = (await resp.text()).match(/const APP_VERSION = '([\d.\-]+)'/);
+    if (m && m[1] !== APP_VERSION) mostrarAvisoNovaVersao(m[1]);
+  } catch (e) { /* offline ou falha de rede: tenta de novo depois */ }
+}
+
+function mostrarAvisoNovaVersao(nova) {
+  if (document.getElementById('update-banner')) return;
+  const el = document.createElement('div');
+  el.id = 'update-banner';
+  el.style.cssText = 'position:fixed;bottom:16px;left:50%;transform:translateX(-50%);' +
+    'background:var(--primary,#2563eb);color:#fff;padding:10px 14px;border-radius:24px;' +
+    'font-size:13px;box-shadow:0 6px 20px rgba(0,0,0,0.25);z-index:10000;' +
+    'display:flex;align-items:center;gap:10px;max-width:92vw;';
+  el.innerHTML = `<span>Nova versão disponível (${escHtml(nova)})</span>
+    <button type="button" onclick="aplicarNovaVersao()" style="background:#fff;color:var(--primary,#2563eb);
+      border:none;border-radius:16px;padding:5px 12px;font-size:12px;font-weight:600;cursor:pointer;">Atualizar</button>
+    <button type="button" onclick="this.parentElement.remove()" style="background:transparent;color:#fff;
+      border:none;font-size:16px;cursor:pointer;line-height:1;padding:0 2px;" title="Agora não">×</button>`;
+  document.body.appendChild(el);
+}
+
+async function aplicarNovaVersao() {
+  await flushPendingSaves();   // nao perder edicao pendente ao recarregar
+  // query nova forca o navegador a buscar do servidor em vez do cache
+  location.replace(location.pathname + '?v=' + Date.now());
+}
+
+// =============================================
 // INIT
 // =============================================
 // =============================================
@@ -1011,6 +1062,13 @@ function init() {
     if (wrap && !wrap.contains(e.target)) closeMonthMenu();
     const uwrap = document.getElementById('undo-wrap');
     if (uwrap && !uwrap.contains(e.target)) closeUndoMenu();
+  });
+  const vLabel = document.getElementById('app-version-label');
+  if (vLabel) vLabel.textContent = APP_VERSION;
+  // checa versao ao abrir e toda vez que a aba volta ao foco
+  setTimeout(checarNovaVersao, 4000);
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') checarNovaVersao();
   });
   const authTimeout = setTimeout(showAuthScreen, 8000);
   auth.onAuthStateChanged(async user => {
