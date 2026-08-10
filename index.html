@@ -681,6 +681,15 @@ window.addEventListener('unhandledrejection', function(e) {
         <select id="year-select" onchange="applyMonthYear()"></select>
         <button onclick="applyMonthYear()" title="Carregar mês">▶</button>
       </div>
+      <div class="month-actions-wrap hidden" id="undo-wrap">
+        <button class="btn-month-menu" id="undo-btn" onclick="undoLast()" type="button" disabled>
+          ↩ Desfazer <span id="undo-count" class="month-menu-badge hidden"></span>
+        </button>
+        <button class="btn-month-menu" id="undo-caret" onclick="toggleUndoMenu(event)" type="button" title="Histórico de alterações" style="padding-left:6px;padding-right:8px;">▾</button>
+        <div class="month-menu-dropdown hidden" id="undo-dropdown" style="max-height:320px;overflow-y:auto;">
+          <div id="undo-list"></div>
+        </div>
+      </div>
       <div class="month-actions-wrap hidden" id="month-actions-wrap">
         <button class="btn-month-menu" id="month-menu-btn" onclick="toggleMonthMenu(event)" type="button">
           📋 Mês <span id="month-menu-badge" class="month-menu-badge hidden"></span> ▾
@@ -985,6 +994,8 @@ function init() {
   document.addEventListener('click', e => {
     const wrap = document.getElementById('month-actions-wrap');
     if (wrap && !wrap.contains(e.target)) closeMonthMenu();
+    const uwrap = document.getElementById('undo-wrap');
+    if (uwrap && !uwrap.contains(e.target)) closeUndoMenu();
   });
   const authTimeout = setTimeout(showAuthScreen, 8000);
   auth.onAuthStateChanged(async user => {
@@ -1095,6 +1106,7 @@ function updateUserUI() {
   document.getElementById('employee-badge-el').classList.toggle('hidden', !isEmployeeView());
   const monthActions = document.getElementById('month-actions-wrap');
   if (monthActions) monthActions.classList.toggle('hidden', !isAdmin);
+  updateUndoUI();
 }
 
 function updateEmployeeTabLabels() {
@@ -1310,6 +1322,7 @@ async function importBlockFromPrevMonth(group, bid) {
   const prevBlock = copyBlocks({ blocks: { [prevBlockEntry[0]]: prevBlockEntry[1] } });
   const prevItems = prevBlock.blocks[prevBlockEntry[0]]?.items || [];
   if (!appData[group].blocks[bid].items) appData[group].blocks[bid].items = [];
+  pushUndo(`Importar itens do mês anterior para ${blockName}`);
   let added = 0;
   for (const item of prevItems) {
     const exists = appData[group].blocks[bid].items.some(ci =>
@@ -1317,7 +1330,7 @@ async function importBlockFromPrevMonth(group, bid) {
     );
     if (!exists) { appData[group].blocks[bid].items.push(item); added++; }
   }
-  if (added === 0) { alert('Todos os itens já estão neste bloco.'); return; }
+  if (added === 0) { popUndoIfUnchanged(); alert('Todos os itens já estão neste bloco.'); return; }
   (group === 'empresa' ? saveEmpresa() : savePessoal()).then(() => {
     renderBlocks(group); renderDashboard(); updateCashflow();
   });
@@ -1333,6 +1346,7 @@ async function mergeFromPrevMonth() {
     db.collection('months').doc(prevKey).collection('pessoal').doc('data').get(),
     readMonthPayments(prevKey),
   ]);
+  pushUndo('Mesclar do mês anterior');
   let changed = false;
   // Merge blocks: add items from prev month that don't exist in current month
   for (const [group, prevDoc] of [['empresa', prevEDoc], ['pessoal', prevPDoc]]) {
@@ -1361,6 +1375,8 @@ async function mergeFromPrevMonth() {
     renderAll();
     renderDashboard();
     updateCashflow();
+  } else {
+    popUndoIfUnchanged();
   }
   alert(changed ? 'Itens do mês anterior mesclados com sucesso!' : 'Nenhum item novo encontrado para mesclar.');
 }
@@ -1420,6 +1436,7 @@ async function confirmResetMonth() {
 
 async function resetMonthData() {
   if (!canWrite()) return;
+  pushUndo(`Zerar dados de ${MONTHS[currentMonth]}/${currentYear}`);
   appData.empresa = { blocks: {} };
   appData.pessoal = { blocks: {} };
   appData.employeePayments = {};
@@ -1632,6 +1649,7 @@ async function loadMonthData() {
   if (!appData.prevEscala.events) appData.prevEscala.events = {};
 
   Object.keys(blockItemSelection).forEach(k => delete blockItemSelection[k]);
+  clearUndo();   // historico e por mes; trocar de mes zera pra nao restaurar dado no mes errado
   closeMonthMenu();
   updateMonthMenuState();
   await updateNewItemsBanner();
@@ -1680,6 +1698,10 @@ function legacyPaymentsDoc(monthKey) {
 function empEmailById(eid) {
   const e = (appData.employees.list || []).find(x => x.id === eid);
   return (e && e.email) ? e.email.toLowerCase() : '';
+}
+function empNameById(eid) {
+  const e = (appData.employees.list || []).find(x => x.id === eid);
+  return e ? (e.name || '').split(' ')[0] : 'funcionário';
 }
 function stripOwnerTag(data) { const v = { ...data }; delete v._email; return v; }
 
@@ -1855,6 +1877,156 @@ async function saveCashflow() {
 }
 
 // =============================================
+// DESFAZER (historico de alteracoes do mes)
+// =============================================
+// Guarda uma foto do estado ANTES de cada alteracao. Desfazer restaura a foto e
+// regrava no Firestore — sem regravar, um F5 traria o dado errado de volta.
+//
+// LIMITE IMPORTANTE: o historico e do mes carregado e vive na memoria da aba.
+// Trocar de mes ou recarregar a pagina zera a lista. E alteracoes que se
+// propagam para meses futuros (parcelas, recorrentes) NAO sao desfeitas la na
+// frente — so neste mes; por isso o aviso na hora de desfazer.
+const UNDO_MAX = 25;
+let undoStack = [];
+
+function snapshotState() {
+  return {
+    monthKey: getMonthKey(),
+    empresa: appData.empresa,
+    pessoal: appData.pessoal,
+    employeePayments: appData.employeePayments,
+    escala: appData.escala,
+    cashflow: appData.cashflow,
+    employees: appData.employees,
+    decimoTerceiro: appData.decimoTerceiro,
+  };
+}
+
+function pushUndo(label) {
+  if (!canWrite()) return;
+  const snap = JSON.parse(JSON.stringify(snapshotState()));
+  undoStack.push({ label, at: Date.now(), snap });
+  if (undoStack.length > UNDO_MAX) undoStack.shift();
+  updateUndoUI();
+}
+
+function clearUndo() { undoStack = []; updateUndoUI(); }
+
+// Descarta a ultima foto se a acao acabou nao mudando nada (ex: "mesclar" que
+// nao encontrou item novo). Evita entrada inutil no historico.
+function popUndoIfUnchanged() {
+  if (!undoStack.length) return;
+  const last = undoStack[undoStack.length - 1];
+  if (JSON.stringify(snapshotState()) === JSON.stringify(last.snap)) {
+    undoStack.pop();
+    updateUndoUI();
+  }
+}
+
+function updateUndoUI() {
+  const wrap = document.getElementById('undo-wrap');
+  const btn = document.getElementById('undo-btn');
+  const count = document.getElementById('undo-count');
+  if (!wrap || !btn) return;
+  wrap.classList.toggle('hidden', !canWrite());
+  btn.disabled = undoStack.length === 0;
+  btn.title = undoStack.length ? 'Desfazer: ' + undoStack[undoStack.length - 1].label : 'Nada para desfazer';
+  if (count) {
+    count.textContent = String(undoStack.length);
+    count.classList.toggle('hidden', undoStack.length === 0);
+  }
+  const list = document.getElementById('undo-list');
+  if (list) {
+    list.innerHTML = undoStack.length === 0
+      ? '<div class="month-menu-item" style="color:var(--gray-400);cursor:default;">Nenhuma alteração ainda</div>'
+      : undoStack.slice().reverse().map((e, i) => {
+          const idx = undoStack.length - 1 - i;
+          const hora = new Date(e.at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+          return `<button class="month-menu-item" type="button" onclick="undoTo(${idx})">
+            <span style="color:var(--gray-400);font-size:11px;">${hora}</span> ${escHtml(e.label)}
+          </button>`;
+        }).join('');
+  }
+}
+
+function toggleUndoMenu(event) {
+  event.stopPropagation();
+  const d = document.getElementById('undo-dropdown');
+  if (d) d.classList.toggle('hidden');
+}
+function closeUndoMenu() {
+  const d = document.getElementById('undo-dropdown');
+  if (d) d.classList.add('hidden');
+}
+
+function undoLast() { if (undoStack.length) return undoTo(undoStack.length - 1); }
+
+// Volta ao estado guardado na posicao idx (ou seja, desfaz essa alteracao e
+// todas as que vieram depois dela).
+let _undoEmAndamento = false;
+async function undoTo(idx) {
+  closeUndoMenu();
+  if (!canWrite() || idx < 0 || idx >= undoStack.length) return;
+  // Dois cliques seguidos no Desfazer disparariam restauracoes concorrentes,
+  // cada uma partindo de um estado ja alterado pela outra.
+  if (_undoEmAndamento) return;
+  const entry = undoStack[idx];
+  if (entry.snap.monthKey !== getMonthKey()) {
+    alert('Este histórico é de outro mês. Volte para ' + entry.snap.monthKey + ' para desfazer.');
+    return;
+  }
+  const quantas = undoStack.length - idx;
+  const msg = quantas === 1
+    ? `Desfazer "${entry.label}"?`
+    : `Desfazer ${quantas} alterações, voltando até antes de "${entry.label}"?`;
+  if (!confirm(msg + '\n\nAtenção: valores que foram propagados para os meses seguintes (parcelas e recorrentes) não são desfeitos lá — apenas neste mês.')) return;
+
+  _undoEmAndamento = true;
+  try {
+    await flushPendingSaves(); // nao deixa um autosave atrasado sobrescrever o que vamos restaurar
+
+    const antes = snapshotState();
+    // copia profunda: sem isso appData passaria a apontar pro objeto guardado no
+    // historico, e edicoes seguintes corromperiam a foto.
+    const s = JSON.parse(JSON.stringify(entry.snap));
+    const mudou = k => JSON.stringify(antes[k]) !== JSON.stringify(s[k]);
+    const saves = [];
+    if (mudou('empresa'))           { appData.empresa = s.empresa;                     saves.push(saveEmpresa()); }
+    if (mudou('pessoal'))           { appData.pessoal = s.pessoal;                     saves.push(savePessoal()); }
+    if (mudou('employeePayments'))  { appData.employeePayments = s.employeePayments;   saves.push(saveEmployeePayments()); }
+    if (mudou('escala'))            { appData.escala = s.escala;                       saves.push(saveEscala()); }
+    if (mudou('cashflow'))          { appData.cashflow = s.cashflow;                   saves.push(saveCashflow()); }
+    if (mudou('employees'))         { appData.employees = s.employees;                 saves.push(saveEmployees()); }
+    if (mudou('decimoTerceiro'))    { appData.decimoTerceiro = s.decimoTerceiro;       saves.push(saveDecimoTerceiro()); }
+
+    if (!saves.length) { undoStack.length = idx; updateUndoUI(); showSavedToast('Nada mudou'); return; }
+
+    try {
+      await Promise.all(saves);
+    } catch (e) {
+      alert('Não foi possível desfazer: ' + e.message);
+      return;
+    }
+
+    undoStack.length = idx;   // as alteracoes desfeitas saem do historico
+    const cfEmConta = document.getElementById('cf-em-conta');
+    const cfRecebido = document.getElementById('cf-recebido');
+    const cfPrevisao = document.getElementById('cf-previsao');
+    if (cfEmConta) cfEmConta.value = appData.cashflow?.emConta ?? '';
+    if (cfRecebido) cfRecebido.value = appData.cashflow?.recebido ?? '';
+    if (cfPrevisao) cfPrevisao.value = appData.cashflow?.previsao ?? '';
+
+    updateUndoUI();
+    renderAll();
+    renderDashboard();
+    updateCashflow();
+    showSavedToast('↩ Alteração desfeita');
+  } finally {
+    _undoEmAndamento = false;
+  }
+}
+
+// =============================================
 // COPY FROM PREVIOUS MONTH
 // =============================================
 async function copyFromPreviousMonth() {
@@ -1895,6 +2067,7 @@ async function copyFromPreviousMonth() {
     return { events: newEvents };
   }
 
+  pushUndo('Copiar dados do mês anterior');
   let empresaChanged = false;
   let pessoalChanged = false;
   let paymentsChanged = false;
@@ -1950,6 +2123,7 @@ async function copyFromPreviousMonth() {
     escalaChanged ? saveEscala() : Promise.resolve(),
     cashflowChanged ? saveCashflow() : Promise.resolve()
   ]);
+  popUndoIfUnchanged();
 
   updateMonthMenuState();
   await updateNewItemsBanner();
@@ -2528,6 +2702,7 @@ function confirmEditBlockName(group, bid) {
 
 function deleteBlock(group, bid) {
   if (!confirm('Excluir este bloco e todos os itens?')) return;
+  pushUndo(`Excluir bloco "${appData[group].blocks[bid]?.name || ''}"`);
   delete appData[group].blocks[bid];
   (group === 'empresa' ? saveEmpresa() : savePessoal()).then(() => { renderBlocks(group); renderDashboard(); updateCashflow(); });
 }
@@ -2740,6 +2915,7 @@ function confirmAddItem(group, bid) {
   const cobranca = document.getElementById('m-item-cobranca')?.value || 'normal';
   if (!desc) return alert('Informe a descrição.');
   if (!appData[group].blocks[bid].items) appData[group].blocks[bid].items = [];
+  pushUndo(`Adicionar item "${desc}" em ${appData[group].blocks[bid].name}`);
   const newItem = { desc, dueDate, value, tipo, paid: false, paidAmount: 0 };
   if (cobranca === 'recorrente') {
     newItem.recorrente = true;
@@ -2801,6 +2977,7 @@ function confirmEditItem(group, bid, idx) {
   const cobranca = document.getElementById('m-item-cobranca')?.value || 'normal';
   if (!desc) return;
   const prev = appData[group].blocks[bid].items[idx];
+  pushUndo(`Editar item "${prev.desc}" em ${appData[group].blocks[bid].name}`);
   const updated = { ...prev, desc, dueDate, value, tipo };
   delete updated.recorrente; delete updated.parcela;
   if (cobranca === 'recorrente') {
@@ -2821,6 +2998,7 @@ function confirmEditItem(group, bid, idx) {
 
 function deleteItem(group, bid, idx) {
   if (!confirm('Remover este item?')) return;
+  pushUndo(`Excluir item "${appData[group].blocks[bid].items[idx]?.desc || ''}"`);
   appData[group].blocks[bid].items.splice(idx, 1);
   adjustSelectionAfterDelete(group, bid, idx);
   (group === 'empresa' ? saveEmpresa() : savePessoal()).then(() => { renderBlocks(group); renderDashboard(); updateCashflow(); });
@@ -3591,6 +3769,7 @@ async function importEmpFromPrevMonth(eid) {
   if (!prevMap[eid]) { alert('Nenhum dado do mês anterior para este funcionário.'); return; }
   const prev = prevMap[eid];
   if (!appData.employeePayments[eid]) appData.employeePayments[eid] = { receitas: [], descontos_list: [], folhaPaga: false };
+  pushUndo(`Importar do mês anterior — ${empNameById(eid)}`);
   let added = 0;
   for (const tipo of ['receitas', 'descontos_list']) {
     if (!appData.employeePayments[eid][tipo]) appData.employeePayments[eid][tipo] = [];
@@ -3620,6 +3799,7 @@ function toggleFolhaPaga(eid) {
   if (!canWrite()) return;
   if (!appData.employeePayments) appData.employeePayments = {};
   if (!appData.employeePayments[eid]) appData.employeePayments[eid] = {};
+  pushUndo(`${appData.employeePayments[eid].folhaPaga ? 'Reabrir' : 'Marcar'} folha paga — ${empNameById(eid)}`);
   appData.employeePayments[eid].folhaPaga = !appData.employeePayments[eid].folhaPaga;
   saveEmployeePayments().then(()=>{ renderEmployees(); renderDashboard(); updateCashflow(); });
 }
@@ -3628,11 +3808,14 @@ function addEmpLine(eid, tipo) {
   if (!appData.employeePayments) appData.employeePayments = {};
   if (!appData.employeePayments[eid]) appData.employeePayments[eid] = {};
   if (!appData.employeePayments[eid][tipo]) appData.employeePayments[eid][tipo] = [];
+  pushUndo(`Adicionar ${tipo === 'receitas' ? 'receita' : 'desconto'} — ${empNameById(eid)}`);
   appData.employeePayments[eid][tipo].push({ nome: '', valor: '' });
   saveEmployeePayments().then(()=>renderEmployees());
 }
 
 function removeEmpLine(eid, tipo, idx) {
+  const alvo = appData.employeePayments[eid][tipo][idx];
+  pushUndo(`Excluir ${tipo === 'receitas' ? 'receita' : 'desconto'} "${alvo?.nome || '(sem nome)'}" — ${empNameById(eid)}`);
   appData.employeePayments[eid][tipo].splice(idx, 1);
   saveEmployeePayments().then(()=>{ renderEmployees(); renderDashboard(); updateCashflow(); });
 }
@@ -3640,6 +3823,7 @@ function removeEmpLine(eid, tipo, idx) {
 function updateEmpLineCobranca(eid, tipo, idx, cobranca) {
   if (!appData.employeePayments?.[eid]?.[tipo]) return;
   const line = appData.employeePayments[eid][tipo][idx];
+  pushUndo(`Mudar cobrança de "${line.nome || '(sem nome)'}" para ${cobranca} — ${empNameById(eid)}`);
   delete line.recorrente; delete line.parcela;
   if (cobranca === 'recorrente') {
     line.recorrente = true;
@@ -3654,6 +3838,7 @@ function updateEmpLineParcelas(eid, tipo, idx, val) {
   const line = appData.employeePayments?.[eid]?.[tipo]?.[idx];
   if (!line?.parcela) return;
   const total = Math.max(line.parcela.atual, parseInt(val) || 2);
+  pushUndo(`Alterar parcelas de "${line.nome || '(sem nome)'}" (${line.parcela.total}→${total}) — ${empNameById(eid)}`);
   line.parcela.total = total;
   saveEmployeePayments().then(() => {
     if (line.parcela.atual === 1) propagateEmpParcela(eid, tipo, line);
@@ -3717,6 +3902,8 @@ function updateEmpLine(eid, tipo, idx, field, val) {
   if (!appData.employeePayments[eid]) appData.employeePayments[eid] = {};
   if (!appData.employeePayments[eid][tipo]) appData.employeePayments[eid][tipo] = [];
   const line = appData.employeePayments[eid][tipo][idx];
+  const rotulo = tipo === 'receitas' ? 'receita' : 'desconto';
+  pushUndo(`Editar ${field === 'valor' ? 'valor' : 'nome'} de ${rotulo} "${line.nome || '(sem nome)'}" — ${empNameById(eid)}`);
   line[field] = field === 'valor' ? (parseFloat(val)||0) : val;
   // Update totals in place without re-rendering the whole card
   updateEmpTotalsInPlace(eid);
@@ -4471,6 +4658,7 @@ async function confirmAddShift(dateStr) {
   const empId = document.getElementById('m-shift-emp').value;
   const type = document.getElementById('m-shift-type').value;
   const target = await getEscalaTarget();
+  pushUndo(`Adicionar plantão de ${empNameById(empId)} em ${fmtDate(dateStr)}`);
   if (!target.events[dateStr]) target.events[dateStr] = [];
   target.events[dateStr].push({ empId, type });
   // Reopen modal with updated list instead of closing
@@ -4480,6 +4668,7 @@ async function confirmAddShift(dateStr) {
 async function removeShiftEvent(dateStr, idx) {
   if (!canWrite()) return;
   const target = await getEscalaTarget();
+  pushUndo(`Remover plantão de ${empNameById(target.events[dateStr]?.[idx]?.empId)} em ${fmtDate(dateStr)}`);
   target.events[dateStr].splice(idx, 1);
   if (target.events[dateStr].length === 0) delete target.events[dateStr];
   target.save().then(()=>{ renderCalendar('escala'); openShiftModal(dateStr); });
