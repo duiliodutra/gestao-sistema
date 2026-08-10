@@ -141,6 +141,20 @@
     display: flex; align-items: center; gap: 6px; white-space: nowrap;
   }
   .btn-month-menu:hover { background: var(--gray-50); border-color: var(--gray-300); }
+  .btn-month-menu:disabled { opacity: 0.45; cursor: default; }
+  .btn-month-menu:disabled:hover { background: white; border-color: var(--gray-200); }
+  /* Desfazer = botao dividido: acao principal + seta do historico, colados.
+     .btn-month-menu e display:flex (bloco), entao sem este inline-flex os dois
+     empilhavam em duas linhas. */
+  .undo-group { display: inline-flex; align-items: stretch; }
+  .undo-group .btn-month-menu { border-radius: 0; }
+  .undo-group .btn-month-menu:first-child {
+    border-top-left-radius: var(--radius); border-bottom-left-radius: var(--radius);
+  }
+  .undo-group .undo-caret {
+    border-top-right-radius: var(--radius); border-bottom-right-radius: var(--radius);
+    border-left: 1px solid var(--gray-200); padding: 5px 7px; font-size: 10px;
+  }
   .month-menu-badge {
     background: var(--warning); color: white; font-size: 10px; font-weight: 700;
     min-width: 16px; height: 16px; border-radius: 8px; display: inline-flex;
@@ -540,6 +554,7 @@
       width: 100%; flex-wrap: wrap; justify-content: space-between; gap: 8px;
     }
     .month-actions-wrap { order: 3; }
+    .undo-label { display: none; }   /* no celular so a seta ↩ cabe */
     .user-badge span:not(.user-avatar) { display: none; }
     .admin-badge { display: none; }
     .month-selector { flex: 1; min-width: 0; }
@@ -681,11 +696,11 @@ window.addEventListener('unhandledrejection', function(e) {
         <select id="year-select" onchange="applyMonthYear()"></select>
         <button onclick="applyMonthYear()" title="Carregar mês">▶</button>
       </div>
-      <div class="month-actions-wrap hidden" id="undo-wrap">
+      <div class="month-actions-wrap undo-group hidden" id="undo-wrap">
         <button class="btn-month-menu" id="undo-btn" onclick="undoLast()" type="button" disabled>
-          ↩ Desfazer <span id="undo-count" class="month-menu-badge hidden"></span>
+          ↩ <span class="undo-label">Desfazer</span> <span id="undo-count" class="month-menu-badge hidden"></span>
         </button>
-        <button class="btn-month-menu" id="undo-caret" onclick="toggleUndoMenu(event)" type="button" title="Histórico de alterações" style="padding-left:6px;padding-right:8px;">▾</button>
+        <button class="btn-month-menu undo-caret" id="undo-caret" onclick="toggleUndoMenu(event)" type="button" title="Histórico de alterações">▾</button>
         <div class="month-menu-dropdown hidden" id="undo-dropdown" style="max-height:320px;overflow-y:auto;">
           <div id="undo-list"></div>
         </div>
