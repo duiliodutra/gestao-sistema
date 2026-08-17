@@ -553,11 +553,17 @@
     .topbar-right {
       width: 100%; flex-wrap: wrap; justify-content: space-between; gap: 8px;
     }
-    .month-actions-wrap { order: 3; }
     .undo-label { display: none; }   /* no celular so a seta ↩ cabe */
     .user-badge span:not(.user-avatar) { display: none; }
     .admin-badge { display: none; }
-    .month-selector { flex: 1; min-width: 0; }
+    /* O seletor de mes ocupa a linha inteira. Com "flex:1; min-width:0" ele
+       encolhia ate sumir em vez de quebrar linha — foi o que aconteceu quando o
+       botao Desfazer entrou na barra e disputou o espaco. */
+    .month-selector { flex: 1 1 100%; min-width: 0; order: 1; }
+    #undo-wrap { order: 2; }
+    #month-actions-wrap { order: 3; }
+    .user-badge { order: 4; }
+    .btn-logout { order: 5; }
     .month-selector select { flex: 1; min-width: 0; max-width: none; font-size: 12px; }
     .month-selector button { padding: 5px 8px; }
     .btn-logout { padding: 5px 8px; font-size: 12px; }
@@ -989,7 +995,7 @@ const blockItemSelection = {};
 // pessoa fica olhando pra uma correcao que "nao funcionou" mas nem chegou nela.
 // Aqui a gente busca o arquivo publicado ignorando o cache e compara a versao.
 // IMPORTANTE: subir APP_VERSION a cada deploy, senao o aviso nunca dispara.
-const APP_VERSION = '2026-08-10.2';
+const APP_VERSION = '2026-08-10.3';
 let _ultimaChecagem = 0;
 
 async function checarNovaVersao() {
