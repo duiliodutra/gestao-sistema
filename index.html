@@ -995,7 +995,7 @@ const blockItemSelection = {};
 // pessoa fica olhando pra uma correcao que "nao funcionou" mas nem chegou nela.
 // Aqui a gente busca o arquivo publicado ignorando o cache e compara a versao.
 // IMPORTANTE: subir APP_VERSION a cada deploy, senao o aviso nunca dispara.
-const APP_VERSION = '2026-08-10.3';
+const APP_VERSION = '2026-08-10.4';
 let _ultimaChecagem = 0;
 
 async function checarNovaVersao() {
@@ -4261,11 +4261,19 @@ function getAquisitivoStats(aq) {
 function buildVacationSection(emp, readOnly = false) {
   normalizeFerias(emp);
   const aquisitivos = emp.ferias.aquisitivos || [];
+
+  // Botao de novo periodo aquisitivo REPETIDO no fim da lista: o do topo fica
+  // longe de onde a pessoa termina de preencher, e ali embaixo o unico botao
+  // visivel era "+ Período de gozo" — que parece o mesmo e cria a coisa errada.
+  const btnNovoAquisitivo = readOnly ? '' : `
+    <button class="btn btn-sm" style="margin-top:14px;border:1px solid var(--primary);color:var(--primary);background:white;"
+      onclick="addAquisitivoPeriod('${emp.id}')">+ Novo período aquisitivo</button>`;
+
   if (!aquisitivos.length) {
-    return '<div class="text-gray text-sm">Nenhum período aquisitivo. Clique em "+ Período aquisitivo".</div>';
+    return `<div class="text-gray text-sm">Nenhum período aquisitivo cadastrado.</div>${btnNovoAquisitivo}`;
   }
 
-  return aquisitivos.map((aq, ai) => {
+  const blocos = aquisitivos.map((aq, ai) => {
     const st = getAquisitivoStats(aq);
     const gozosHtml = (aq.gozos || []).map((gz, gi) => {
       const dias = getGozoDays(gz);
@@ -4341,6 +4349,8 @@ function buildVacationSection(emp, readOnly = false) {
       </div>
     </div>`;
   }).join('');
+
+  return blocos + btnNovoAquisitivo;
 }
 
 function scheduleVacSave() {
