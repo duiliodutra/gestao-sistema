@@ -995,7 +995,7 @@ const blockItemSelection = {};
 // pessoa fica olhando pra uma correcao que "nao funcionou" mas nem chegou nela.
 // Aqui a gente busca o arquivo publicado ignorando o cache e compara a versao.
 // IMPORTANTE: subir APP_VERSION a cada deploy, senao o aviso nunca dispara.
-const APP_VERSION = '2026-09-21.1';
+const APP_VERSION = '2026-09-21.2';
 let _ultimaChecagem = 0;
 
 async function checarNovaVersao() {
@@ -2907,102 +2907,29 @@ function addItemToBlock(group, bid, tipo = 'despesa') {
     </div>`);
 }
 
+// As funcoes propagateParcela/propagateRecorrente foram removidas: elas
+// gravavam o item direto nos meses futuros quando ele era criado ou editado.
+// Isso fazia um mes receber conteudo sem passar pelo mes anterior — e uma conta
+// corrigida em dezembro voltava a aparecer em janeiro com a versao antiga, ja
+// gravada la meses antes. Agora cada mes so recebe pelo "Mesclar do mes
+// anterior", lendo exatamente o mes imediatamente anterior.
+
 function toggleParcelaField() {
   const v = document.getElementById('m-item-cobranca')?.value;
   const wrap = document.getElementById('m-parcelas-wrap');
   if (wrap) wrap.style.display = v === 'parcelado' ? '' : 'none';
 }
 
-async function propagateParcela(group, bid, baseItem) {
-  if (!canWrite()) return;
-  const col = group;
-  const blockName = appData[group]?.blocks[bid]?.name;
-  const total = baseItem.parcela?.total || 0;
-  for (let i = 2; i <= total; i++) {
-    let m = currentMonth + (i - 1), y = currentYear;
-    while (m > 11) { m -= 12; y++; }
-    const key = `${y}-${String(m + 1).padStart(2, '0')}`;
-    const ref = db.collection('months').doc(key).collection(col).doc('data');
-    const snap = await ref.get();
-    const data = snap.exists ? snap.data() : { blocks: {} };
-    if (!data.blocks) data.blocks = {};
-    const matchEntry = Object.entries(data.blocks).find(([, b]) => b.name === blockName);
-    const blockId = matchEntry ? matchEntry[0] : bid;
-    if (!data.blocks[blockId]) data.blocks[blockId] = { name: blockName, items: [] };
-    if (!data.blocks[blockId].items) data.blocks[blockId].items = [];
-    const matchIdx = data.blocks[blockId].items.findIndex(ci =>
-      ci.desc === baseItem.desc && getItemTipo(ci) === getItemTipo(baseItem) &&
-      ci.parcela?.atual === i
-    );
-    if (matchIdx === -1) {
-      let dueDate = baseItem.dueDate;
-      if (dueDate) {
-        const parts = dueDate.split('-');
-        if (parts.length === 3) dueDate = `${y}-${String(m + 1).padStart(2, '0')}-${parts[2]}`;
-      }
-      data.blocks[blockId].items.push({ ...baseItem, dueDate, paid: false, paidAmount: 0, parcela: { atual: i, total } });
-      await ref.set(data);
-    } else if (data.blocks[blockId].items[matchIdx].parcela?.total !== total) {
-      data.blocks[blockId].items[matchIdx].parcela.total = total;
-      await ref.set(data);
-    }
-  }
-}
-
-async function propagateRecorrente(group, bid, item) {
-  const col = group === 'empresa' ? 'empresa' : 'pessoal';
-  const blockName = appData[group]?.blocks[bid]?.name;
-  const CREATE_BUFFER = 3;   // só cria o item em meses que ainda não têm nada dentro desse buffer
-  const SYNC_HORIZON = 24;   // mas sincroniza o valor em qualquer mês futuro que já tenha o item, até 2 anos
-  for (let i = 1; i <= SYNC_HORIZON; i++) {
-    let m = currentMonth + i, y = currentYear;
-    while (m > 11) { m -= 12; y++; }
-    const key = `${y}-${String(m + 1).padStart(2, '0')}`;
-    const ref = db.collection('months').doc(key).collection(col).doc('data');
-    const snap = await ref.get();
-    const data = snap.exists ? snap.data() : { blocks: {} };
-    if (!data.blocks) data.blocks = {};
-    const matchEntry = Object.entries(data.blocks).find(([,b]) => b.name === blockName);
-    const blockId = matchEntry ? matchEntry[0] : bid;
-    const blockAlreadyExists = !!data.blocks[blockId];
-    if (!blockAlreadyExists) {
-      if (i > CREATE_BUFFER) continue;
-      const cur = appData[group].blocks[bid] || {};
-      data.blocks[blockId] = { name: cur.name || blockName, items: [] };
-    }
-    if (!data.blocks[blockId].items) data.blocks[blockId].items = [];
-    let dueDate = item.dueDate;
-    if (dueDate) {
-      const parts = dueDate.split('-');
-      if (parts.length === 3) dueDate = `${y}-${String(m+1).padStart(2,'0')}-${parts[2]}`;
-    }
-    const existingIdx = data.blocks[blockId].items.findIndex(ci =>
-      ci.desc === item.desc && getItemTipo(ci) === getItemTipo(item) && ci.recorrente
-    );
-    if (existingIdx === -1) {
-      if (i > CREATE_BUFFER) continue;
-      data.blocks[blockId].items.push({ ...item, dueDate, paid: false, paidAmount: 0 });
-      await ref.set(data);
-    } else {
-      const old = data.blocks[blockId].items[existingIdx];
-      const updated = { ...old, value: item.value, desc: item.desc, tipo: item.tipo, dueDate };
-      if (JSON.stringify(old) !== JSON.stringify(updated)) {
-        data.blocks[blockId].items[existingIdx] = updated;
-        await ref.set(data);
-      }
-    }
-  }
-}
-
-// Desfaz o que propagateRecorrente espalhou: remove as cópias do item nos meses
-// à frente. É o que faz uma recorrência realmente PARAR — sem isso, apagar ou
-// desmarcar a conta neste mês deixa as cópias futuras órfãs, e elas reaparecem.
+// Remove as cópias do item nos meses à frente que você já tenha aberto e
+// mesclado — e também as que a propagação antiga (removida) deixou gravadas.
+// É o que faz uma recorrência realmente PARAR: sem isso, apagar ou desmarcar a
+// conta neste mês deixa as cópias futuras órfãs, e elas reaparecem.
 // Nunca mexe em mês já marcado como pago: aquilo é histórico.
 async function removeRecorrenteForward(group, bid, item) {
   if (!canWrite()) return 0;
   const col = group === 'empresa' ? 'empresa' : 'pessoal';
   const blockName = appData[group]?.blocks[bid]?.name;
-  const HORIZON = 24; // mesmo alcance do propagateRecorrente
+  const HORIZON = 24; // alcance da varredura pra frente
   let removed = 0;
 
   for (let i = 1; i <= HORIZON; i++) {
@@ -3051,10 +2978,10 @@ function confirmAddItem(group, bid) {
     newItem.parcela = { atual: 1, total };
   }
   appData[group].blocks[bid].items.push(newItem);
+  // O item nasce SÓ neste mês. Os meses seguintes o recebem quando você abrir
+  // cada um e usar "Mesclar do mês anterior" — ver comentário em copyBlocks.
   const saveNow = group === 'empresa' ? saveEmpresa() : savePessoal();
-  saveNow.then(async () => {
-    if (newItem.recorrente) await propagateRecorrente(group, bid, newItem);
-    else if (newItem.parcela) await propagateParcela(group, bid, newItem);
+  saveNow.then(() => {
     renderBlocks(group); renderDashboard(); updateCashflow(); closeModal();
   });
 }
@@ -3120,15 +3047,14 @@ function confirmEditItem(group, bid, idx) {
   appData[group].blocks[bid].items[idx] = updated;
   const saveNow = group === 'empresa' ? saveEmpresa() : savePessoal();
   saveNow.then(async () => {
-    if (updated.recorrente) await propagateRecorrente(group, bid, updated);
-    else if (updated.parcela?.atual === 1) await propagateParcela(group, bid, updated);
     closeModal();
 
-    // Deixou de ser recorrente: sem limpar, as cópias já espalhadas pra frente
-    // continuam lá e voltam a aparecer como se a conta não tivesse acabado.
+    // A edição vale deste mês em diante. Meses à frente que você já abriu e
+    // mesclou continuam com a versão antiga — por isso a oferta de limpar.
     if (eraRecorrente && !updated.recorrente) {
       const parar = confirm(
-        `"${itemAntigo.desc}" deixou de ser recorrente, mas já existe cópia dela nos meses seguintes.\n\n` +
+        `"${itemAntigo.desc}" deixou de ser recorrente.\n\n` +
+        `Se você já abriu meses à frente, a conta pode estar lançada neles.\n\n` +
         `OK — remover dos meses à frente (meses já pagos não são tocados).\n` +
         `Cancelar — deixar como está.\n\n` +
         `Atenção: o Desfazer recupera apenas este mês, não os meses à frente.`
@@ -3151,7 +3077,8 @@ async function deleteItem(group, bid, idx) {
   let pararRecorrencia = false;
   if (item.recorrente) {
     pararRecorrencia = confirm(
-      `"${item.desc}" é uma conta recorrente, então já existe cópia dela nos meses seguintes.\n\n` +
+      `"${item.desc}" é uma conta recorrente.\n\n` +
+      `Se você já abriu meses à frente, ela pode estar lançada neles.\n\n` +
       `OK — parar a recorrência: remove também dos meses à frente (meses já pagos não são tocados).\n` +
       `Cancelar — remover só deste mês.\n\n` +
       `Atenção: o Desfazer recupera apenas este mês, não os meses à frente.`
