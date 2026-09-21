@@ -1004,7 +1004,7 @@ const blockItemSelection = {};
 // pessoa fica olhando pra uma correcao que "nao funcionou" mas nem chegou nela.
 // Aqui a gente busca o arquivo publicado ignorando o cache e compara a versao.
 // IMPORTANTE: subir APP_VERSION a cada deploy, senao o aviso nunca dispara.
-const APP_VERSION = '2026-09-21.4';
+const APP_VERSION = '2026-09-21.5';
 let _ultimaChecagem = 0;
 
 async function checarNovaVersao() {
@@ -2824,7 +2824,7 @@ function openQuickEntryModal() {
     '<div class="form-row quick-employee-field" style="display:none;"><div class="form-group"><div class="form-label">Funcionário</div><select class="form-control" id="quick-employee">' + employeeOptions + '</select></div></div>',
     '<div class="form-row"><div class="form-group"><div class="form-label">Descrição</div><input type="text" class="form-control" id="quick-desc" placeholder="Ex: Conta de energia, pagamento extra..."></div><div class="form-group"><div class="form-label">Valor (R$)</div><input type="number" step="0.01" class="form-control" id="quick-value" placeholder="0,00"></div></div>',
     '<div class="form-row quick-account-field"><div class="form-group"><div class="form-label">Vencimento / Data prevista</div><input type="date" class="form-control" id="quick-date"></div></div>',
-    '<div class="modal-footer"><button class="btn btn-ghost" onclick="closeModal()">Cancelar</button><button class="btn btn-ghost" style="border:1px solid var(--primary);color:var(--primary);" onclick="confirmQuickEntry(true)">OK e próximo</button><button class="btn btn-primary" onclick="confirmQuickEntry()">OK</button></div>'
+    '<div class="modal-footer"><button class="btn btn-ghost" onclick="closeModal()">Cancelar</button><button class="btn btn-ghost" data-modal-next style="border:1px solid var(--primary);color:var(--primary);" onclick="confirmQuickEntry(true)" title="Ctrl+Enter">OK e próximo</button><button class="btn btn-primary" onclick="confirmQuickEntry()" title="Enter">OK</button></div>'
   ].join('');
   openModal(html);
   updateQuickEntryMode();
@@ -2928,8 +2928,8 @@ function addItemToBlock(group, bid, tipo = 'despesa') {
     </div></div>
     <div class="modal-footer">
       <button class="btn btn-ghost" onclick="closeModal()">Cancelar</button>
-      <button class="btn btn-ghost" style="border:1px solid var(--primary);color:var(--primary);" onclick="confirmAddItem('${group}','${bid}',true)">OK e próximo</button>
-      <button class="btn btn-primary" onclick="confirmAddItem('${group}','${bid}')">OK</button>
+      <button class="btn btn-ghost" data-modal-next style="border:1px solid var(--primary);color:var(--primary);" onclick="confirmAddItem('${group}','${bid}',true)" title="Ctrl+Enter">OK e próximo</button>
+      <button class="btn btn-primary" onclick="confirmAddItem('${group}','${bid}')" title="Enter">OK</button>
     </div>`, 'm-item-desc');
 }
 
@@ -4910,9 +4910,13 @@ function openModal(html, focusId) {
     const alvo = e.target;
     if (alvo && (alvo.tagName === 'TEXTAREA' || alvo.tagName === 'BUTTON')) return;
     const primario = box.querySelector('.modal-footer .btn-primary');
-    if (!primario || primario.disabled) return;
+    const proximo = box.querySelector('.modal-footer [data-modal-next]');
+    // Ctrl+Enter (ou Cmd, no Mac) = "OK e próximo". Onde esse botão não existe,
+    // cai no comportamento do Enter em vez de não fazer nada.
+    const botao = ((e.ctrlKey || e.metaKey) && proximo) ? proximo : primario;
+    if (!botao || botao.disabled) return;
     e.preventDefault();
-    primario.click();
+    botao.click();
   };
 
   if (focusId) setTimeout(() => document.getElementById(focusId)?.focus(), 30);
