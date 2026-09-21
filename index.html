@@ -1004,7 +1004,7 @@ const blockItemSelection = {};
 // pessoa fica olhando pra uma correcao que "nao funcionou" mas nem chegou nela.
 // Aqui a gente busca o arquivo publicado ignorando o cache e compara a versao.
 // IMPORTANTE: subir APP_VERSION a cada deploy, senao o aviso nunca dispara.
-const APP_VERSION = '2026-09-21.5';
+const APP_VERSION = '2026-09-21.6';
 let _ultimaChecagem = 0;
 
 async function checarNovaVersao() {
@@ -2951,6 +2951,63 @@ function toggleParcelaField() {
 // É o que faz uma recorrência realmente PARAR: sem isso, apagar ou desmarcar a
 // conta neste mês deixa as cópias futuras órfãs, e elas reaparecem.
 // Nunca mexe em mês já marcado como pago: aquilo é histórico.
+// Ao editar um lançamento que se repete, corrige as ocorrências JÁ lançadas nos
+// meses à frente. É o que evita duplicar: a mesclagem reconhece a conta pela
+// descrição, então renomear "Neo Energia" para "Neoenergia" faria o mês seguinte
+// achar que é outra conta e ficar com as duas.
+//
+// Nada é criado aqui — só corrige o que já existe, mantendo a regra de que um
+// mês só ganha lançamento novo pelo "Mesclar do mês anterior".
+//
+// O valor é mais delicado que o nome: só é atualizado onde a cópia ainda estava
+// igual à versão antiga. Se você tinha ajustado o valor só naquele mês, aquilo
+// foi uma decisão sua e fica de pé. O nome é sempre sincronizado, porque é a
+// identidade que a mesclagem usa.
+async function syncRecorrenteForward(group, bid, antigo, novo) {
+  if (!canWrite()) return { meses: 0, nomes: 0, valores: 0 };
+  const col = group === 'empresa' ? 'empresa' : 'pessoal';
+  const blockName = appData[group]?.blocks[bid]?.name;
+  const HORIZON = 24;
+  let meses = 0, nomes = 0, valores = 0;
+
+  const vAntigo = parseFloat(antigo.value) || 0;
+  const vNovo = parseFloat(novo.value) || 0;
+
+  for (let i = 1; i <= HORIZON; i++) {
+    let m = currentMonth + i, y = currentYear;
+    while (m > 11) { m -= 12; y++; }
+    const key = `${y}-${String(m + 1).padStart(2, '0')}`;
+    const ref = db.collection('months').doc(key).collection(col).doc('data');
+    const snap = await ref.get();
+    if (!snap.exists) continue;
+    const data = snap.data();
+    if (!data.blocks) continue;
+    const matchEntry = Object.entries(data.blocks).find(([, b]) => b.name === blockName);
+    if (!matchEntry) continue;
+    const [blockId, block] = matchEntry;
+    const items = block.items || [];
+    let mudou = false;
+
+    items.forEach(ci => {
+      if (ci.desc !== antigo.desc || getItemTipo(ci) !== getItemTipo(antigo)) return;
+      // só mexe em quem também se repete, pra não pegar um avulso homônimo
+      const seRepete = antigo.recorrente ? !!ci.recorrente : !!ci.parcela;
+      if (!seRepete) return;
+
+      if (novo.desc !== antigo.desc) { ci.desc = novo.desc; nomes++; mudou = true; }
+
+      const pago = ci.paid || (parseFloat(ci.paidAmount) > 0);
+      const aindaNoValorAntigo = Math.abs((parseFloat(ci.value) || 0) - vAntigo) < 0.01;
+      if (!pago && aindaNoValorAntigo && vNovo !== vAntigo) {
+        ci.value = vNovo; valores++; mudou = true;
+      }
+    });
+
+    if (mudou) { data.blocks[blockId].items = items; await ref.set(data); meses++; }
+  }
+  return { meses, nomes, valores };
+}
+
 async function removeRecorrenteForward(group, bid, item) {
   if (!canWrite()) return 0;
   const col = group === 'empresa' ? 'empresa' : 'pessoal';
@@ -3102,6 +3159,15 @@ function confirmEditItem(group, bid, idx) {
       if (parar) {
         const removed = await removeRecorrenteForward(group, bid, itemAntigo);
         showSavedToast(removed > 0 ? `Removida de mais ${removed} mês(es) à frente` : 'Nada a remover à frente');
+      }
+    } else if (updated.recorrente || updated.parcela) {
+      // Continua se repetindo: alinhar as ocorrências já lançadas à frente,
+      // senão a próxima mesclagem trata a versão nova como outra conta.
+      const mudouNome = updated.desc !== itemAntigo.desc;
+      const mudouValor = (parseFloat(updated.value) || 0) !== (parseFloat(itemAntigo.value) || 0);
+      if (mudouNome || mudouValor) {
+        const r = await syncRecorrenteForward(group, bid, itemAntigo, updated);
+        if (r.meses > 0) showSavedToast(`Atualizado também em ${r.meses} mês(es) à frente`);
       }
     }
     renderBlocks(group); renderDashboard(); updateCashflow();
