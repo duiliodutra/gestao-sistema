@@ -995,7 +995,7 @@ const blockItemSelection = {};
 // pessoa fica olhando pra uma correcao que "nao funcionou" mas nem chegou nela.
 // Aqui a gente busca o arquivo publicado ignorando o cache e compara a versao.
 // IMPORTANTE: subir APP_VERSION a cada deploy, senao o aviso nunca dispara.
-const APP_VERSION = '2026-09-21.2';
+const APP_VERSION = '2026-09-21.3';
 let _ultimaChecagem = 0;
 
 async function checarNovaVersao() {
@@ -2815,7 +2815,7 @@ function openQuickEntryModal() {
     '<div class="form-row quick-employee-field" style="display:none;"><div class="form-group"><div class="form-label">Funcionário</div><select class="form-control" id="quick-employee">' + employeeOptions + '</select></div></div>',
     '<div class="form-row"><div class="form-group"><div class="form-label">Descrição</div><input type="text" class="form-control" id="quick-desc" placeholder="Ex: Conta de energia, pagamento extra..."></div><div class="form-group"><div class="form-label">Valor (R$)</div><input type="number" step="0.01" class="form-control" id="quick-value" placeholder="0,00"></div></div>',
     '<div class="form-row quick-account-field"><div class="form-group"><div class="form-label">Vencimento / Data prevista</div><input type="date" class="form-control" id="quick-date"></div></div>',
-    '<div class="modal-footer"><button class="btn btn-ghost" onclick="closeModal()">Cancelar</button><button class="btn btn-primary" onclick="confirmQuickEntry()">Adicionar</button></div>'
+    '<div class="modal-footer"><button class="btn btn-ghost" onclick="closeModal()">Cancelar</button><button class="btn btn-ghost" style="border:1px solid var(--primary);color:var(--primary);" onclick="confirmQuickEntry(true)">OK e próximo</button><button class="btn btn-primary" onclick="confirmQuickEntry()">OK</button></div>'
   ].join('');
   openModal(html);
   updateQuickEntryMode();
@@ -2839,7 +2839,17 @@ function updateQuickEntryMode() {
   if (newBlockWrap && blockSelect) newBlockWrap.style.display = blockSelect.value === '__new' ? '' : 'none';
 }
 
-function confirmQuickEntry() {
+// Limpa descrição e valor mantendo destino, bloco, tipo e data — ver confirmAddItem.
+function quickEntryKeepGoing(desc) {
+  const d = document.getElementById('quick-desc');
+  const v = document.getElementById('quick-value');
+  if (d) d.value = '';
+  if (v) v.value = '';
+  showSavedToast(`✓ ${desc}`);
+  d?.focus();
+}
+
+function confirmQuickEntry(continuar = false) {
   if (!canWrite()) return;
   const dest = document.getElementById('quick-dest')?.value || 'empresa';
   const desc = document.getElementById('quick-desc')?.value.trim() || '';
@@ -2854,7 +2864,10 @@ function confirmQuickEntry() {
     if (!appData.employeePayments[eid]) appData.employeePayments[eid] = {};
     if (!appData.employeePayments[eid][tipo]) appData.employeePayments[eid][tipo] = [];
     appData.employeePayments[eid][tipo].push({ nome: desc, valor: value });
-    saveEmployeePayments().then(() => { renderEmployees(); renderDashboard(); updateCashflow(); closeModal(); });
+    saveEmployeePayments().then(() => {
+      renderEmployees(); renderDashboard(); updateCashflow();
+      if (continuar) quickEntryKeepGoing(desc); else closeModal();
+    });
     return;
   }
   const group = dest === 'pessoal' ? 'pessoal' : 'empresa';
@@ -2873,7 +2886,10 @@ function confirmQuickEntry() {
   normalizeBlockItem(item);
   appData[group].blocks[bid].items.push(item);
   activeBlockTab[group] = bid;
-  (group === 'empresa' ? saveEmpresa() : savePessoal()).then(() => { renderBlocks(group); renderDashboard(); updateCashflow(); closeModal(); });
+  (group === 'empresa' ? saveEmpresa() : savePessoal()).then(() => {
+    renderBlocks(group); renderDashboard(); updateCashflow();
+    if (continuar) quickEntryKeepGoing(desc); else closeModal();
+  });
 }
 function addItemToBlock(group, bid, tipo = 'despesa') {
   openModal(`
@@ -2903,8 +2919,9 @@ function addItemToBlock(group, bid, tipo = 'despesa') {
     </div></div>
     <div class="modal-footer">
       <button class="btn btn-ghost" onclick="closeModal()">Cancelar</button>
-      <button class="btn btn-primary" onclick="confirmAddItem('${group}','${bid}')">Adicionar</button>
-    </div>`);
+      <button class="btn btn-ghost" style="border:1px solid var(--primary);color:var(--primary);" onclick="confirmAddItem('${group}','${bid}',true)">OK e próximo</button>
+      <button class="btn btn-primary" onclick="confirmAddItem('${group}','${bid}')">OK</button>
+    </div>`, 'm-item-desc');
 }
 
 // As funcoes propagateParcela/propagateRecorrente foram removidas: elas
@@ -2960,7 +2977,9 @@ async function removeRecorrenteForward(group, bid, item) {
   return removed;
 }
 
-function confirmAddItem(group, bid) {
+// continuar = "OK e próximo": grava e deixa o formulário aberto e limpo para o
+// lançamento seguinte.
+function confirmAddItem(group, bid, continuar = false) {
   const desc = document.getElementById('m-item-desc').value.trim();
   const dueDate = document.getElementById('m-item-date').value;
   const value = parseFloat(document.getElementById('m-item-value').value) || 0;
@@ -2982,7 +3001,19 @@ function confirmAddItem(group, bid) {
   // cada um e usar "Mesclar do mês anterior" — ver comentário em copyBlocks.
   const saveNow = group === 'empresa' ? saveEmpresa() : savePessoal();
   saveNow.then(() => {
-    renderBlocks(group); renderDashboard(); updateCashflow(); closeModal();
+    renderBlocks(group); renderDashboard(); updateCashflow();
+    if (continuar) {
+      // Limpa no lugar em vez de reabrir: vencimento, tipo e forma de cobrança
+      // continuam como estavam, que é o que costuma se repetir numa tanda.
+      const d = document.getElementById('m-item-desc');
+      const v = document.getElementById('m-item-value');
+      if (d) d.value = '';
+      if (v) v.value = '';
+      showSavedToast(`✓ ${desc}`);
+      d?.focus();
+    } else {
+      closeModal();
+    }
   });
 }
 
@@ -3018,8 +3049,8 @@ function editItem(group, bid, idx) {
     </div></div>
     <div class="modal-footer">
       <button class="btn btn-ghost" onclick="closeModal()">Cancelar</button>
-      <button class="btn btn-primary" onclick="confirmEditItem('${group}','${bid}',${idx})">Salvar</button>
-    </div>`);
+      <button class="btn btn-primary" onclick="confirmEditItem('${group}','${bid}',${idx})">OK</button>
+    </div>`, 'm-item-desc');
 }
 
 function confirmEditItem(group, bid, idx) {
@@ -4791,9 +4822,25 @@ function showTab(name, btn) {
 // =============================================
 // MODAL
 // =============================================
-function openModal(html) {
-  document.getElementById('modal-box').innerHTML = html;
+function openModal(html, focusId) {
+  const box = document.getElementById('modal-box');
+  box.innerHTML = html;
   document.getElementById('modal-overlay').classList.remove('hidden');
+
+  // Enter confirma o modal, em qualquer tela. Só dispara o botão azul
+  // (.btn-primary): ações destrutivas, como "Zerar mês", usam .btn-danger e
+  // continuam exigindo clique, pra não se apagar nada com um Enter distraído.
+  box.onkeydown = (e) => {
+    if (e.key !== 'Enter' || e.shiftKey) return;
+    const alvo = e.target;
+    if (alvo && (alvo.tagName === 'TEXTAREA' || alvo.tagName === 'BUTTON')) return;
+    const primario = box.querySelector('.modal-footer .btn-primary');
+    if (!primario || primario.disabled) return;
+    e.preventDefault();
+    primario.click();
+  };
+
+  if (focusId) setTimeout(() => document.getElementById(focusId)?.focus(), 30);
 }
 function closeModal() {
   partialPaymentCtx = null;
