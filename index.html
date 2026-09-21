@@ -1004,7 +1004,7 @@ const blockItemSelection = {};
 // pessoa fica olhando pra uma correcao que "nao funcionou" mas nem chegou nela.
 // Aqui a gente busca o arquivo publicado ignorando o cache e compara a versao.
 // IMPORTANTE: subir APP_VERSION a cada deploy, senao o aviso nunca dispara.
-const APP_VERSION = '2026-09-21.6';
+const APP_VERSION = '2026-09-21.7';
 let _ultimaChecagem = 0;
 
 async function checarNovaVersao() {
@@ -1394,7 +1394,7 @@ function copyEmployeePayments(src, current = {}) {
         }
         if (!nextLine) return;
         const exists = result[eid][tipo].some(l =>
-          l.nome === nextLine.nome &&
+          mesmoNomeLancamento(l.nome, nextLine.nome) &&
           (nextLine.parcela ? l.parcela?.atual === nextLine.parcela.atual : !!l.recorrente)
         );
         if (!exists) result[eid][tipo].push(nextLine);
@@ -1795,6 +1795,18 @@ function empEmailById(eid) {
   const e = (appData.employees.list || []).find(x => x.id === eid);
   return (e && e.email) ? e.email.toLowerCase() : '';
 }
+// Comparação de nome de lançamento da folha. "Salário nível 23" e "Salário
+// Nível 23" são a mesma conta — com comparação exata a mesclagem tratava como
+// duas e duplicava. Ignora maiúsculas, acentos e espaços sobrando.
+function normalizaNomeLancamento(s) {
+  return String(s || '')
+    .normalize('NFD').replace(/[̀-ͯ]/g, '')
+    .trim().toLowerCase().replace(/\s+/g, ' ');
+}
+function mesmoNomeLancamento(a, b) {
+  return normalizaNomeLancamento(a) === normalizaNomeLancamento(b);
+}
+
 function empNameById(eid) {
   const e = (appData.employees.list || []).find(x => x.id === eid);
   return e ? (e.name || '').split(' ')[0] : 'funcionário';
@@ -3979,7 +3991,7 @@ async function importEmpFromPrevMonth(eid) {
       if (line.parcela && line.parcela.atual >= line.parcela.total) continue;
       const nextAtual = line.parcela ? line.parcela.atual + 1 : null;
       const exists = appData.employeePayments[eid][tipo].some(l =>
-        l.nome === line.nome &&
+        mesmoNomeLancamento(l.nome, line.nome) &&
         (line.parcela ? l.parcela?.atual === nextAtual : !!l.recorrente)
       );
       if (!exists) {
@@ -4055,7 +4067,7 @@ async function propagateEmpParcela(eid, tipo, baseLine) {
     const pd = (await readEmpPayment(key, eid)) || { receitas: [], descontos_list: [], folhaPaga: false };
     if (!pd[tipo]) pd[tipo] = [];
     const matchIdx = pd[tipo].findIndex(l =>
-      l.nome === baseLine.nome &&
+      mesmoNomeLancamento(l.nome, baseLine.nome) &&
       l.parcela?.atual === i
     );
     if (matchIdx === -1) {
@@ -4080,7 +4092,7 @@ async function propagateEmpLine(eid, tipo, line) {
     if (!existing && i > CREATE_BUFFER) continue;
     const pd = existing || { receitas: [], descontos_list: [], folhaPaga: false };
     if (!pd[tipo]) pd[tipo] = [];
-    const matchIdx = pd[tipo].findIndex(l => l.nome === line.nome && l.recorrente);
+    const matchIdx = pd[tipo].findIndex(l => mesmoNomeLancamento(l.nome, line.nome) && l.recorrente);
     if (matchIdx === -1) {
       if (i > CREATE_BUFFER) continue;
       pd[tipo].push({ ...line, paid: false });
@@ -4102,6 +4114,7 @@ function updateEmpLine(eid, tipo, idx, field, val) {
   if (!appData.employeePayments[eid][tipo]) appData.employeePayments[eid][tipo] = [];
   const line = appData.employeePayments[eid][tipo][idx];
   const rotulo = tipo === 'receitas' ? 'receita' : 'desconto';
+  const nomeAntigo = line.nome; // guardado antes de sobrescrever, pra achar as cópias à frente
   pushUndo(`Editar ${field === 'valor' ? 'valor' : 'nome'} de ${rotulo} "${line.nome || '(sem nome)'}" — ${empNameById(eid)}`);
   line[field] = field === 'valor' ? (parseFloat(val)||0) : val;
   // Update totals in place without re-rendering the whole card
@@ -4112,7 +4125,39 @@ function updateEmpLine(eid, tipo, idx, field, val) {
     renderDashboard();
     updateCashflow();
     if (field === 'valor' && line.recorrente) propagateEmpLine(eid, tipo, line);
+    // Renomear sem alcançar os meses à frente faz a mesclagem seguinte achar
+    // que é outra conta e lançar as duas.
+    if (field === 'nome' && (line.recorrente || line.parcela)) {
+      renameEmpLineForward(eid, tipo, nomeAntigo, line);
+    }
   }, 1500);
+}
+
+// Renomeia as ocorrências já lançadas à frente. Não cria nada: só corrige o que
+// existe, para a mesclagem continuar reconhecendo a mesma conta.
+async function renameEmpLineForward(eid, tipo, nomeAntigo, line) {
+  if (!canWrite()) return 0;
+  if (mesmoNomeLancamento(nomeAntigo, line.nome)) return 0;
+  const HORIZON = 24;
+  let meses = 0;
+  for (let i = 1; i <= HORIZON; i++) {
+    let m = currentMonth + i, y = currentYear;
+    while (m > 11) { m -= 12; y++; }
+    const key = `${y}-${String(m + 1).padStart(2, '0')}`;
+    const pd = await readEmpPayment(key, eid);
+    if (!pd || !pd[tipo]) continue;
+    let mudou = false;
+    pd[tipo].forEach(l => {
+      if (!mesmoNomeLancamento(l.nome, nomeAntigo)) return;
+      const seRepete = line.recorrente ? !!l.recorrente : !!l.parcela;
+      if (!seRepete) return;
+      l.nome = line.nome;
+      mudou = true;
+    });
+    if (mudou) { await writeEmpPayment(key, eid, pd); meses++; }
+  }
+  if (meses > 0) showSavedToast(`Renomeado também em ${meses} mês(es) à frente`);
+  return meses;
 }
 
 function updateEmpTotalsInPlace(eid) {
