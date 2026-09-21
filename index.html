@@ -995,7 +995,7 @@ const blockItemSelection = {};
 // pessoa fica olhando pra uma correcao que "nao funcionou" mas nem chegou nela.
 // Aqui a gente busca o arquivo publicado ignorando o cache e compara a versao.
 // IMPORTANTE: subir APP_VERSION a cada deploy, senao o aviso nunca dispara.
-const APP_VERSION = '2026-08-10.4';
+const APP_VERSION = '2026-09-21.1';
 let _ultimaChecagem = 0;
 
 async function checarNovaVersao() {
@@ -1343,15 +1343,23 @@ function updateMonthMenuState() {
   if (newCountEl) newCountEl.textContent = String(newCount);
 }
 
+// Só vem pro mês seguinte o que TEM continuidade: recorrente e parcelamento em
+// andamento. Item "Normal (uma vez)" fica onde foi lançado.
+//
+// Antes o else copiava tudo o que não era parcela, inclusive os Normais. Como
+// cada mês era mesclado a partir do anterior, uma despesa avulsa de junho ia
+// pra julho, de julho pra agosto, e assim por diante — em outubro apareciam
+// contas de vários meses atrás que já tinham encerrado. Cada mesclagem lê só o
+// mês anterior; era o arrasto acumulado que dava a impressão de vir de longe.
 function copyBlocks(src) {
   const newBlocks = {};
   Object.entries(src.blocks || {}).forEach(([bid, block]) => {
     const items = (block.items || []).reduce((acc, item) => {
       if (item.parcela) {
         const next = item.parcela.atual + 1;
-        if (next > item.parcela.total) return acc;
+        if (next > item.parcela.total) return acc; // parcelamento encerrado
         acc.push({ ...item, tipo: getItemTipo(item), paid: false, paidAmount: 0, dueDate: advanceDateToCurrentMonth(item.dueDate), parcela: { atual: next, total: item.parcela.total } });
-      } else {
+      } else if (item.recorrente) {
         acc.push({ ...item, tipo: getItemTipo(item), paid: false, paidAmount: 0, dueDate: advanceDateToCurrentMonth(item.dueDate) });
       }
       return acc;
@@ -2986,6 +2994,45 @@ async function propagateRecorrente(group, bid, item) {
   }
 }
 
+// Desfaz o que propagateRecorrente espalhou: remove as cópias do item nos meses
+// à frente. É o que faz uma recorrência realmente PARAR — sem isso, apagar ou
+// desmarcar a conta neste mês deixa as cópias futuras órfãs, e elas reaparecem.
+// Nunca mexe em mês já marcado como pago: aquilo é histórico.
+async function removeRecorrenteForward(group, bid, item) {
+  if (!canWrite()) return 0;
+  const col = group === 'empresa' ? 'empresa' : 'pessoal';
+  const blockName = appData[group]?.blocks[bid]?.name;
+  const HORIZON = 24; // mesmo alcance do propagateRecorrente
+  let removed = 0;
+
+  for (let i = 1; i <= HORIZON; i++) {
+    let m = currentMonth + i, y = currentYear;
+    while (m > 11) { m -= 12; y++; }
+    const key = `${y}-${String(m + 1).padStart(2, '0')}`;
+    const ref = db.collection('months').doc(key).collection(col).doc('data');
+    const snap = await ref.get();
+    if (!snap.exists) continue;
+    const data = snap.data();
+    if (!data.blocks) continue;
+    const matchEntry = Object.entries(data.blocks).find(([, b]) => b.name === blockName);
+    if (!matchEntry) continue;
+    const [blockId, block] = matchEntry;
+    const items = block.items || [];
+    const keep = items.filter(ci => !(
+      ci.desc === item.desc &&
+      getItemTipo(ci) === getItemTipo(item) &&
+      ci.recorrente &&
+      !ci.paid && !(parseFloat(ci.paidAmount) > 0)
+    ));
+    if (keep.length !== items.length) {
+      removed += items.length - keep.length;
+      data.blocks[blockId].items = keep;
+      await ref.set(data);
+    }
+  }
+  return removed;
+}
+
 function confirmAddItem(group, bid) {
   const desc = document.getElementById('m-item-desc').value.trim();
   const dueDate = document.getElementById('m-item-date').value;
@@ -3056,6 +3103,10 @@ function confirmEditItem(group, bid, idx) {
   const cobranca = document.getElementById('m-item-cobranca')?.value || 'normal';
   if (!desc) return;
   const prev = appData[group].blocks[bid].items[idx];
+  // Guardado antes da alteração: se deixar de ser recorrente, é por estes
+  // valores (descrição/tipo antigos) que as cópias futuras são encontradas.
+  const eraRecorrente = !!prev.recorrente;
+  const itemAntigo = { ...prev };
   pushUndo(`Editar item "${prev.desc}" em ${appData[group].blocks[bid].name}`);
   const updated = { ...prev, desc, dueDate, value, tipo };
   delete updated.recorrente; delete updated.parcela;
@@ -3071,16 +3122,52 @@ function confirmEditItem(group, bid, idx) {
   saveNow.then(async () => {
     if (updated.recorrente) await propagateRecorrente(group, bid, updated);
     else if (updated.parcela?.atual === 1) await propagateParcela(group, bid, updated);
-    renderBlocks(group); renderDashboard(); updateCashflow(); closeModal();
+    closeModal();
+
+    // Deixou de ser recorrente: sem limpar, as cópias já espalhadas pra frente
+    // continuam lá e voltam a aparecer como se a conta não tivesse acabado.
+    if (eraRecorrente && !updated.recorrente) {
+      const parar = confirm(
+        `"${itemAntigo.desc}" deixou de ser recorrente, mas já existe cópia dela nos meses seguintes.\n\n` +
+        `OK — remover dos meses à frente (meses já pagos não são tocados).\n` +
+        `Cancelar — deixar como está.\n\n` +
+        `Atenção: o Desfazer recupera apenas este mês, não os meses à frente.`
+      );
+      if (parar) {
+        const removed = await removeRecorrenteForward(group, bid, itemAntigo);
+        showSavedToast(removed > 0 ? `Removida de mais ${removed} mês(es) à frente` : 'Nada a remover à frente');
+      }
+    }
+    renderBlocks(group); renderDashboard(); updateCashflow();
   });
 }
 
-function deleteItem(group, bid, idx) {
+async function deleteItem(group, bid, idx) {
+  const item = appData[group].blocks[bid].items[idx];
+  if (!item) return;
   if (!confirm('Remover este item?')) return;
-  pushUndo(`Excluir item "${appData[group].blocks[bid].items[idx]?.desc || ''}"`);
+
+  // Recorrente já foi copiado pra frente; perguntar se é pra parar de vez.
+  let pararRecorrencia = false;
+  if (item.recorrente) {
+    pararRecorrencia = confirm(
+      `"${item.desc}" é uma conta recorrente, então já existe cópia dela nos meses seguintes.\n\n` +
+      `OK — parar a recorrência: remove também dos meses à frente (meses já pagos não são tocados).\n` +
+      `Cancelar — remover só deste mês.\n\n` +
+      `Atenção: o Desfazer recupera apenas este mês, não os meses à frente.`
+    );
+  }
+
+  pushUndo(`Excluir item "${item.desc || ''}"`);
   appData[group].blocks[bid].items.splice(idx, 1);
   adjustSelectionAfterDelete(group, bid, idx);
-  (group === 'empresa' ? saveEmpresa() : savePessoal()).then(() => { renderBlocks(group); renderDashboard(); updateCashflow(); });
+  await (group === 'empresa' ? saveEmpresa() : savePessoal());
+
+  if (pararRecorrencia) {
+    const removed = await removeRecorrenteForward(group, bid, item);
+    showSavedToast(removed > 0 ? `Recorrência parada — removida de mais ${removed} mês(es)` : 'Nada a remover à frente');
+  }
+  renderBlocks(group); renderDashboard(); updateCashflow();
 }
 
 let partialPaymentCtx = null;
