@@ -104,6 +104,19 @@ service cloud.firestore {
       allow read, write: if isAdmin();
     }
 
+    // ---------------------------------------------------------------
+    // PROPOSTAS DE ESCALA (funcionario propoe, admin aprova)
+    // Um documento por funcionario, id = uid. O funcionario le/escreve
+    // apenas o proprio doc; o admin le/escreve todos. Nada aqui altera a
+    // escala real: o admin aplica (ou rejeita) cada proposta no app, e so
+    // entao a mudanca vai para months/{mes}/escala/data (write so do admin).
+    // Por isso o risco e baixo mesmo liberando escrita ao funcionario.
+    // ---------------------------------------------------------------
+    match /months/{monthId}/escala_prop/{uid} {
+      allow read, write: if isAdmin()
+        || (isSignedIn() && request.auth.uid == uid);
+    }
+
     // Qualquer subcolecao nova em /months nasce restrita ao admin.
     match /months/{monthId}/{collection}/{docId} {
       allow read, write: if isAdmin();

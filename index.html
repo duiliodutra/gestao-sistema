@@ -492,6 +492,17 @@
   .cal-event.dobra { background: #7c3aed; color: white; font-weight: 600; }
   .cal-event.folga { background: #0d9488; color: white; font-weight: 600; }
   .cal-event.ferias { background: #16a34a; color: white; font-weight: 600; }
+  /* Proposta pendente de escala: mesma cor do tipo, com contorno tracejado */
+  .cal-event.pendente { outline: 2px dashed #b45309; outline-offset: -2px; opacity: 0.92; }
+  .prop-banner {
+    background: #fff7ed; border: 1px solid #fdba74; color: #9a3412;
+    border-radius: var(--radius); padding: 12px 14px; margin-bottom: 14px;
+    display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;
+  }
+  .prop-op {
+    border: 1px solid var(--gray-200); border-left: 4px solid #b45309;
+    border-radius: var(--radius); padding: 10px 12px; margin-bottom: 10px; background: #fffdfa;
+  }
 
   /* LEGEND */
   .legend { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
@@ -904,6 +915,7 @@ window.addEventListener('unhandledrejection', function(e) {
     <div class="tab-pane active" id="tab-escala">
       <div class="section-title">📅 Escala de Plantões</div>
       <div class="section-desc" id="escala-desc">Gerencie a escala de trabalho dos funcionários</div>
+      <div id="escala-prop-banner" class="prop-banner" style="display:none;"></div>
       <div class="legend">
         <div class="legend-item"><div class="legend-dot" style="background:#dc2626;"></div>Plantão Remunerado</div>
         <div class="legend-item"><div class="legend-dot" style="background:#6b7280;"></div>Não Remunerado</div>
@@ -1203,7 +1215,7 @@ function updateEmployeeTabLabels() {
   const escalaDesc = document.getElementById('escala-desc');
   const feriasDesc = document.getElementById('ferias-desc');
   if (isEmployeeView()) {
-    if (escalaDesc) escalaDesc.textContent = 'Sábados, domingos e feriados: escala de toda a equipe. Dias de semana: somente a sua.';
+    if (escalaDesc) escalaDesc.textContent = 'Clique num dia para propor seus plantões/folgas — as mudanças passam por aprovação do administrador. Sábados, domingos e feriados mostram a equipe toda; dias de semana, só a sua.';
     if (feriasDesc) feriasDesc.textContent = 'Visualize as férias de todos os colegas (somente leitura)';
   } else {
     if (escalaDesc) escalaDesc.textContent = 'Gerencie a escala de trabalho dos funcionários';
@@ -4764,6 +4776,7 @@ async function renderCalendar(type) {
   if (!gridEl || !titleEl) return;
 
   const escalaEvents = type === 'escala' ? (await getEscalaTarget()).events : null;
+  if (type === 'escala') await loadEscalaProposalsFor(month, year);
   // a renderizacao e assincrona (pode ter trocado de mes de novo enquanto buscava); descarta se ficou obsoleta
   if ((type === 'escala' ? calEscalaMonth : calFeriasMonth) !== month || (type === 'escala' ? calEscalaYear : calFeriasYear) !== year) return;
 
@@ -4798,6 +4811,15 @@ async function renderCalendar(type) {
         const emp = (appData.employees.list||[]).find(e=>e.id===ev.empId);
         eventsHTML += `<div class="cal-event ${t.cls}">${escHtml(emp?emp.name.split(' ')[0]:'?')}</div>`;
       });
+      // Propostas pendentes deste dia — destaque tracejado (aguardando aprovação)
+      escalaPropsForDate(dateStr).forEach(op=>{
+        const t = SHIFT_TYPES.find(s=>s.value===op.type)||{cls:'',label:op.type};
+        const emp = (appData.employees.list||[]).find(e=>e.id===op.empId);
+        const nm = escHtml(emp?emp.name.split(' ')[0]:'?');
+        const mark = op.action==='remove' ? '🗑' : '＋';
+        const by = escHtml(op.byName || '');
+        eventsHTML += `<div class="cal-event ${t.cls} pendente" title="Proposta${by?(' de '+by):''} — aguardando aprovação">${mark} ${nm}</div>`;
+      });
     } else {
       (appData.employees.list||[]).forEach((emp,idx)=>{
         normalizeFerias(emp);
@@ -4812,8 +4834,9 @@ async function renderCalendar(type) {
       });
     }
 
-    const canClick = type === 'escala' && canWrite();
-    const clickAttr = canClick ? `onclick="openShiftModal('${dateStr}')"` : '';
+    const canClick = type === 'escala' && (canWrite() || isEmployeeView());
+    const clickFn = canWrite() ? 'openShiftModal' : 'openShiftModalEmployee';
+    const clickAttr = canClick ? `onclick="${clickFn}('${dateStr}')"` : '';
     const isHol = type === 'escala' && isHoliday(dateStr);
     const holidayTag = isHol ? '<span class="holiday-tag">feriado</span>' : '';
     html += `<div class="cal-day ${isToday?'today':''} ${isHol?'holiday':''}" ${clickAttr} style="${type==='escala' && !canClick ? 'cursor:default;' : ''}">
@@ -4830,6 +4853,7 @@ async function renderCalendar(type) {
   gridEl.innerHTML = html;
 
   if (type === 'escala') renderShiftSummary(escalaEvents);
+  if (type === 'escala' && isAdmin) updateEscalaPropBanner();
   if (type === 'ferias') renderFeriasLegend();
 }
 
@@ -4945,6 +4969,233 @@ async function removeShiftEvent(dateStr, idx) {
   target.events[dateStr].splice(idx, 1);
   if (target.events[dateStr].length === 0) delete target.events[dateStr];
   target.save().then(()=>{ renderCalendar('escala'); openShiftModal(dateStr); });
+}
+
+// =============================================
+// PROPOSTAS DE ESCALA (funcionario propoe, admin aprova)
+// Nada entra na escala real sem aprovacao do admin. As propostas ficam em
+// months/{mes}/escala_prop/{uid}: um documento por funcionario; so ele e o
+// admin leem/escrevem (ver firestore.rules). O mes segue o calendario exibido.
+// =============================================
+let escalaProps = [];           // admin: ops achatadas do mes exibido, p/ revisao
+let myEscalaProp = { ops: [] };  // funcionario: proprio doc de propostas do mes exibido
+
+function escalaPropColl(key) {
+  return db.collection('months')
+    .doc(key || escalaKeyFor(calEscalaMonth, calEscalaYear))
+    .collection('escala_prop');
+}
+function newOpId() { return Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
+
+async function loadEscalaProposalsFor(month, year) {
+  const key = escalaKeyFor(month, year);
+  escalaProps = [];
+  myEscalaProp = { ops: [] };
+  try {
+    if (isEmployeeView()) {
+      const snap = await escalaPropColl(key).doc(currentUser.uid).get();
+      myEscalaProp = snap.exists ? snap.data() : { ops: [] };
+      if (!myEscalaProp.ops) myEscalaProp.ops = [];
+    } else if (isAdmin) {
+      const snap = await escalaPropColl(key).get();
+      snap.forEach(doc => {
+        const d = doc.data() || {};
+        (d.ops || []).forEach(op => escalaProps.push({ ...op, uid: doc.id, byName: d.byName || '?', byEmail: d.byEmail || '' }));
+      });
+      escalaProps.sort((a,b)=> (a.date||'').localeCompare(b.date||'') || (a.at||0)-(b.at||0));
+    }
+  } catch (e) { console.warn('propostas escala:', e); }
+}
+
+// Ops pendentes de um dia, conforme o que o papel atual pode ver/propor
+function escalaPropsForDate(dateStr) {
+  if (isAdmin) return escalaProps.filter(op => op.date === dateStr);
+  if (isEmployeeView()) return (myEscalaProp.ops || []).filter(op => op.date === dateStr);
+  return [];
+}
+
+// ---------- Lado do FUNCIONARIO: propor ----------
+async function saveMyEscalaProp() {
+  const ref = escalaPropColl().doc(currentUser.uid);
+  myEscalaProp.ops = myEscalaProp.ops || [];
+  if (!myEscalaProp.ops.length) { await ref.delete().catch(()=>{}); return; }
+  const emp = (appData.employees.list||[]).find(e=>e.id===employeeOwnId);
+  myEscalaProp.byName = emp ? emp.name : (currentUser.displayName || currentUser.email);
+  myEscalaProp.byEmail = currentUser.email;
+  myEscalaProp.updatedAt = Date.now();
+  await ref.set(myEscalaProp);
+}
+
+async function openShiftModalEmployee(dateStr) {
+  if (!isEmployeeView() || !employeeOwnId) return;
+  const target = await getEscalaTarget();
+  const approved = ((target.events||{})[dateStr]||[]).filter(ev => ev.empId === employeeOwnId);
+  const myOps = (myEscalaProp.ops||[]).filter(op => op.date === dateStr);
+
+  const approvedRows = approved.map((ev)=>{
+    const t = SHIFT_TYPES.find(s=>s.value===ev.type)||SHIFT_TYPES[0];
+    const removing = myOps.some(op=>op.action==='remove' && op.type===ev.type);
+    return `<div style="display:flex;gap:8px;align-items:center;margin-bottom:6px;">
+      <span style="flex:1;font-size:13px;">${t.label}${removing?' <em style="color:#b45309;">(remoção proposta)</em>':''}</span>
+      ${removing?'':`<button class="btn btn-sm btn-danger btn-icon" title="Propor remoção" onclick="proposeRemoveShift('${dateStr}','${ev.type}')">✕</button>`}
+    </div>`;
+  }).join('');
+
+  const pendingRows = myOps.map(op=>{
+    const t = SHIFT_TYPES.find(s=>s.value===op.type)||{label:op.type};
+    const label = op.action==='remove' ? `Remover ${t.label}` : `Adicionar ${t.label}`;
+    return `<div style="display:flex;gap:8px;align-items:center;margin-bottom:6px;">
+      <span style="flex:1;font-size:13px;color:#9a3412;">⏳ ${label} <em>(aguardando aprovação)</em></span>
+      <button class="btn btn-sm btn-ghost btn-icon" title="Cancelar proposta" onclick="cancelMyOp('${dateStr}','${op.id}')">↩</button>
+    </div>`;
+  }).join('');
+
+  openModal(`
+    <div class="modal-title">Escala — ${fmtDate(dateStr)}</div>
+    <div class="viewer-notice" style="margin-bottom:12px;">Suas alterações entram como <strong>proposta</strong> e só passam a valer após aprovação do administrador.</div>
+    <div class="card-title" style="margin-bottom:8px;">Seus plantões aprovados</div>
+    <div style="margin-bottom:12px;">${approvedRows || '<div class="text-gray text-sm">Nenhum plantão seu neste dia.</div>'}</div>
+    ${pendingRows ? `<div class="card-title" style="margin-bottom:8px;">Suas propostas pendentes</div><div style="margin-bottom:12px;">${pendingRows}</div>` : ''}
+    <hr style="margin:12px 0;border-color:var(--gray-200);">
+    <div class="card-title" style="margin-bottom:10px;">Propor novo plantão</div>
+    <div class="form-group"><div class="form-label">Tipo</div>
+      <select class="form-control" id="m-prop-type">
+        ${SHIFT_TYPES.map(t=>`<option value="${t.value}">${t.label}</option>`).join('')}
+      </select>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal()">Fechar</button>
+      <button class="btn btn-primary" onclick="proposeAddShift('${dateStr}')">Propor</button>
+    </div>`);
+}
+
+async function proposeAddShift(dateStr) {
+  if (!isEmployeeView() || !employeeOwnId) return;
+  const type = document.getElementById('m-prop-type').value;
+  myEscalaProp.ops = myEscalaProp.ops || [];
+  myEscalaProp.ops.push({ id:newOpId(), action:'add', date:dateStr, empId:employeeOwnId, type, at:Date.now() });
+  await saveMyEscalaProp();
+  await renderCalendar('escala');
+  openShiftModalEmployee(dateStr);
+}
+
+async function proposeRemoveShift(dateStr, type) {
+  if (!isEmployeeView() || !employeeOwnId) return;
+  myEscalaProp.ops = myEscalaProp.ops || [];
+  myEscalaProp.ops.push({ id:newOpId(), action:'remove', date:dateStr, empId:employeeOwnId, type, at:Date.now() });
+  await saveMyEscalaProp();
+  await renderCalendar('escala');
+  openShiftModalEmployee(dateStr);
+}
+
+async function cancelMyOp(dateStr, opId) {
+  myEscalaProp.ops = (myEscalaProp.ops||[]).filter(op => op.id !== opId);
+  await saveMyEscalaProp();
+  await renderCalendar('escala');
+  openShiftModalEmployee(dateStr);
+}
+
+// ---------- Lado do ADMIN: revisar e aprovar ----------
+function updateEscalaPropBanner() {
+  const el = document.getElementById('escala-prop-banner');
+  if (!el) return;
+  if (!isAdmin || escalaProps.length === 0) { el.style.display='none'; return; }
+  const n = escalaProps.length;
+  el.innerHTML = `<div>📝 <strong>${n}</strong> alteraç${n>1?'ões':'ão'} de escala aguardando sua aprovação (${MONTHS[calEscalaMonth]} ${calEscalaYear}).</div>
+    <button class="btn btn-primary btn-sm" onclick="openEscalaReview()">Revisar agora</button>`;
+  el.style.display='flex';
+}
+
+function openEscalaReview() {
+  if (!isAdmin) return;
+  if (escalaProps.length === 0) { closeModal(); return; }
+  const rows = escalaProps.map(op=>{
+    const emp = (appData.employees.list||[]).find(e=>e.id===op.empId);
+    const nm = escHtml(emp?emp.name:'?');
+    const actLabel = op.action==='remove' ? 'Remover' : 'Adicionar';
+    const typeCtl = op.action==='add'
+      ? `<select class="form-control" style="max-width:170px;" id="rev-type-${op.uid}-${op.id}">
+          ${SHIFT_TYPES.map(t=>`<option value="${t.value}" ${t.value===op.type?'selected':''}>${t.label}</option>`).join('')}
+         </select>`
+      : `<span style="font-size:13px;font-weight:600;">${(SHIFT_TYPES.find(s=>s.value===op.type)||{label:op.type}).label}</span>`;
+    return `<div class="prop-op">
+      <div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:center;">
+        <div style="font-size:13px;">
+          <strong>${nm}</strong> · ${fmtDate(op.date)}<br>
+          <span style="color:#9a3412;font-weight:600;">${actLabel}</span> ${op.action==='add'?'<span class="text-gray text-sm">(tipo editável)</span>':''}
+        </div>
+        <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
+          ${typeCtl}
+          <button class="btn btn-success btn-sm" onclick="approveOp('${op.uid}','${op.id}')">Aprovar</button>
+          <button class="btn btn-danger btn-sm" onclick="rejectOp('${op.uid}','${op.id}')">Rejeitar</button>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+  openModal(`
+    <div class="modal-title">Aprovação de escala — ${escalaProps.length} pendente(s)</div>
+    <div style="max-height:60vh;overflow:auto;margin:10px 0;">${rows}</div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal()">Fechar</button>
+      <button class="btn btn-primary" onclick="approveAllOps()">Aprovar tudo</button>
+    </div>`);
+}
+
+// Aplica uma op na escala real (mes exibido). overrideType permite editar o tipo.
+async function applyOpToEscala(op, overrideType) {
+  const target = await getEscalaTarget();
+  if (!target.events) target.events = {};
+  if (op.action === 'add') {
+    if (!target.events[op.date]) target.events[op.date] = [];
+    target.events[op.date].push({ empId: op.empId, type: overrideType || op.type });
+  } else if (op.action === 'remove') {
+    const arr = target.events[op.date] || [];
+    const i = arr.findIndex(ev => ev.empId === op.empId && ev.type === op.type);
+    if (i >= 0) arr.splice(i, 1);
+    if (arr.length === 0) delete target.events[op.date];
+  }
+  await target.save();
+}
+
+async function removeOpFromDoc(uid, opId) {
+  const ref = escalaPropColl().doc(uid);
+  const snap = await ref.get();
+  if (!snap.exists) return;
+  const d = snap.data() || {};
+  d.ops = (d.ops || []).filter(o => o.id !== opId);
+  if (d.ops.length === 0) await ref.delete();
+  else await ref.set(d);
+}
+
+async function approveOp(uid, opId) {
+  if (!isAdmin) return;
+  const op = escalaProps.find(o => o.uid===uid && o.id===opId);
+  if (!op) return;
+  const sel = document.getElementById(`rev-type-${uid}-${opId}`);
+  pushUndo(`Aprovar ${op.action==='remove'?'remoção':'inclusão'} de ${empNameById(op.empId)} em ${fmtDate(op.date)}`);
+  await applyOpToEscala(op, sel ? sel.value : null);
+  await removeOpFromDoc(uid, opId);
+  await renderCalendar('escala');   // recarrega propostas e atualiza o aviso
+  openEscalaReview();
+}
+
+async function rejectOp(uid, opId) {
+  if (!isAdmin) return;
+  await removeOpFromDoc(uid, opId);
+  await renderCalendar('escala');
+  openEscalaReview();
+}
+
+async function approveAllOps() {
+  if (!isAdmin) return;
+  const ops = [...escalaProps];
+  for (const op of ops) {
+    const sel = document.getElementById(`rev-type-${op.uid}-${op.id}`);
+    await applyOpToEscala(op, sel ? sel.value : null);
+    await removeOpFromDoc(op.uid, op.id);
+  }
+  await renderCalendar('escala');
+  closeModal();
 }
 
 // =============================================
