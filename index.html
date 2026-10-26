@@ -749,12 +749,12 @@ window.addEventListener('unhandledrejection', function(e) {
   </div>
 
   <div class="navtabs" id="navtabs-container">
-    <button class="navtab active" id="tab-dashboard-btn" onclick="showTab('dashboard', this)">🏠 Painel</button>
+    <button class="navtab" id="tab-dashboard-btn" style="display:none;" onclick="showTab('dashboard', this)">🏠 Painel</button>
     <button class="navtab" id="tab-minha-area-btn" style="display:none;" onclick="showTab('minha-area', this)">👤 Minha Área</button>
-    <button class="navtab" id="tab-empresa-btn" onclick="showTab('empresa', this)">🏢 Empresa</button>
-    <button class="navtab" id="tab-pessoal-btn" onclick="showTab('pessoal', this)">👤 Pessoal</button>
+    <button class="navtab" id="tab-empresa-btn" style="display:none;" onclick="showTab('empresa', this)">🏢 Empresa</button>
+    <button class="navtab" id="tab-pessoal-btn" style="display:none;" onclick="showTab('pessoal', this)">👤 Pessoal</button>
     <button class="navtab" id="tab-funcionarios-btn" onclick="showTab('funcionarios', this)">👥 Funcionários</button>
-    <button class="navtab" id="tab-escala-btn" onclick="showTab('escala', this)">📅 Escala</button>
+    <button class="navtab active" id="tab-escala-btn" onclick="showTab('escala', this)">📅 Escala</button>
     <button class="navtab" id="tab-ferias-btn" onclick="showTab('ferias', this)">🌴 Férias</button>
   </div>
 
@@ -768,7 +768,7 @@ window.addEventListener('unhandledrejection', function(e) {
     </div>
 
     <!-- ===== DASHBOARD ===== -->
-    <div class="tab-pane active" id="tab-dashboard">
+    <div class="tab-pane" id="tab-dashboard">
       <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:4px;">
         <div>
           <div class="section-title">Painel Principal</div>
@@ -900,7 +900,7 @@ window.addEventListener('unhandledrejection', function(e) {
     </div>
 
     <!-- ===== ESCALA ===== -->
-    <div class="tab-pane" id="tab-escala">
+    <div class="tab-pane active" id="tab-escala">
       <div class="section-title">📅 Escala de Plantões</div>
       <div class="section-desc" id="escala-desc">Gerencie a escala de trabalho dos funcionários</div>
       <div class="legend">
@@ -1210,6 +1210,14 @@ function updateEmployeeTabLabels() {
 }
 
 function applyRoleVisibility() {
+  // ===== GESTÃO OCULTA =====
+  // As abas de gestão (Painel, Empresa, Pessoal) foram ocultadas a pedido.
+  // O código e os dados continuam intactos — nada foi apagado. Para reativar,
+  // basta remover este bloco e o bloco "abrir admin na Escala" no fim desta função.
+  ['tab-dashboard-btn','tab-empresa-btn','tab-pessoal-btn'].forEach(id => {
+    const el = document.getElementById(id); if (el) el.style.display = 'none';
+  });
+
   const hiddenForEmployee = ['tab-dashboard-btn','tab-empresa-btn','tab-pessoal-btn','tab-funcionarios-btn'];
   const minhaAreaBtn = document.getElementById('tab-minha-area-btn');
 
@@ -1235,6 +1243,14 @@ function applyRoleVisibility() {
       const el = document.getElementById(id); if (el) el.style.display = 'none';
     });
   }
+
+  // Abrir admin na Escala — o Painel era a aba inicial, mas foi ocultado.
+  document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.navtab').forEach(b => b.classList.remove('active'));
+  const escalaPane = document.getElementById('tab-escala');
+  const escalaBtn = document.getElementById('tab-escala-btn');
+  if (escalaPane) escalaPane.classList.add('active');
+  if (escalaBtn) escalaBtn.classList.add('active');
 }
 
 function flushPendingSaves() {
@@ -4932,6 +4948,7 @@ async function removeShiftEvent(dateStr, idx) {
 // TABS
 // =============================================
 function showTab(name, btn) {
+  if (['dashboard','empresa','pessoal'].includes(name)) return; // abas de gestão ocultas
   if (isEmployeeView() && !['minha-area','escala','ferias'].includes(name)) return;
   document.querySelectorAll('.tab-pane').forEach(p=>p.classList.remove('active'));
   document.querySelectorAll('.navtab').forEach(b=>b.classList.remove('active'));
