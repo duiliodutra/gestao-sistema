@@ -490,6 +490,7 @@
   .cal-event.hora-extra { background: #2563eb; color: white; font-weight: 600; }
   .cal-event.meio-plantao { background: #ea580c; color: white; font-weight: 600; }
   .cal-event.dobra { background: #7c3aed; color: white; font-weight: 600; }
+  .cal-event.folga { background: #0d9488; color: white; font-weight: 600; }
   .cal-event.ferias { background: #16a34a; color: white; font-weight: 600; }
 
   /* LEGEND */
@@ -909,6 +910,7 @@ window.addEventListener('unhandledrejection', function(e) {
         <div class="legend-item"><div class="legend-dot" style="background:#2563eb;"></div>Hora Extra</div>
         <div class="legend-item"><div class="legend-dot" style="background:#ea580c;"></div>Meio Plantão</div>
         <div class="legend-item"><div class="legend-dot" style="background:#7c3aed;"></div>Dobra</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#0d9488;"></div>Folga</div>
       </div>
       <div class="card">
         <div class="calendar-header">
@@ -4656,7 +4658,8 @@ const SHIFT_TYPES = [
   { value: 'nao-remunerado', label: 'Não Remunerado', cls: 'nao-remunerado', pay: 0 },
   { value: 'hora-extra', label: 'Hora Extra', cls: 'hora-extra', pay: 0 },
   { value: 'meio-plantao', label: 'Meio Plantão', cls: 'meio-plantao', pay: 100 },
-  { value: 'dobra', label: 'Dobra', cls: 'dobra', pay: 50 }
+  { value: 'dobra', label: 'Dobra', cls: 'dobra', pay: 50 },
+  { value: 'folga', label: 'Folga', cls: 'folga', pay: 0 }
 ];
 
 const EMP_COLORS = ['#1e40af','#065f46','#92400e','#5b21b6','#9f1239','#0c4a6e'];
